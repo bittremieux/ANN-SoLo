@@ -1,7 +1,10 @@
 import logging
 import os
-import pathlib
 import re
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
 
 from config import config
 
@@ -44,7 +47,7 @@ def write_mztab(identifications, filename):
     with open(filename, 'w') as f_out:
         # metadata section
         for m in metadata:
-            f_out.write('\t'.join(['MTD', *m]) + '\n')
+            f_out.write('\t'.join(['MTD'] + list(m)) + '\n')
 
         # PSMs
         f_out.write('\t'.join(['PSH', 'sequence', 'PSM_ID', 'accession', 'unique', 'database', 'database_version',

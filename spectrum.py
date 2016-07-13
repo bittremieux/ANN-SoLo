@@ -17,7 +17,7 @@ def get_dim(min_mz, max_mz, bin_size):
     Returns:
         The number of bins over the given mass range for the given bin size.
     """
-    return math.ceil((max_mz - min_mz + 1) // bin_size)
+    return int(math.ceil((max_mz - min_mz + 1) // bin_size))
 
 
 class Spectrum:

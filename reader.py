@@ -2,8 +2,12 @@ import abc
 import logging
 import mmap
 import os
+import six
 import struct
-from functools import lru_cache
+try:
+    from functools import lru_cache
+except ImportError:
+    from functools32 import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -51,7 +55,8 @@ def _parse_annotation(raw):
     return None
 
 
-class SpectralLibraryReader(metaclass=abc.ABCMeta):
+@six.add_metaclass(abc.ABCMeta)
+class SpectralLibraryReader(object):
     """
     Read spectra from a spectral library file.
 

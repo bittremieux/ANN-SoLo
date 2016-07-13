@@ -2,7 +2,7 @@ import abc
 import copy
 import logging
 import os
-import pickle
+import six
 import time
 from collections import defaultdict
 
@@ -18,7 +18,15 @@ import spectrum_match
 from config import config
 
 
-class SpectralLibrary(metaclass=abc.ABCMeta):
+# define FileNotFoundError for Python 2
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
+
+
+@six.add_metaclass(abc.ABCMeta)
+class SpectralLibrary(object):
     """
     Spectral library search engine.
 
@@ -133,7 +141,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         # store the information
         logging.debug('Saving the spectral library information')
         joblib.dump((self._offsets, self._precursor_masses, config.get_build_config()), self._base_filename + '.spcfg',
-                    compress=9, protocol=pickle.HIGHEST_PROTOCOL)
+                    compress=9, protocol=2)
 
         logging.info('Finished creating the spectral library information')
 
@@ -358,7 +366,7 @@ class SpectralLibraryAnn(SpectralLibrary):
         self._ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz,
                                                                                   config.bin_size)))
 
-        super().__init__(lib_filename)
+        super(self.__class__, self).__init__(lib_filename)
 
     def _load(self):
         """
@@ -376,7 +384,7 @@ class SpectralLibraryAnn(SpectralLibrary):
                         using non-compatible settings, or if some of the ANN indices are missing.
         """
         # retain the current settings which will be overwritten on loading
-        super()._load()
+        super(self.__class__, self)._load()
 
         # load the ANN index for each charge
         for charge in self._offsets.keys():
@@ -410,7 +418,7 @@ class SpectralLibraryAnn(SpectralLibrary):
             ann_index.unload()
         self._ann_indices.clear()
 
-        super()._reset()
+        super(self.__class__, self)._reset()
 
     def _create(self, num_trees=None):
         """
@@ -428,7 +436,7 @@ class SpectralLibraryAnn(SpectralLibrary):
         if num_trees is None:
             num_trees = config.num_trees
 
-        super()._create()
+        super(self.__class__, self)._create()
 
         # build the ANN indices
         logging.debug('Building the spectral library ANN indices')
