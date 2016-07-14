@@ -124,7 +124,8 @@ class SpectralLibrary(object):
             for library_spectrum, offset in tqdm.tqdm(lib_reader.get_all_spectra(),
                                                       desc='Library spectra read', unit='spectra'):
                 # store the spectrum information for easy retrieval, discard low-quality spectra
-                if library_spectrum.has_peaks():
+                library_spectrum.process_peaks()
+                if library_spectrum.is_processed_and_high_quality():
                     offsets[library_spectrum.precursor_charge].append(offset)
                     precursor_masses[library_spectrum.precursor_charge].append(library_spectrum.precursor_mz)
 
@@ -170,14 +171,13 @@ class SpectralLibrary(object):
         # read all spectra in the query file and split based on their precursor charge
         logging.info('Reading all query spectra')
         query_spectra = []
-        for query_spectrum, peaks, intensities in tqdm.tqdm(
-                reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra'):
+        for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra'):
             # for queries with an unknown charge, try all possible charge states
             for charge in [2, 3] if query_spectrum.precursor_charge is None else [query_spectrum.precursor_charge]:
                 query_spectrum_charge = copy.copy(query_spectrum)
                 query_spectrum_charge.precursor_charge = charge
-                query_spectrum_charge.set_peaks(peaks, intensities)
-                if query_spectrum_charge.has_peaks():      # discard low-quality spectra
+                query_spectrum_charge.process_peaks()
+                if query_spectrum_charge.is_processed_and_high_quality():      # discard low-quality spectra
                     query_spectra.append(query_spectrum_charge)
 
         # sort the spectra based on their precursor charge and precursor mass
@@ -215,7 +215,7 @@ class SpectralLibrary(object):
             A SpectrumMatch identification. If the query couldn't be identified SpectrumMatch.sequence will be None.
         """
         # discard low-quality spectra
-        if not query.has_peaks():
+        if not query.is_processed_and_high_quality():
             return spectrum.SpectrumMatch(query)
 
         start_total = start_candidates = time.time()
@@ -338,8 +338,8 @@ class SpectralLibraryBf(SpectralLibrary):
         # read the candidates
         candidates = []
         for offset in self._offsets[query.precursor_charge][mass_filter]:
-            candidate = lib_reader.get_single_spectrum(offset)
-            if candidate.has_peaks():
+            candidate = lib_reader.get_single_spectrum(offset, True)
+            if candidate.is_processed_and_high_quality():
                 candidates.append(candidate)
 
         return candidates
@@ -505,8 +505,8 @@ class SpectralLibraryAnn(SpectralLibrary):
         # read the candidates
         candidates = []
         for offset in self._offsets[query.precursor_charge][candidate_filter]:
-            candidate = lib_reader.get_single_spectrum(offset)
-            if candidate.has_peaks():
+            candidate = lib_reader.get_single_spectrum(offset, True)
+            if candidate.is_processed_and_high_quality():
                 candidates.append(candidate)
 
         return candidates

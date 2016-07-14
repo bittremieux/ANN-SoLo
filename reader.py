@@ -16,7 +16,8 @@ from pyteomics import mgf
 import spectrum
 
 
-def get_spectral_library_reader(base_filename):
+def get_spectral_library_reader(filename):
+    base_filename, _ = os.path.splitext(filename)
     splib_exists = os.path.isfile(base_filename + '.splib')
     sptxt_exists = os.path.isfile(base_filename + '.sptxt')
     if splib_exists:
@@ -93,18 +94,24 @@ class SpectralLibraryReader(object):
         pass
 
     @lru_cache(maxsize=_max_cache_size)
-    def get_single_spectrum(self, offset):
+    def get_single_spectrum(self, offset, process_peaks=False):
         """
         Read a single `Spectrum` at the specified offset in the spectral library file.
 
         Args:
             offset: The offset of the `Spectrum` in the spectral library file.
+            process_peaks: Flag whether to directly process the `Spectrum`'s peaks.
 
         Returns:
             The `Spectrum` in the spectral library file at the specified offset.
         """
         self._mm.seek(offset)
-        return self._read_spectrum()[0]
+
+        read_spectrum = self._read_spectrum()[0]
+        if process_peaks:
+            read_spectrum.process_peaks()
+
+        return read_spectrum
 
     def _read_spectrum(self):
         pass
@@ -276,9 +283,11 @@ def read_mgf(filename):
             precursor_charge = int(mgf_spectrum['params']['charge'][0])
         else:
             precursor_charge = None
-        read_spectrum = spectrum.Spectrum(identifier, precursor_mz, precursor_charge, retention_time)
 
-        yield read_spectrum, mgf_spectrum['m/z array'], mgf_spectrum['intensity array']
+        read_spectrum = spectrum.Spectrum(identifier, precursor_mz, precursor_charge, retention_time)
+        read_spectrum.set_peaks(mgf_spectrum['m/z array'], mgf_spectrum['intensity array'])
+
+        yield read_spectrum
 
 
 def read_mztab_psms(filename):

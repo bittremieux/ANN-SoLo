@@ -55,26 +55,37 @@ class Spectrum:
         self.masses = None
         self.intensities = None
         self.annotations = None
+        self._is_processed = False
 
-    def has_peaks(self):
+    def is_processed_and_high_quality(self):
         """
-        Verify if the Spectrum has associated peaks and is of high quality.
+        Verify if the Spectrum's peaks have been processed and are of high quality.
 
         Returns:
-            True if the Spectrum has peaks with specified masses and intensities, False if not.
+            True if the Spectrum's peaks have been processed, False if not.
         """
-        return self.masses is not None and self.intensities is not None
+        return self._is_processed
 
-    def set_peaks(self, masses, intensities, annotations=None, resolution=None, min_mz=None, max_mz=None,
-                  remove_precursor=None, remove_precursor_tolerance=None, min_peaks=None, max_peaks_used=None,
-                  min_intensity=None, min_dynamic_range=None, min_mz_range=None, scaling=None):
+    def set_peaks(self, masses, intensities, annotations=None):
         """
-        Check that the spectrum is of sufficient quality and process the peaks.
+        Assigns peaks to the spectrum. Note: no quality checking or processing of the spectrum is performed.
 
         Args:
             masses: The masses at which the peaks are detected.
             intensities: The intensities of the peaks at their corresponding masses.
             annotations: (Optionally) the annotations of the peaks at their corresponding masses.
+        """
+        self.masses = masses.astype(np.float32)
+        self.intensities = intensities.astype(np.float32)
+        self.annotations = annotations if annotations is not None else np.empty(len(masses), object)
+
+    def process_peaks(self, resolution=None, min_mz=None, max_mz=None,
+                      remove_precursor=None, remove_precursor_tolerance=None, min_peaks=None, max_peaks_used=None,
+                      min_intensity=None, min_dynamic_range=None, min_mz_range=None, scaling=None):
+        """
+        Check that the spectrum is of sufficient quality and process the peaks.
+
+        Args:
             resolution: Spectral library resolution; masses will be rounded to the given number of decimals.
             min_mz: Minimum m/z value (inclusive). Peaks at lower m/z values will be discarded.
             max_mz: Maximum m/z value (inclusive). Peaks at higher m/z values will be discarded.
@@ -111,8 +122,9 @@ class Spectrum:
         if scaling is None:
             scaling = config.scaling
 
-        if annotations is None:
-            annotations = np.empty(len(masses), object)
+        masses = self.masses
+        intensities = self.intensities
+        annotations = self.annotations
 
         # round masses based on the spectral library resolution
         if resolution is not None:
@@ -178,11 +190,12 @@ class Spectrum:
         else:
             scaled_intensities = filtered_intensities
         # normalize the intensities to get a unit vector
-        norm_intensities = scaled_intensities / np.linalg.norm(scaled_intensities)
+        norm_intensities = (scaled_intensities / np.linalg.norm(scaled_intensities)).astype(np.float32)
 
-        self.masses = filtered_masses.astype(np.float32)
-        self.intensities = norm_intensities.astype(np.float32)
+        self.masses = filtered_masses
+        self.intensities = norm_intensities
         self.annotations = filtered_annotations
+        self._is_processed = True
 
     def get_vector(self, min_mz=None, max_mz=None, bin_size=None):
         """
@@ -205,8 +218,8 @@ class Spectrum:
         if bin_size is None:
             bin_size = config.bin_size
 
-        if self.has_peaks():
-            peaks = np.zeros((get_dim(min_mz, max_mz, bin_size),), dtype=np.float64)     # Annoy requires float64
+        if self.is_processed_and_high_quality():
+            peaks = np.zeros((get_dim(min_mz, max_mz, bin_size),), dtype=np.float32)
             # add each mass and intensity to their low-dimensionality bin
             for mass, intensity in zip(self.masses, self.intensities):
                 mass_bin = int((mass - min_mz) // bin_size)
