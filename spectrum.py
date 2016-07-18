@@ -1,3 +1,4 @@
+from __future__ import division
 import math
 
 import numpy as np
@@ -57,12 +58,12 @@ class Spectrum:
         self.annotations = None
         self._is_processed = False
 
-    def is_processed_and_high_quality(self):
+    def is_valid(self):
         """
-        Verify if the Spectrum's peaks have been processed and are of high quality.
+        Verify if this is a valid and high-quality Spectrum.
 
         Returns:
-            True if the Spectrum's peaks have been processed, False if not.
+            True if the Spectrum's peaks have been processed and are of high quality, False if not.
         """
         return self._is_processed
 
@@ -218,7 +219,7 @@ class Spectrum:
         if bin_size is None:
             bin_size = config.bin_size
 
-        if self.is_processed_and_high_quality():
+        if self.is_valid():
             peaks = np.zeros((get_dim(min_mz, max_mz, bin_size),), dtype=np.float32)
             # add each mass and intensity to their low-dimensionality bin
             for mass, intensity in zip(self.masses, self.intensities):
@@ -236,7 +237,7 @@ class SpectrumMatch:
     def __init__(self, query_spectrum, library_spectrum=None, search_engine_score=0.0):
         # query information
         self.query_id = query_spectrum.identifier
-        self.retention_time = 0     # TODO
+        self.retention_time = query_spectrum.retention_time
         self.charge = query_spectrum.precursor_charge
         self.exp_mass_to_charge = query_spectrum.precursor_mz
 

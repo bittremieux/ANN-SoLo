@@ -1,4 +1,6 @@
+from __future__ import division
 import abc
+import collections
 import copy
 import logging
 import os
@@ -7,8 +9,6 @@ import time
 from collections import defaultdict
 
 import annoy
-import joblib
-import numexpr as ne
 import numpy as np
 import tqdm
 
@@ -35,126 +35,23 @@ class SpectralLibrary(object):
     spectrum to which is matches best.
     """
 
+    _config_match_keys = []
+
     def __init__(self, lib_filename):
         """
-        Initialize the spectral library from the given spectral library file.
+        Initialize the spectral library search engine from the given spectral library file.
 
         Args:
-            lib_filename: The spectral library file containing all library spectra.
+            lib_filename: The spectral library file name.
 
         Raises:
-            FileNotFoundError: The given spectral library file wasn't found.
+            FileNotFoundError: The given spectral library file wasn't found or isn't supported.
         """
-        self._base_filename, _ = os.path.splitext(lib_filename)
-
         try:
-            self._load()
+            self._library_reader = reader.get_spectral_library_reader(lib_filename, self._config_match_keys)
         except FileNotFoundError as e:
             logging.error(e)
             raise
-        except ValueError as e:
-            logging.warning(e)
-
-            self._reset()
-            self._create()
-
-    def _load(self):
-        """
-        Load existing information for the spectral library.
-
-        For each spectrum in the spectral library its offset in the spectral library file is retrieved for quick
-        random-access reading of the spectra. Further, the precursor mass for each spectrum is retrieved to be able to
-        filter on a precursor mass window. Finally, the settings used to construct the existing spectral library are
-        retrieved.
-
-        Raises:
-            FileNotFoundError: The given spectral library file wasn't found.
-            ValueError: No information file for the spectral library found.
-        """
-        logging.info('Loading the spectral library information')
-
-        # make sure all required files are present
-        if not os.path.isfile(self._base_filename + '.splib') and not os.path.isfile(self._base_filename + '.sptxt'):
-            raise FileNotFoundError('Missing spectral library file (required file format: splib or sptxt)')
-        if not os.path.isfile(self._base_filename + '.spcfg'):
-            raise ValueError('Missing spcfg file')  # this means we should just recreate the spectral library
-
-        # load the spectral library information
-        self._offsets, self._precursor_masses, load_config = joblib.load(self._base_filename + '.spcfg')
-
-        # check if the configuration is compatible to the loaded configuration
-        if not self._is_valid_config(load_config):
-            raise ValueError('The spectral library search engine was created using a non-compatible configuration')
-
-        logging.info('Finished loading the spectral library information')
-
-    @abc.abstractmethod
-    def _is_valid_config(self, load_config):
-        """
-        Check if the configuration used to previously build the spectral library search engine conforms to the current
-        configuration.
-
-        Args:
-            load_config: The configuration used to previously build the spectral library search engine.
-
-        Returns:
-            True if the configuration is valid, False if not.
-        """
-        pass
-
-    def _reset(self):
-        """Reset the spectral library."""
-        self._offsets = self._precursor_masses = None
-
-    def _create(self):
-        """
-        Create new information for the spectral library.
-
-        For each spectrum in the spectral library its offset in the spectral library file is stored to enable quick
-        random-access reading of the spectra. Further, the precursor mass for each spectrum is stored to be able to
-        filter on a precursor mass window. Finally, the settings used to construct the existing spectral library are
-        stored.
-        """
-        logging.info('Creating the spectral library information from file %s', self._base_filename)
-
-        # read all the spectra in the spectral library
-        offsets = defaultdict(list)
-        precursor_masses = defaultdict(list)
-        with reader.get_spectral_library_reader(self._base_filename) as lib_reader:
-            for library_spectrum, offset in tqdm.tqdm(lib_reader.get_all_spectra(),
-                                                      desc='Library spectra read', unit='spectra'):
-                # store the spectrum information for easy retrieval, discard low-quality spectra
-                library_spectrum.process_peaks()
-                if library_spectrum.is_processed_and_high_quality():
-                    offsets[library_spectrum.precursor_charge].append(offset)
-                    precursor_masses[library_spectrum.precursor_charge].append(library_spectrum.precursor_mz)
-
-                    self._add_library_spectrum(library_spectrum)
-
-        # convert the standard lists to NumPy arrays for better performance later on
-        self._offsets = {}
-        for charge, offset in offsets.items():
-            self._offsets[charge] = np.array(offset)
-        self._precursor_masses = {}
-        for charge, masses in precursor_masses.items():
-            self._precursor_masses[charge] = np.array(masses)
-
-        # store the information
-        logging.debug('Saving the spectral library information')
-        joblib.dump((self._offsets, self._precursor_masses, config.get_build_config()), self._base_filename + '.spcfg',
-                    compress=9, protocol=2)
-
-        logging.info('Finished creating the spectral library information')
-
-    @abc.abstractmethod
-    def _add_library_spectrum(self, library_spectrum):
-        """
-        Additional processing to add a library spectrum for spectral library searching.
-
-        Args:
-            library_spectrum: The Spectrum to add.
-        """
-        pass
 
     def search(self, query_filename):
         """
@@ -174,10 +71,10 @@ class SpectralLibrary(object):
         for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra'):
             # for queries with an unknown charge, try all possible charge states
             for charge in [2, 3] if query_spectrum.precursor_charge is None else [query_spectrum.precursor_charge]:
-                query_spectrum_charge = copy.copy(query_spectrum)
+                query_spectrum_charge = copy.copy(query_spectrum)   # TODO: don't needlessly copy
                 query_spectrum_charge.precursor_charge = charge
                 query_spectrum_charge.process_peaks()
-                if query_spectrum_charge.is_processed_and_high_quality():      # discard low-quality spectra
+                if query_spectrum_charge.is_valid():      # discard low-quality spectra
                     query_spectra.append(query_spectrum_charge)
 
         # sort the spectra based on their precursor charge and precursor mass
@@ -186,42 +83,39 @@ class SpectralLibrary(object):
         # identify all spectra
         logging.info('Identifying all query spectra')
         query_matches = {}
-        with reader.get_spectral_library_reader(self._base_filename) as lib_reader:
-            for query_spectrum in tqdm.tqdm(
-                    query_spectra, desc='Query spectra identified', unit='spectra', smoothing=0):
-                query_match = self._find_match(query_spectrum, lib_reader)
+        for query_spectrum in tqdm.tqdm(query_spectra, desc='Query spectra identified', unit='spectra', smoothing=0):
+            query_match = self._find_match(query_spectrum)
 
-                # discard spectra that couldn't be identified
-                if query_match.sequence is not None:
-                    # make sure we only retain the best identification
-                    # (i.e. for duplicated spectra if the precursor charge was unknown)
-                    if query_match.query_id not in query_matches or\
-                       query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
-                        query_matches[query_match.query_id] = query_match
+            # discard spectra that couldn't be identified
+            if query_match.sequence is not None:
+                # make sure we only retain the best identification
+                # (i.e. for duplicated spectra if the precursor charge was unknown)
+                if query_match.query_id not in query_matches or\
+                   query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
+                    query_matches[query_match.query_id] = query_match
 
         logging.info('Finished identifying file %s', query_filename)
 
         return query_matches.values()
 
-    def _find_match(self, query, lib_reader):
+    def _find_match(self, query):
         """
         Identifies the given query Spectrum.
 
         Args:
             query: The query Spectrum to be identified.
-            lib_reader: The spectral library reader to read spectra.
 
         Returns:
             A SpectrumMatch identification. If the query couldn't be identified SpectrumMatch.sequence will be None.
         """
         # discard low-quality spectra
-        if not query.is_processed_and_high_quality():
+        if not query.is_valid():
             return spectrum.SpectrumMatch(query)
 
         start_total = start_candidates = time.time()
 
-        # find all candidate library spectra for which a match as to be computed
-        candidates = self._filter_library_candidates(query, lib_reader)
+        # find all candidate library spectra for which a match has to be computed
+        candidates = self._filter_library_candidates(query)
 
         stop_candidates = start_match = time.time()
 
@@ -243,13 +137,12 @@ class SpectralLibrary(object):
         return identification
 
     @abc.abstractmethod
-    def _filter_library_candidates(self, query, lib_reader, tol_mass=None, tol_mode=None):
+    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None):
         """
         Find all candidate matches for the given query in the spectral library.
 
         Args:
             query: The query Spectrum for which candidate Spectra are retrieved from the spectral library.
-            lib_reader: The spectral library reader to read spectra.
             tol_mass: The size of the precursor mass window.
             tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
 
@@ -260,7 +153,7 @@ class SpectralLibrary(object):
 
     def _get_mass_filter_idx(self, mass, charge, tol_mass, tol_mode):
         """
-        Get the indices of all candidate matches that fall within the given window around the specified mass.
+        Get the identifiers of all candidate matches that fall within the given window around the specified mass.
 
         Args:
             mass: The mass around which the window to identify the candidates is centered.
@@ -269,19 +162,22 @@ class SpectralLibrary(object):
             tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
 
         Returns:
-            A dict with as key each of the allowed charges and for each charge the indices of the candidate matches
-            within the mass window.
+            A list containing the identifiers of the candidate matches that fall within the given mass window.
         """
-        # check which mass differences fall within the precursor mass window
-        lib_masses = self._precursor_masses[charge]
-        if tol_mode == 'Da':
-            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) * charge') <= tol_mass)[0]
-        elif tol_mode == 'ppm':
-            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) / lib_masses * 10**6') <= tol_mass)[0]
-        else:
-            mass_filter = np.arange(len(lib_masses))
+        spec_info = self._library_reader.spec_info
 
-        return mass_filter
+        # check which candidates fall within the precursor mass window
+        if tol_mode == 'Da':
+            mass_min, mass_max = mass - tol_mass / charge, mass + tol_mass / charge
+        elif tol_mode == 'ppm':
+            mass_min, mass_max = mass * (1 - tol_mass / 10**6), mass * (1 + tol_mass / 10**6)
+        else:
+            mass_min, mass_max = spec_info['precursor_mz'].min(), spec_info['precursor_mz'].max()
+
+        candidate_idx = spec_info.loc[(spec_info['precursor_charge'] == charge) &
+                                      (spec_info['precursor_mz'].between(mass_min, mass_max))].index.values
+
+        return candidate_idx
 
 
 class SpectralLibraryBf(SpectralLibrary):
@@ -292,26 +188,7 @@ class SpectralLibraryBf(SpectralLibrary):
     within the precursor mass window are considered as candidate matches when identifying a query spectrum.
     """
 
-    def _is_valid_config(self, load_config):
-        """
-        Check if the configuration used to previously build the spectral library search engine conforms to the current
-        configuration.
-
-        For the brute-force approach, no specific configuration is used to build the search engine, so just always
-        return True.
-
-        Args:
-            load_config: The configuration used to previously build the spectral library search engine.
-
-        Returns:
-            True.
-        """
-        return True
-
-    def _add_library_spectrum(self, library_spectrum):
-        pass
-
-    def _filter_library_candidates(self, query, lib_reader, tol_mass=None, tol_mode=None):
+    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None):
         """
         Find all candidate matches for the given query in the spectral library.
 
@@ -320,7 +197,6 @@ class SpectralLibraryBf(SpectralLibrary):
 
         Args:
             query: The query Spectrum for which candidate Spectra are retrieved from the spectral library.
-            lib_reader: The spectral library reader to read spectra.
             tol_mass: The size of the precursor mass window.
             tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
 
@@ -333,14 +209,16 @@ class SpectralLibraryBf(SpectralLibrary):
             tol_mode = config.precursor_tolerance_mode
 
         # filter the candidates on the precursor mass window
-        mass_filter = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
+        candidate_idx = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
         # read the candidates
+
         candidates = []
-        for offset in self._offsets[query.precursor_charge][mass_filter]:
-            candidate = lib_reader.get_single_spectrum(offset, True)
-            if candidate.is_processed_and_high_quality():
-                candidates.append(candidate)
+        with self._library_reader as lib_reader:
+            for idx in candidate_idx:
+                candidate = lib_reader.get_spectrum(idx, True)
+                if candidate.is_valid():
+                    candidates.append(candidate)
 
         return candidates
 
@@ -353,109 +231,72 @@ class SpectralLibraryAnn(SpectralLibrary):
     spectra to a query spectrum as potential matches during identification.
     """
 
+    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'num_trees']
+
     def __init__(self, lib_filename):
         """
         Initialize the spectral library from the given spectral library file.
 
+        Further, the ANN indices are loaded from the associated index files. If these are missing, new index files are
+        built and stored for all charge states separately.
+
         Args:
-            lib_filename: The spectral library file containing all library spectra.
+            lib_filename: The spectral library file name.
 
         Raises:
-            FileNotFoundError: The given spectral library file wasn't found.
+            FileNotFoundError: The given spectral library file wasn't found or isn't supported.
         """
-        self._ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz,
-                                                                                  config.bin_size)))
-
+        # get the spectral library reader in the super-class initialization
         super(self.__class__, self).__init__(lib_filename)
 
-    def _load(self):
-        """
-        Load existing information for the spectral library.
+        # load the ANN index if it exists, or create a new one
+        self._ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)))
 
-        For each spectrum in the spectral library its offset in the spectral library file is retrieved for quick
-        random-access reading of the spectra. Further, the precursor mass for each spectrum is retrieved to be able to
-        filter on a precursor mass window. Finally, the settings used to construct the existing spectral library are
-        retrieved.
-        Furthermore, the ANN indices for all charges are loaded.
-
-        Raises:
-            FileNotFoundError: The given spectral library file wasn't found.
-            ValueError: If no information file for the spectral library found, if the ANN index was previously created
-                        using non-compatible settings, or if some of the ANN indices are missing.
-        """
-        # retain the current settings which will be overwritten on loading
-        super(self.__class__, self)._load()
+        do_create = False
 
         # load the ANN index for each charge
-        for charge in self._offsets.keys():
-            if not os.path.isfile('{}_{}.idxann'.format(self._base_filename, charge)):
-                raise ValueError('Missing idxann file for charge {}'.format(charge))
+        base_filename, _ = os.path.splitext(lib_filename)
+        for charge in sorted(self._library_reader.spec_info['precursor_charge'].unique()):
+            if not os.path.isfile('{}_{}.idxann'.format(base_filename, charge)):
+                do_create = True
+                logging.warning('Missing idxann file for charge {}'.format(charge))
             else:
-                self._ann_indices[charge] = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz,
-                                                                              config.bin_size))
-                self._ann_indices[charge].load('{}_{}.idxann'.format(self._base_filename, charge))
+                self._ann_indices[charge] = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+                self._ann_indices[charge].load('{}_{}.idxann'.format(base_filename, charge))
 
-    def _is_valid_config(self, load_config):
-        """
-        Check if the configuration used to previously build the spectral library search engine conforms to the current
-        configuration.
+        # create the ANN index if required
+        if do_create:
+            # make sure that no old data remains
+            for ann_index in self._ann_indices.values():
+                ann_index.unload()
+            self._ann_indices.clear()
 
-        Args:
-            load_config: The configuration used to previously build the spectral library search engine.
+            # add all spectra to the ANN indices
+            logging.debug('Adding the spectra to the spectral library ANN indices')
+            charge_counts = collections.defaultdict(int)
+            with self._library_reader as lib_reader:
+                for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
+                    lib_spectrum.process_peaks()
+                    if lib_spectrum.is_valid():
+                        self._ann_indices[lib_spectrum.precursor_charge].add_item(
+                            charge_counts[lib_spectrum.precursor_charge], lib_spectrum.get_vector())
+                        charge_counts[lib_spectrum.precursor_charge] += 1
 
-        Returns:
-            True if the configuration is valid, False if not.
-        """
-        return load_config == config.get_build_config()
+            # build the ANN indices
+            logging.debug('Building the spectral library ANN indices')
 
-    def _reset(self):
-        """
-        Reset the spectral library.
-
-        All ANN indices are released.
-        """
-        for ann_index in self._ann_indices.values():
-            ann_index.unload()
-        self._ann_indices.clear()
-
-        super(self.__class__, self)._reset()
-
-    def _create(self, num_trees=None):
-        """
-        Create new information for the spectral library.
-
-        For each spectrum in the spectral library its offset in the spectral library file is stored to enable quick
-        random-access reading of the spectra. Further, the precursor mass for each spectrum is stored to be able to
-        filter on a precursor mass window. Finally, the settings used to construct the existing spectral library are
-        stored.
-        Furthermore, ANN indices are built and stored for all charge states separately.
-
-        Args:
-            num_trees: The number of individual trees to build.
-        """
-        if num_trees is None:
             num_trees = config.num_trees
+            for ann_index in self._ann_indices.values():
+                ann_index.build(num_trees)
 
-        super(self.__class__, self)._create()
+            # store the ANN indices
+            logging.debug('Saving the spectral library ANN indices')
+            for charge, ann_index in self._ann_indices.items():
+                ann_index.save('{}_{}.idxann'.format(base_filename, charge))
 
-        # build the ANN indices
-        logging.debug('Building the spectral library ANN indices')
-        for ann_index in self._ann_indices.values():
-            ann_index.build(num_trees)
+            logging.info('Finished creating the spectral library ANN indices')
 
-        # store the ANN indices
-        logging.debug('Saving the spectral library ANN indices')
-        for charge, ann_index in self._ann_indices.items():
-            ann_index.save('{}_{}.idxann'.format(self._base_filename, charge))
-
-        logging.info('Finished creating the spectral library ANN indices')
-
-    def _add_library_spectrum(self, library_spectrum):
-        self._ann_indices[library_spectrum.precursor_charge].add_item(
-            self._ann_indices[library_spectrum.precursor_charge].get_n_items(), library_spectrum.get_vector())
-
-    def _filter_library_candidates(self, query, lib_reader, tol_mass=None, tol_mode=None,
-                                   num_candidates=None, k=None, ann_cutoff=None):
+    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None, num_candidates=None, k=None, ann_cutoff=None):
         """
         Find all candidate matches for the given query in the spectral library.
 
@@ -465,7 +306,6 @@ class SpectralLibraryAnn(SpectralLibrary):
 
         Args:
             query: The query Spectrum for which candidate Spectra are retrieved from the spectral library.
-            lib_reader: The spectral library reader to read spectra.
             tol_mass: The size of the precursor mass window.
             tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
             num_candidates: The number of candidates to retrieve from the ANN index.
@@ -492,21 +332,24 @@ class SpectralLibraryAnn(SpectralLibrary):
         # if there are too many candidates, refine using the ANN index
         if len(mass_filter) > ann_cutoff:
             # retrieve the most similar candidates from the ANN index
-            ann_filter = np.zeros(num_candidates, np.uint32)
-            for i, candidate_i in enumerate(self._ann_indices[query.precursor_charge].get_nns_by_vector(
-                    query.get_vector(), num_candidates, k)):
-                ann_filter[i] = candidate_i
+            ann_charge_ids = np.asarray(self._ann_indices[query.precursor_charge].get_nns_by_vector(
+                query.get_vector(), num_candidates, k))
+            # convert the numbered index for this specific charge to global identifiers
+            ann_filter = self._library_reader.spec_info.loc[
+                (self._library_reader.spec_info['precursor_charge'] == query.precursor_charge) &
+                (self._library_reader.spec_info['charge_id'].isin(ann_charge_ids))].index.values
 
             # select the candidates passing both the ANN filter and precursor mass filter
-            candidate_filter = np.intersect1d(ann_filter, mass_filter, True)
+            candidate_idx = np.intersect1d(ann_filter, mass_filter, True)
         else:
-            candidate_filter = mass_filter
+            candidate_idx = mass_filter
 
         # read the candidates
         candidates = []
-        for offset in self._offsets[query.precursor_charge][candidate_filter]:
-            candidate = lib_reader.get_single_spectrum(offset, True)
-            if candidate.is_processed_and_high_quality():
-                candidates.append(candidate)
+        with self._library_reader as lib_reader:
+            for idx in candidate_idx:
+                candidate = lib_reader.get_spectrum(idx, True)
+                if candidate.is_valid():
+                    candidates.append(candidate)
 
         return candidates

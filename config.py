@@ -131,18 +131,5 @@ class Config:
     def __getitem__(self, item):
         return self.__getattr__(item)
 
-    def get_build_config(self):
-        """
-        Return the configuration settings that have an influence on the construction of the spectral library search
-        engine.
-
-        For the SpectralLibraryAnn this is the dimension of the vectors and the number of trees.
-
-        Returns:
-            A tuple of min_mz, max_mz, bin_size (all three used to determine the dimension of the vectors), and
-            num_trees.
-        """
-        return self.min_mz, self.max_mz, self.bin_size, self.num_trees
-
 
 config = Config()
