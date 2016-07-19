@@ -168,9 +168,9 @@ class SpectralLibrary(object):
         # check which mass differences fall within the precursor mass window
         lib_masses = self._library_reader.spec_info[charge]['precursor_mass']
         if tol_mode == 'Da':
-            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) * charge') <= tol_mass)[0]
+            mass_filter = ne.evaluate('abs(mass - lib_masses) * charge <= tol_mass')
         elif tol_mode == 'ppm':
-            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) / lib_masses * 10**6') <= tol_mass)[0]
+            mass_filter = ne.evaluate('abs(mass - lib_masses) / lib_masses * 10**6 <= tol_mass')
         else:
             mass_filter = np.arange(len(lib_masses))
 
