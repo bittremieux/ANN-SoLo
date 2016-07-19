@@ -219,28 +219,19 @@ class SpectraSTReader(SpectralLibraryReader):
         logging.info('Creating the spectral library configuration for file %s', self._filename)
 
         # read all the spectra in the spectral library
-        ids = []
-        precursor_charges = []
-        precursor_masses = []
-        offsets = []
-        charge_counts = collections.defaultdict(int)
-        charge_ids = []
+        temp_info = collections.defaultdict(lambda: {'id': [], 'precursor_mass': []})
+        offsets = {}
         with self as lib_reader:
             for spec, offset in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra read', unit='spectra'):
                 # store the spectrum information for easy retrieval
-                ids.append(spec.identifier)
-                precursor_charges.append(spec.precursor_charge)
-                precursor_masses.append(spec.precursor_mz)
-                offsets.append(offset)
-                charge_ids.append(charge_counts[spec.precursor_charge])
-                charge_counts[spec.precursor_charge] += 1
-
-        # convert to a tabular DataFrame for easy retrieval
-        self.spec_info = pd.DataFrame({'precursor_charge': np.asarray(precursor_charges, np.uint8),
-                                       'precursor_mz': np.asarray(precursor_masses, np.float32),
-                                       'charge_id': np.asarray(charge_ids, np.uint32),
-                                       'offset': np.asarray(offsets, np.uint64)},
-                                      np.asarray(ids, np.uint32))
+                info_charge = temp_info[spec.precursor_charge]
+                info_charge['id'].append(spec.identifier)
+                info_charge['precursor_mass'].append(spec.precursor_mz)
+                offsets[spec.identifier] = offset
+        self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
+                                   'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
+                          for charge, charge_info in six.iteritems(temp_info)}
+        self.spec_info['offset'] = offsets
 
         # store the configuration
         config_filename = self._filename + '.spcfg'
@@ -261,7 +252,7 @@ class SpectraSTReader(SpectralLibraryReader):
         Returns:
             The `Spectrum` from the spectral library file with the specified identifier.
         """
-        self._mm.seek(self.spec_info.at[spec_id, 'offset'])
+        self._mm.seek(self.spec_info['offset'][spec_id])
 
         read_spectrum = self._read_spectrum()[0]
         if process_peaks:
@@ -434,16 +425,14 @@ class SqliteSpecReader(SpectralLibraryReader):
         ids, precursor_charges, precursor_masses = zip(*cursor.fetchall())
         conn.close()
 
-        charge_counts = collections.defaultdict(int)
-        charge_ids = []
-        for charge in precursor_charges:
-            charge_ids.append(charge_counts[charge])
-            charge_counts[charge] += 1
-
-        self.spec_info = pd.DataFrame({'precursor_charge': np.asarray(precursor_charges, np.uint8),
-                                       'precursor_mz': np.asarray(precursor_masses, np.float32),
-                                       'charge_id': np.asarray(charge_ids, np.uint32)},
-                                      np.asarray(ids, np.uint32))
+        temp_info = collections.defaultdict(lambda: {'id': [], 'precursor_mass': []})
+        for i, charge, mass in zip(ids, precursor_charges, precursor_masses):
+            info_charge = temp_info[charge]
+            info_charge['id'].append(i)
+            info_charge['precursor_mass'].append(mass)
+        self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
+                                   'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
+                          for charge, charge_info in six.iteritems(temp_info)}
 
         # store the configuration
         config_filename = self._filename + '.spcfg'

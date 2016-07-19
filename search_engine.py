@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 
 import annoy
+import numexpr as ne
 import numpy as np
 import tqdm
 
@@ -164,20 +165,16 @@ class SpectralLibrary(object):
         Returns:
             A list containing the identifiers of the candidate matches that fall within the given mass window.
         """
-        spec_info = self._library_reader.spec_info
-
-        # check which candidates fall within the precursor mass window
+        # check which mass differences fall within the precursor mass window
+        lib_masses = self._library_reader.spec_info[charge]['precursor_mass']
         if tol_mode == 'Da':
-            mass_min, mass_max = mass - tol_mass / charge, mass + tol_mass / charge
+            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) * charge') <= tol_mass)[0]
         elif tol_mode == 'ppm':
-            mass_min, mass_max = mass * (1 - tol_mass / 10**6), mass * (1 + tol_mass / 10**6)
+            mass_filter = np.where(ne.evaluate('abs(mass - lib_masses) / lib_masses * 10**6') <= tol_mass)[0]
         else:
-            mass_min, mass_max = spec_info['precursor_mz'].min(), spec_info['precursor_mz'].max()
+            mass_filter = np.arange(len(lib_masses))
 
-        candidate_idx = spec_info.loc[(spec_info['precursor_charge'] == charge) &
-                                      (spec_info['precursor_mz'].between(mass_min, mass_max))].index.values
-
-        return candidate_idx
+        return self._library_reader.spec_info[charge]['id'][mass_filter]
 
 
 class SpectralLibraryBf(SpectralLibrary):
@@ -256,7 +253,7 @@ class SpectralLibraryAnn(SpectralLibrary):
 
         # load the ANN index for each charge
         base_filename, _ = os.path.splitext(lib_filename)
-        for charge in sorted(self._library_reader.spec_info['precursor_charge'].unique()):
+        for charge in self._library_reader.spec_info:
             if not os.path.isfile('{}_{}.idxann'.format(base_filename, charge)):
                 do_create = True
                 logging.warning('Missing idxann file for charge {}'.format(charge))
@@ -291,7 +288,7 @@ class SpectralLibraryAnn(SpectralLibrary):
 
             # store the ANN indices
             logging.debug('Saving the spectral library ANN indices')
-            for charge, ann_index in self._ann_indices.items():
+            for charge, ann_index in six.iteritems(self._ann_indices):
                 ann_index.save('{}_{}.idxann'.format(base_filename, charge))
 
             logging.info('Finished creating the spectral library ANN indices')
@@ -335,9 +332,7 @@ class SpectralLibraryAnn(SpectralLibrary):
             ann_charge_ids = np.asarray(self._ann_indices[query.precursor_charge].get_nns_by_vector(
                 query.get_vector(), num_candidates, k))
             # convert the numbered index for this specific charge to global identifiers
-            ann_filter = self._library_reader.spec_info.loc[
-                (self._library_reader.spec_info['precursor_charge'] == query.precursor_charge) &
-                (self._library_reader.spec_info['charge_id'].isin(ann_charge_ids))].index.values
+            ann_filter = self._library_reader.spec_info[query.precursor_charge]['id'][ann_charge_ids]
 
             # select the candidates passing both the ANN filter and precursor mass filter
             candidate_idx = np.intersect1d(ann_filter, mass_filter, True)
