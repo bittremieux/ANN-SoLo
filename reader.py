@@ -405,6 +405,11 @@ class SqliteSpecReader(SpectralLibraryReader):
 
     def __enter__(self):
         self._conn = sqlite3.connect(self._filename, detect_types=sqlite3.PARSE_DECLTYPES)
+
+        cursor = self._conn.cursor()
+        cursor.execute('PRAGMA locking_mode = EXCLUSIVE')
+        self._conn.commit()
+
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
