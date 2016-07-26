@@ -255,8 +255,9 @@ class SpectralLibraryAnn(SpectralLibrary):
         base_filename, _ = os.path.splitext(lib_filename)
         for charge in self._library_reader.spec_info:
             if not os.path.isfile('{}_{}.idxann'.format(base_filename, charge)):
-                do_create = True
-                logging.warning('Missing idxann file for charge {}'.format(charge))
+                if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
+                    do_create = True
+                    logging.warning('Missing ANN index file for charge {}'.format(charge))
             else:
                 self._ann_indices[charge] = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
                 self._ann_indices[charge].load('{}_{}.idxann'.format(base_filename, charge))
@@ -270,21 +271,27 @@ class SpectralLibraryAnn(SpectralLibrary):
 
             # add all spectra to the ANN indices
             logging.debug('Adding the spectra to the spectral library ANN indices')
+            ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)))
             charge_counts = collections.defaultdict(int)
             with self._library_reader as lib_reader:
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
                     lib_spectrum.process_peaks()
                     if lib_spectrum.is_valid():
-                        self._ann_indices[lib_spectrum.precursor_charge].add_item(
+                        ann_indices[lib_spectrum.precursor_charge].add_item(
                             charge_counts[lib_spectrum.precursor_charge], lib_spectrum.get_vector())
                         charge_counts[lib_spectrum.precursor_charge] += 1
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
 
+            # build only the ANN indices that contain sufficient points
             num_trees = config.num_trees
-            for ann_index in self._ann_indices.values():
-                ann_index.build(num_trees)
+            for charge, ann_index in six.iteritems(ann_indices):
+                if ann_index.get_n_items() > config.ann_cutoff:
+                    ann_index.build(num_trees)
+                    self._ann_indices[charge] = ann_index
+                else:
+                    logging.debug('No ANN index built for charge {} because it only contains {} spectra'.format(charge, ann_index.get_n_items()))
 
             # store the ANN indices
             logging.debug('Saving the spectral library ANN indices')
@@ -327,7 +334,7 @@ class SpectralLibraryAnn(SpectralLibrary):
         mass_filter = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
         # if there are too many candidates, refine using the ANN index
-        if len(mass_filter) > ann_cutoff:
+        if len(mass_filter) > ann_cutoff and query.precursor_charge in self._ann_indices:
             # retrieve the most similar candidates from the ANN index
             ann_charge_ids = np.asarray(self._ann_indices[query.precursor_charge].get_nns_by_vector(
                 query.get_vector(), num_candidates, k))
