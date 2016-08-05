@@ -17,7 +17,7 @@ class Config:
                                                 default_config_files=['./config.ini'])
 
         # IO
-        self._parser.add_argument('spectral_library_filename', help='sptxt spectral library')
+        self._parser.add_argument('spectral_library_filename', help='spectral library file')
         self._parser.add_argument('query_filename', help='mgf file to identify')
         self._parser.add_argument('out_filename',
                                   help='the name of the mzTab output file containing the identifications')
