@@ -36,7 +36,7 @@ if __name__ == '__main__':
                    'majorVersion INTEGER, minorVersion INTEGER)')
     cursor.execute('CREATE TABLE RefSpectra (id INTEGER primary key autoincrement not null, peptideSeq VARCHAR(150), '
                    'precursorMZ REAL, precursorCharge INTEGER, numPeaks INTEGER, isDecoy BOOLEAN)')
-    cursor.execute('CREATE TABLE RefSpectraPeaks(RefSpectraID INTEGER, peakMZ array, peakIntensity array)')
+    cursor.execute('CREATE TABLE RefSpectraPeaks(RefSpectraID INTEGER, peakMZ array, peakIntensity array, peakAnnotation array)')
     # create the database indices
     cursor.execute('CREATE INDEX idxPeptide ON RefSpectra (peptideSeq, precursorCharge)')
     cursor.execute('CREATE INDEX idxRefIdPeaks ON RefSpectraPeaks (RefSpectraID)')
@@ -49,8 +49,8 @@ if __name__ == '__main__':
             cursor.execute('INSERT INTO RefSpectra VALUES (?, ?, ?, ?, ?, ?)',
                            (spectrum.identifier, spectrum.peptide, spectrum.precursor_mz, spectrum.precursor_charge,
                             len(spectrum.masses), 1 if spectrum.is_decoy else 0))
-            cursor.execute('INSERT INTO RefSpectraPeaks VALUES (?, ?, ?)',
-                           (spectrum.identifier, spectrum.masses, spectrum.intensities))
+            cursor.execute('INSERT INTO RefSpectraPeaks VALUES (?, ?, ?, ?)',
+                           (spectrum.identifier, spectrum.masses, spectrum.intensities, spectrum.annotations))
 
     # add the global information
     cursor.execute('INSERT INTO LibInfo VALUES (?, ?, ?, ?, ?)',

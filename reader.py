@@ -72,7 +72,7 @@ def verify_extension(supported_extensions, filename):
 
 
 _annotation_ion_types = frozenset(b'abcxyz')
-_ignore_annotations = True
+_ignore_annotations = False
 
 
 def _parse_annotation(raw):
@@ -484,13 +484,13 @@ class SqliteSpecReader(SpectralLibraryReader):
         cursor = self._conn.cursor()
 
         # retrieve the specified spectrum
-        cursor.execute('SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity '
+        cursor.execute('SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity, peakAnnotation '
                        'FROM RefSpectra, RefSpectraPeaks '
                        'WHERE RefSpectra.id == ? AND RefSpectra.id == RefSpectraPeaks.RefSpectraID', (int(spec_id),))
-        peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities = cursor.fetchone()
+        peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities, annotations = cursor.fetchone()
 
         read_spectrum = spectrum.Spectrum(spec_id, precursor_mz, precursor_charge, None, peptide, is_decoy == 1)
-        read_spectrum.set_peaks(masses, intensities)
+        read_spectrum.set_peaks(masses, intensities, annotations)
 
         if process_peaks:
             read_spectrum.process_peaks()
