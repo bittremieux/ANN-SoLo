@@ -55,7 +55,7 @@ if __name__ == '__main__':
     # add the global information
     cursor.execute('INSERT INTO LibInfo VALUES (?, ?, ?, ?, ?)',
                    ('urn:lsid:inspector:ann_solo:{}'.format(os.path.basename(spql_filename)),
-                    datetime.datetime.strftime(datetime.datetime.utcnow(), '%Y-%m-%d %H:%M:%S%z'),
+                    datetime.datetime.strftime(datetime.datetime.utcnow(), '%Y-%m-%d %H:%M:%S'),
                     num_specs, major_version, minor_version))
 
     conn.commit()

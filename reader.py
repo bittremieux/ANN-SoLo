@@ -1,5 +1,6 @@
 import abc
 import collections
+import datetime
 import io
 import logging
 import mmap
@@ -260,6 +261,9 @@ class SpectraSTReader(SpectralLibraryReader):
 
         return read_spectrum
 
+    def get_version(self):
+        return None
+
 
 class SptxtReader(SpectraSTReader):
     """
@@ -496,6 +500,13 @@ class SqliteSpecReader(SpectralLibraryReader):
             read_spectrum.process_peaks()
 
         return read_spectrum
+
+    def get_version(self):
+        cursor = self._conn.cursor()
+        cursor.execute('SELECT createTime, numSpecs FROM LibInfo')
+        create_time, num_specs = cursor.fetchone()
+
+        return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'), num_specs
 
 
 def read_mgf(filename):

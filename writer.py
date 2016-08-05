@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import re
@@ -6,6 +7,7 @@ try:
 except ImportError:
     import pathlib2 as pathlib
 
+import reader
 from config import config
 
 
@@ -27,7 +29,7 @@ def write_mztab(identifications, filename):
         ('mzTab-type', 'Identification'),
         ('description', 'Identification results of file "{}" against spectral library file "{}"'.format(
             config.query_filename, config.spectral_library_filename)),
-        ('software[1]', '[MS, MS:1001456, ANN spectral library, 0.1]'),
+        ('software[1]', '[MS, MS:1001456, ANN SoLo, 0.0.dev]'),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine specific score for PSMs,]'),
         ('ms_run[1]-location', pathlib.Path(os.path.abspath(config.query_filename)).as_uri()),
         ('fixed_mod[1]', '[MS, MS:1002453, No fixed modifications searched,]'),
@@ -44,6 +46,11 @@ def write_mztab(identifications, filename):
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i), '{} = {}'.format(key, config[key])))
 
+    with reader.get_spectral_library_reader(os.path.abspath(config.spectral_library_filename)) as lib_reader:
+        version = lib_reader.get_version()
+        database_version = '{} ({} entries)'.format(datetime.datetime.strftime(version[0], '%Y-%m-%d'), version[1])\
+                           if version is not None else 'null'
+
     with open(filename, 'w') as f_out:
         # metadata section
         for m in metadata:
@@ -53,12 +60,14 @@ def write_mztab(identifications, filename):
         f_out.write('\t'.join(['PSH', 'sequence', 'PSM_ID', 'accession', 'unique', 'database', 'database_version',
                                'search_engine', 'search_engine_score[1]', 'modifications', 'retention_time', 'charge',
                                'exp_mass_to_charge', 'calc_mass_to_charge', 'spectra_ref', 'pre', 'post', 'start',
-                               'end', 'is_decoy', 'num_candidates', 'time_total', 'time_candidates', 'time_match']) +
-                    '\n')
+                               'end', 'opt_is_decoy', 'opt_num_candidates', 'opt_time_total', 'opt_time_candidates',
+                               'opt_time_match']) + '\n')
         # PSMs sorted by their query id
         for identification in sorted(identifications, key=lambda i: natural_sort_key(i.query_id)):
-            f_out.write('\t'.join(['PSM', identification.sequence, str(identification.query_id), 'null', 'null', 'null',
-                                   'null', '[MS, MS:1001456, ANN spectral library,]',
+            f_out.write('\t'.join(['PSM', identification.sequence, str(identification.query_id),
+                                   str(identification.library_id), 'null',
+                                   pathlib.Path(os.path.abspath(config.spectral_library_filename)).as_uri(),
+                                   database_version, '[MS, MS:1001456, ANN SoLo,]',
                                    str(identification.search_engine_score), 'null', str(identification.retention_time),
                                    str(identification.charge), str(identification.exp_mass_to_charge),
                                    str(identification.calc_mass_to_charge),
