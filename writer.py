@@ -60,8 +60,8 @@ def write_mztab(identifications, filename):
         f_out.write('\t'.join(['PSH', 'sequence', 'PSM_ID', 'accession', 'unique', 'database', 'database_version',
                                'search_engine', 'search_engine_score[1]', 'modifications', 'retention_time', 'charge',
                                'exp_mass_to_charge', 'calc_mass_to_charge', 'spectra_ref', 'pre', 'post', 'start',
-                               'end', 'opt_is_decoy', 'opt_num_candidates', 'opt_time_total', 'opt_time_candidates',
-                               'opt_time_match']) + '\n')
+                               'end', 'opt_cv_MS:1002217_decoy_peptide', 'opt_num_candidates', 'opt_time_total',
+                               'opt_time_candidates', 'opt_time_match']) + '\n')
         # PSMs sorted by their query id
         for identification in sorted(identifications, key=lambda i: natural_sort_key(i.query_id)):
             f_out.write('\t'.join(['PSM', identification.sequence, str(identification.query_id),
