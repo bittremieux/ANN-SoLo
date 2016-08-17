@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 
 import annoy
+import nmslib_vector
 import numexpr as ne
 import numpy as np
 import tqdm
@@ -228,6 +229,82 @@ class SpectralLibraryAnn(SpectralLibrary):
     spectra to a query spectrum as potential matches during identification.
     """
 
+    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None, num_candidates=None, ann_cutoff=None):
+        """
+        Find all candidate matches for the given query in the spectral library.
+
+        First, the most similar candidates are retrieved from the ANN index to restrict the search space to only
+        the most relevant candidates. Next, these candidates are further filtered on their precursor mass similar
+        to the brute-force approach.
+
+        Args:
+            query: The query Spectrum for which candidate Spectra are retrieved from the spectral library.
+            tol_mass: The size of the precursor mass window.
+            tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
+            num_candidates: The number of candidates to retrieve from the ANN index.
+            ann_cutoff: The minimum number of candidates for the query to use the ANN index to reduce the search space.
+
+        Returns:
+            The candidate Spectra in the spectral library that need to be compared to the given query Spectrum.
+        """
+        if tol_mass is None:
+            tol_mass = config.precursor_tolerance_mass
+        if tol_mode is None:
+            tol_mode = config.precursor_tolerance_mode
+        if num_candidates is None:
+            num_candidates = config.num_candidates
+        if ann_cutoff is None:
+            ann_cutoff = config.ann_cutoff
+
+        # filter the candidates on the precursor mass window
+        mass_filter = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
+
+        # if there are too many candidates, refine using the ANN index
+        if len(mass_filter) > ann_cutoff and query.precursor_charge in self._ann_indices:
+            # retrieve the most similar candidates from the ANN index
+            ann_charge_ids = self._query_ann(self._ann_indices[query.precursor_charge], query.get_vector(), num_candidates)
+            # convert the numbered index for this specific charge to global identifiers
+            ann_filter = self._library_reader.spec_info[query.precursor_charge]['id'][ann_charge_ids]
+
+            # select the candidates passing both the ANN filter and precursor mass filter
+            candidate_idx = np.intersect1d(ann_filter, mass_filter, True)
+        else:
+            candidate_idx = mass_filter
+
+        # read the candidates
+        candidates = []
+        with self._library_reader as lib_reader:
+            for idx in candidate_idx:
+                candidate = lib_reader.get_spectrum(idx, True)
+                if candidate.is_valid():
+                    candidates.append(candidate)
+
+        return candidates
+
+    @staticmethod
+    @abc.abstractmethod
+    def _query_ann(ann_index, query_vec, num_candidates):
+        """
+        Retrieve the nearest neighbors for the given query vector from the ANN index.
+
+        Args:
+            ann_index: The ANN index against which to query.
+            query_vec: The NumPy query vector.
+            num_candidates: The number of candidate neighbors to retrieve.
+
+        Returns:
+            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
+        """
+        pass
+
+
+class SpectralLibraryAnnoy(SpectralLibraryAnn):
+    """
+    Approximate nearest neighbors (ANN) spectral library search engine using the Annoy library for ANN retrieval.
+
+    Annoy constructs a random projection tree forest for ANN retrieval.
+    """
+
     _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'num_trees']
 
     def __init__(self, lib_filename):
@@ -300,58 +377,107 @@ class SpectralLibraryAnn(SpectralLibrary):
 
             logging.info('Finished creating the spectral library ANN indices')
 
-    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None, num_candidates=None, k=None, ann_cutoff=None):
+    @staticmethod
+    def _query_ann(ann_index, query_vec, num_candidates):
         """
-        Find all candidate matches for the given query in the spectral library.
-
-        First, the most similar candidates are retrieved from the ANN index to restrict the search space to only
-        the most relevant candidates. Next, these candidates are further filtered on their precursor mass similar
-        to the brute-force approach.
+        Retrieve the nearest neighbors for the given query vector from the ANN index.
 
         Args:
-            query: The query Spectrum for which candidate Spectra are retrieved from the spectral library.
-            tol_mass: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified ('Da' or 'ppm').
-            num_candidates: The number of candidates to retrieve from the ANN index.
-            k: The number of nodes to search in the ANN index during candidate retrieval.
-            ann_cutoff: The minimum number of candidates for the query to use the ANN index to reduce the search space.
+            ann_index: The ANN index against which to query.
+            query_vec: The NumPy query vector.
+            num_candidates: The number of candidate neighbors to retrieve.
 
         Returns:
-            The candidate Spectra in the spectral library that need to be compared to the given query Spectrum.
+            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
         """
-        if tol_mass is None:
-            tol_mass = config.precursor_tolerance_mass
-        if tol_mode is None:
-            tol_mode = config.precursor_tolerance_mode
-        if num_candidates is None:
-            num_candidates = config.num_candidates
-        if k is None:
-            k = config.search_k
-        if ann_cutoff is None:
-            ann_cutoff = config.ann_cutoff
+        return np.asarray(ann_index.get_nns_by_vector(query_vec, num_candidates, config.search_kk))
 
-        # filter the candidates on the precursor mass window
-        mass_filter = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
-        # if there are too many candidates, refine using the ANN index
-        if len(mass_filter) > ann_cutoff and query.precursor_charge in self._ann_indices:
-            # retrieve the most similar candidates from the ANN index
-            ann_charge_ids = np.asarray(self._ann_indices[query.precursor_charge].get_nns_by_vector(
-                query.get_vector(), num_candidates, k))
-            # convert the numbered index for this specific charge to global identifiers
-            ann_filter = self._library_reader.spec_info[query.precursor_charge]['id'][ann_charge_ids]
+class SpectralLibraryHnsw(SpectralLibraryAnn):
+    """
+    Approximate nearest neighbors (ANN) spectral library search engine using the nmslib library for ANN retrieval.
 
-            # select the candidates passing both the ANN filter and precursor mass filter
-            candidate_idx = np.intersect1d(ann_filter, mass_filter, True)
-        else:
-            candidate_idx = mass_filter
+    Potentially any (A)NN technique provided by nmslib can be used, although here we use a hard-coded hierarchical
+    navigable small-word (HNSW) graph for ANN retrieval.
+    """
 
-        # read the candidates
-        candidates = []
+    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'M', 'post']
+
+    def __init__(self, lib_filename):
+        """
+        Initialize the spectral library from the given spectral library file.
+
+        Further, the ANN indices are loaded from the associated index files. If these are missing, new index files are
+        built and stored for all charge states separately.
+
+        Args:
+            lib_filename: The spectral library file name.
+
+        Raises:
+            FileNotFoundError: The given spectral library file wasn't found or isn't supported.
+        """
+        # get the spectral library reader in the super-class initialization
+        super(self.__class__, self).__init__(lib_filename)
+
+        # use hierarchic navigable small-world graph for cosine similarity
+        self._ann_indices = defaultdict(
+            lambda: nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT))
+
+        # add all the data points to the ANN indices
+        logging.debug('Adding the spectra to the spectral library ANN indices')
+        ann_indices = defaultdict(
+            lambda: nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT))
+        charge_counts = collections.defaultdict(int)
         with self._library_reader as lib_reader:
-            for idx in candidate_idx:
-                candidate = lib_reader.get_spectrum(idx, True)
-                if candidate.is_valid():
-                    candidates.append(candidate)
+            for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
+                # TODO: immediately check the number of spectra with this charge from the reader
+                lib_spectrum.process_peaks()
+                if lib_spectrum.is_valid():
+                    nmslib_vector.addDataPoint(ann_indices[lib_spectrum.precursor_charge],
+                                               charge_counts[lib_spectrum.precursor_charge], lib_spectrum.get_vector().tolist())
+                    charge_counts[lib_spectrum.precursor_charge] += 1
 
-        return candidates
+        # initiate the ANN indices
+        logging.debug('Setting up the spectral library ANN indices')
+
+        # try to load the existing ANN indices, otherwise build a new index
+        base_filename, _ = os.path.splitext(lib_filename)
+        index_param = ['M={}'.format(config.M), 'post={}'.format(config.post), 'efConstruction=800']
+        for charge, ann_index in six.iteritems(ann_indices):
+            idx_filename = '{}_{}.idxhnsw'.format(base_filename, charge)
+            if charge_counts[charge] > config.ann_cutoff:
+                # load existing index
+                if os.path.isfile(idx_filename):
+                    logging.debug('Loading the ANN index for charge {}'.format(charge))
+                    nmslib_vector.loadIndex(ann_index, idx_filename)
+                # create new index
+                else:
+                    logging.debug('Creating new ANN index for charge {}'.format(charge))
+                    nmslib_vector.createIndex(ann_index, index_param)
+                    logging.debug('Saving the ANN index for charge {}'.format(charge))
+                    nmslib_vector.saveIndex(ann_index, idx_filename)
+
+                # set query parameters
+                nmslib_vector.setQueryTimeParams(ann_index, ['ef={}'.format(config.ef)])
+
+                self._ann_indices[charge] = ann_index
+            else:
+                nmslib_vector.freeIndex(ann_index)
+                logging.debug('No ANN index built for charge {} because it only contains {} spectra'.format(charge, charge_counts[charge]))
+
+        logging.info('Finished setting up the spectral library ANN indices')
+
+    @staticmethod
+    def _query_ann(ann_index, query_vec, num_candidates):
+        """
+        Retrieve the nearest neighbors for the given query vector from the ANN index.
+
+        Args:
+            ann_index: The ANN index against which to query.
+            query_vec: The NumPy query vector.
+            num_candidates: The number of candidate neighbors to retrieve.
+
+        Returns:
+            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
+        """
+        return np.asarray(nmslib_vector.knnQuery(ann_index, num_candidates, query_vec.tolist()))

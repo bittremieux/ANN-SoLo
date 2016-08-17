@@ -65,9 +65,10 @@ class Config:
 
         # MODE
         # use an ANN index or the conventional brute-force mode
-        self._parser.add_argument('--mode', type=str, choices=['ann', 'bf'], required=True,
-                                  help='search using an ANN index or in conventional (brute-force) mode '
-                                       '(default: %(default)s)')
+        self._parser.add_argument('--mode', type=str, choices=['annoy', 'bf', 'hnsw'], required=True,
+                                  help="search using an approximate nearest neighbors or the conventional (brute-force)"
+                                       " mode; 'bf': brute-force, 'annoy': ANN using Annoy, 'hnsw': ANN using "
+                                       "hierarchical navigable small-world graph")
 
         # ANN
         # number of ANN trees
@@ -99,15 +100,29 @@ class Config:
                                   help='number of candidates to retrieve from the ANN index for each query '
                                        '(default: %(default)s)')
 
-        # number of nodes to explore during ANN searching
-        self._parser.add_argument('--search_k', default=50000, type=int,
-                                  help='number of nodes to explore in the ANN index during searching '
-                                       '(default: %(default)s)')
-
         # minimum number of candidates for a query before ANN indexing is used
         self._parser.add_argument('--ann_cutoff', default=20000, type=int,
                                   help='minimum number of candidates for a query before ANN indexing is used to refine '
                                        'the candidates (default: %(default)s)')
+
+        # custom Annoy parameters
+        # number of nodes to explore during ANN searching
+        self._parser.add_argument('--search_k', default=50000, type=int,
+                                  help='number of nodes to explore in the ANN index during searching '
+                                       '(only required when using Annoy mode; default: %(default)s)')
+
+        # custom HNSW parameters
+        # size of the initial set of potential neighbors during indexing
+        self._parser.add_argument('--M', default=32, type=int,
+                                  help='size of the initial set of potential neighbors to construct the HNSW graph '
+                                       '(default: %(default)s)')
+        #
+        self._parser.add_argument('--post', default=0, type=int,
+                                  help='post (default: %(default)s)')
+        # depth of the ANN search
+        self._parser.add_argument('--ef', default=200, type=int,
+                                  help='depth of the search that is used to find the nearest neighbors '
+                                       '(default: %(default)s)')
 
         # filled in 'parse', contains the specified settings
         self._namespace = None
