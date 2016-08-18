@@ -7,6 +7,10 @@ import os
 import six
 import time
 from collections import defaultdict
+try:
+    from functools import lru_cache
+except ImportError:
+    from functools32 import lru_cache
 
 import annoy
 import nmslib_vector
@@ -260,9 +264,9 @@ class SpectralLibraryAnn(SpectralLibrary):
         mass_filter = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
         # if there are too many candidates, refine using the ANN index
-        if len(mass_filter) > ann_cutoff and query.precursor_charge in self._ann_indices:
+        if len(mass_filter) > ann_cutoff and query.precursor_charge in self._ann_filenames:
             # retrieve the most similar candidates from the ANN index
-            ann_charge_ids = self._query_ann(self._ann_indices[query.precursor_charge], query.get_vector(), num_candidates)
+            ann_charge_ids = self._query_ann(query, num_candidates)
             # convert the numbered index for this specific charge to global identifiers
             ann_filter = self._library_reader.spec_info[query.precursor_charge]['id'][ann_charge_ids]
 
@@ -281,19 +285,40 @@ class SpectralLibraryAnn(SpectralLibrary):
 
         return candidates
 
-    @staticmethod
     @abc.abstractmethod
-    def _query_ann(ann_index, query_vec, num_candidates):
+    @lru_cache(maxsize=1)
+    def _get_ann_index(self, charge):
         """
-        Retrieve the nearest neighbors for the given query vector from the ANN index.
+        Get the ANN index for the specified charge.
+
+        This allows on-demand loading of the ANN indices and prevents having to keep a large amount of data for the
+        index into memory (depending on the ANN method).
+        The previously used index is cached to avoid reloading the same index (only a single index is cached to prevent
+        using an excessive amount of memory). If no index for the specified charge is cached yet, this index is loaded
+        from the disk.
+
+        To prevent loading the same index multiple times (incurring a significant performance quality) it is CRUCIAL
+        that query spectra are sorted by precursor charge so the previous index can be reused.
 
         Args:
-            ann_index: The ANN index against which to query.
-            query_vec: The NumPy query vector.
+            charge: The precursor charge for which the ANN index is retrieved.
+
+        Returns:
+            The ANN index for the specified precursor charge.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _query_ann(self, query, num_candidates):
+        """
+        Retrieve the nearest neighbors for the given query vector from its corresponding ANN index.
+
+        Args:
+            query: The query spectrum.
             num_candidates: The number of candidate neighbors to retrieve.
 
         Returns:
-            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
+            A NumPy array containing the identifiers of the candidate neighbors retrieved from the ANN index.
         """
         pass
 
@@ -323,40 +348,33 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         # get the spectral library reader in the super-class initialization
         super(self.__class__, self).__init__(lib_filename)
 
-        # load the ANN index if it exists, or create a new one
-        self._ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)))
-
+        self._ann_filenames = {}
         do_create = False
 
-        # load the ANN index for each charge
+        # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
         for charge in self._library_reader.spec_info:
-            if not os.path.isfile('{}_{}.idxann'.format(base_filename, charge)):
-                if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
-                    do_create = True
-                    logging.warning('Missing ANN index file for charge {}'.format(charge))
-            else:
-                self._ann_indices[charge] = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
-                self._ann_indices[charge].load('{}_{}.idxann'.format(base_filename, charge))
+            self._ann_filenames[charge] = '{}_{}.idxann'.format(base_filename, charge)
+            if not os.path.isfile(self._ann_filenames[charge]) and\
+               len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
+                do_create = True
+                logging.warning('Missing ANN index file for charge {}'.format(charge))
 
-        # create the ANN index if required
+        # create the missing ANN indices
         if do_create:
-            # make sure that no old data remains
-            for ann_index in self._ann_indices.values():
-                ann_index.unload()
-            self._ann_indices.clear()
-
             # add all spectra to the ANN indices
             logging.debug('Adding the spectra to the spectral library ANN indices')
             ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)))
             charge_counts = collections.defaultdict(int)
             with self._library_reader as lib_reader:
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
-                    lib_spectrum.process_peaks()
-                    if lib_spectrum.is_valid():
-                        ann_indices[lib_spectrum.precursor_charge].add_item(
-                            charge_counts[lib_spectrum.precursor_charge], lib_spectrum.get_vector())
-                        charge_counts[lib_spectrum.precursor_charge] += 1
+                    # discard infrequent precursor charges
+                    charge = lib_spectrum.precursor_charge
+                    if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
+                        lib_spectrum.process_peaks()
+                        if lib_spectrum.is_valid():
+                            ann_indices[charge].add_item(charge_counts[charge], lib_spectrum.get_vector())
+                            charge_counts[charge] += 1
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
@@ -364,33 +382,56 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             # build only the ANN indices that contain sufficient points
             num_trees = config.num_trees
             for charge, ann_index in six.iteritems(ann_indices):
-                if ann_index.get_n_items() > config.ann_cutoff:
+                if ann_index.get_n_items() > config.ann_cutoff:     # TODO: verify that this should never be the case
+                    logging.debug('Creating new ANN index for charge {}'.format(charge))
                     ann_index.build(num_trees)
-                    self._ann_indices[charge] = ann_index
+                    logging.debug('Saving the ANN index for charge {}'.format(charge))
+                    ann_index.save(self._ann_filenames[charge])
+                    # unload the index to prevent using excessive memory
+                    ann_index.unload()
                 else:
                     logging.debug('No ANN index built for charge {} because it only contains {} spectra'.format(charge, ann_index.get_n_items()))
 
-            # store the ANN indices
-            logging.debug('Saving the spectral library ANN indices')
-            for charge, ann_index in six.iteritems(self._ann_indices):
-                ann_index.save('{}_{}.idxann'.format(base_filename, charge))
-
             logging.info('Finished creating the spectral library ANN indices')
 
-    @staticmethod
-    def _query_ann(ann_index, query_vec, num_candidates):
+    @lru_cache(maxsize=1)
+    def _get_ann_index(self, charge):
         """
-        Retrieve the nearest neighbors for the given query vector from the ANN index.
+        Get the ANN index for the specified charge.
+
+        This allows on-demand loading of the ANN indices and prevents having to keep a large amount of data for the
+        index into memory (depending on the ANN method).
+        The previously used index is cached to avoid reloading the same index (only a single index is cached to prevent
+        using an excessive amount of memory). If no index for the specified charge is cached yet, this index is loaded
+        from the disk.
+
+        To prevent loading the same index multiple times (incurring a significant performance quality) it is CRUCIAL
+        that query spectra are sorted by precursor charge so the previous index can be reused.
 
         Args:
-            ann_index: The ANN index against which to query.
-            query_vec: The NumPy query vector.
+            charge: The precursor charge for which the ANN index is retrieved.
+
+        Returns:
+            The ANN index for the specified precursor charge.
+        """
+        ann_index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+        ann_index.load(self._ann_filenames[charge])
+
+        return ann_index
+
+    def _query_ann(self, query, num_candidates):
+        """
+        Retrieve the nearest neighbors for the given query vector from its corresponding ANN index.
+
+        Args:
+            query: The query spectrum.
             num_candidates: The number of candidate neighbors to retrieve.
 
         Returns:
-            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
+            A NumPy array containing the identifiers of the candidate neighbors retrieved from the ANN index.
         """
-        return np.asarray(ann_index.get_nns_by_vector(query_vec, num_candidates, config.search_kk))
+        ann_index = self._get_ann_index(query.precursor_charge)
+        return np.asarray(ann_index.get_nns_by_vector(query.get_vector(), num_candidates, config.search_k))
 
 
 class SpectralLibraryHnsw(SpectralLibraryAnn):
@@ -419,65 +460,91 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
         # get the spectral library reader in the super-class initialization
         super(self.__class__, self).__init__(lib_filename)
 
-        # use hierarchic navigable small-world graph for cosine similarity
-        self._ann_indices = defaultdict(
-            lambda: nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT))
+        self._ann_filenames = {}
+        do_create = False
 
-        # add all the data points to the ANN indices
-        logging.debug('Adding the spectra to the spectral library ANN indices')
-        ann_indices = defaultdict(
-            lambda: nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT))
-        charge_counts = collections.defaultdict(int)
-        with self._library_reader as lib_reader:
-            for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
-                # TODO: immediately check the number of spectra with this charge from the reader
-                lib_spectrum.process_peaks()
-                if lib_spectrum.is_valid():
-                    nmslib_vector.addDataPoint(ann_indices[lib_spectrum.precursor_charge],
-                                               charge_counts[lib_spectrum.precursor_charge], lib_spectrum.get_vector().tolist())
-                    charge_counts[lib_spectrum.precursor_charge] += 1
-
-        # initiate the ANN indices
-        logging.debug('Setting up the spectral library ANN indices')
-
-        # try to load the existing ANN indices, otherwise build a new index
+        # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
-        index_param = ['M={}'.format(config.M), 'post={}'.format(config.post), 'efConstruction=800']
-        for charge, ann_index in six.iteritems(ann_indices):
-            idx_filename = '{}_{}.idxhnsw'.format(base_filename, charge)
-            if charge_counts[charge] > config.ann_cutoff:
-                # load existing index
-                if os.path.isfile(idx_filename):
-                    logging.debug('Loading the ANN index for charge {}'.format(charge))
-                    nmslib_vector.loadIndex(ann_index, idx_filename)
-                # create new index
-                else:
+        for charge in self._library_reader.spec_info:
+            self._ann_filenames[charge] = '{}_{}.idxhnsw'.format(base_filename, charge)
+            if not os.path.isfile(self._ann_filenames[charge]) and \
+               len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
+                do_create = True
+                logging.warning('Missing ANN index file for charge {}'.format(charge))
+
+        # create the missing ANN indices
+        if do_create:
+            # add all spectra to the ANN indices
+            logging.debug('Adding the spectra to the spectral library ANN indices')
+            ann_indices = defaultdict(
+                lambda: nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT))
+            charge_counts = collections.defaultdict(int)
+            with self._library_reader as lib_reader:
+                for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
+                    # discard infrequent precursor charges
+                    charge = lib_spectrum.precursor_charge
+                    if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff:
+                        lib_spectrum.process_peaks()
+                        if lib_spectrum.is_valid():
+                            nmslib_vector.addDataPoint(ann_indices[charge], charge_counts[charge], lib_spectrum.get_vector().tolist())
+                            charge_counts[charge] += 1
+
+            # build the ANN indices
+            logging.debug('Building the spectral library ANN indices')
+
+            # build only the ANN indices that contain sufficient points
+            index_param = ['M={}'.format(config.M), 'post={}'.format(config.post), 'efConstruction=800']
+            for charge, ann_index in six.iteritems(ann_indices):
+                if ann_index.get_n_items() > config.ann_cutoff:     # TODO: verify that this should never be the case
                     logging.debug('Creating new ANN index for charge {}'.format(charge))
                     nmslib_vector.createIndex(ann_index, index_param)
                     logging.debug('Saving the ANN index for charge {}'.format(charge))
-                    nmslib_vector.saveIndex(ann_index, idx_filename)
+                    nmslib_vector.saveIndex(ann_index, self._ann_filenames[charge])
+                    # unload the index to prevent running out of memory
+                    nmslib_vector.freeIndex(ann_index)
+                else:
+                    logging.debug('No ANN index built for charge {} because it contains too few spectra'.format(charge))
 
-                # set query parameters
-                nmslib_vector.setQueryTimeParams(ann_index, ['ef={}'.format(config.ef)])
+            logging.info('Finished creating the spectral library ANN indices')
 
-                self._ann_indices[charge] = ann_index
-            else:
-                nmslib_vector.freeIndex(ann_index)
-                logging.debug('No ANN index built for charge {} because it only contains {} spectra'.format(charge, charge_counts[charge]))
-
-        logging.info('Finished setting up the spectral library ANN indices')
-
-    @staticmethod
-    def _query_ann(ann_index, query_vec, num_candidates):
+    @lru_cache(maxsize=1)
+    def _get_ann_index(self, charge):
         """
-        Retrieve the nearest neighbors for the given query vector from the ANN index.
+        Get the ANN index for the specified charge.
+
+        This allows on-demand loading of the ANN indices and prevents having to keep a large amount of data for the
+        index into memory (depending on the ANN method).
+        The previously used index is cached to avoid reloading the same index (only a single index is cached to prevent
+        using an excessive amount of memory). If no index for the specified charge is cached yet, this index is loaded
+        from the disk.
+
+        To prevent loading the same index multiple times (incurring a significant performance quality) it is CRUCIAL
+        that query spectra are sorted by precursor charge so the previous index can be reused.
 
         Args:
-            ann_index: The ANN index against which to query.
-            query_vec: The NumPy query vector.
+            charge: The precursor charge for which the ANN index is retrieved.
+
+        Returns:
+            The ANN index for the specified precursor charge.
+        """
+        ann_index = nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT)
+        nmslib_vector.loadIndex(ann_index, self._ann_filenames[charge])
+
+        # set query parameters
+        nmslib_vector.setQueryTimeParams(ann_index, ['ef={}'.format(config.ef)])
+
+        return ann_index
+
+    def _query_ann(self, query, num_candidates):
+        """
+        Retrieve the nearest neighbors for the given query vector from its corresponding ANN index.
+
+        Args:
+            query: The query spectrum.
             num_candidates: The number of candidate neighbors to retrieve.
 
         Returns:
-            A NumPy array containing the identifiers of the candidate neighbors in the given ANN index.
+            A NumPy array containing the identifiers of the candidate neighbors retrieved from the ANN index.
         """
-        return np.asarray(nmslib_vector.knnQuery(ann_index, num_candidates, query_vec.tolist()))
+        ann_index = self._get_ann_index(query.precursor_charge)
+        return np.asarray(nmslib_vector.knnQuery(ann_index, num_candidates, query.get_vector().tolist()))
