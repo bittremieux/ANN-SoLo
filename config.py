@@ -63,22 +63,6 @@ class Config:
                                   help='to reduce the influence of very intense peaks, scale the peaks by their square '
                                        'root or by their rank  (default: %(default)s)')
 
-        # MODE
-        # use an ANN index or the conventional brute-force mode
-        self._parser.add_argument('--mode', type=str, choices=['annoy', 'bf', 'hnsw'], required=True,
-                                  help="search using an approximate nearest neighbors or the conventional (brute-force)"
-                                       " mode; 'bf': brute-force, 'annoy': ANN using Annoy, 'hnsw': ANN using "
-                                       "hierarchical navigable small-world graph")
-
-        # ANN
-        # number of ANN trees
-        self._parser.add_argument('--num_trees', default=100, type=int,
-                                  help='number of ANN trees (default: %(default)s)')
-
-        # bin size for the ANN index (Dalton)
-        self._parser.add_argument('--bin_size', default=1.0, type=float,
-                                  help='ANN vector bin width (default: %(default)s Da)')
-
         # MATCHING
         # maximum SSM precursor mass tolerance
         self._parser.add_argument('--precursor_tolerance_mass', type=float, required=True,
@@ -95,6 +79,17 @@ class Config:
                                   help='allow shifted peaks according to the precursor mass difference to accommodate '
                                        'for PTMs while calculating the dot product match score')
 
+        # MODE
+        # use an ANN index or the conventional brute-force mode
+        self._parser.add_argument('--mode', type=str, choices=['annoy', 'bf', 'hnsw'], required=True,
+                                  help="search using an approximate nearest neighbors or the conventional (brute-force)"
+                                       " mode; 'bf': brute-force, 'annoy': ANN using Annoy, 'hnsw': ANN using "
+                                       "hierarchical navigable small-world graph")
+
+        # bin size for the ANN index (Dalton)
+        self._parser.add_argument('--bin_size', default=1.0, type=float,
+                                  help='ANN vector bin width (default: %(default)s Da)')
+
         # number of candidates to retrieve from the ANN index for each query
         self._parser.add_argument('--num_candidates', default=1000, type=int,
                                   help='number of candidates to retrieve from the ANN index for each query '
@@ -106,6 +101,10 @@ class Config:
                                        'the candidates (default: %(default)s)')
 
         # custom Annoy parameters
+        # number of ANN trees
+        self._parser.add_argument('--num_trees', default=100, type=int,
+                                  help='number of ANN trees (default: %(default)s)')
+
         # number of nodes to explore during ANN searching
         self._parser.add_argument('--search_k', default=50000, type=int,
                                   help='number of nodes to explore in the ANN index during searching '
