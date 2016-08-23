@@ -115,9 +115,6 @@ class Config:
         self._parser.add_argument('--M', default=32, type=int,
                                   help='size of the initial set of potential neighbors to construct the HNSW graph '
                                        '(default: %(default)s)')
-        #
-        self._parser.add_argument('--post', default=0, type=int,
-                                  help='post (default: %(default)s)')
         # depth of the ANN search
         self._parser.add_argument('--ef', default=200, type=int,
                                   help='depth of the search that is used to find the nearest neighbors '

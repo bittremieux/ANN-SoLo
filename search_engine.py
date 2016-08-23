@@ -440,7 +440,7 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
     navigable small-word (HNSW) graph for ANN retrieval.
     """
 
-    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'M', 'post']
+    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'M']
 
     def __init__(self, lib_filename):
         """
@@ -492,7 +492,7 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
             logging.debug('Building the spectral library ANN indices')
 
             # build only the ANN indices that contain sufficient points
-            index_param = ['M={}'.format(config.M), 'post={}'.format(config.post), 'efConstruction=800']
+            index_param = ['M={}'.format(config.M), 'post=2', 'efConstruction=800']
             for charge, ann_index in six.iteritems(ann_indices):
                 logging.debug('Creating new ANN index for charge {}'.format(charge))
                 nmslib_vector.createIndex(ann_index, index_param)
