@@ -44,7 +44,7 @@ def write_mztab(identifications, filename):
     if config.mode == 'annoy':
         config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff', 'num_trees', 'search_k'])
     elif config.mode == 'hnsw':
-        config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff', 'M', 'post', 'ef'])
+        config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff', 'M', 'ef'])
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i), '{} = {}'.format(key, config[key])))
 
