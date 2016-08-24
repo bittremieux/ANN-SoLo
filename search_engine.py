@@ -351,10 +351,12 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         base_filename, _ = os.path.splitext(lib_filename)
         ann_charges = [charge for charge in self._library_reader.spec_info if
                        len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff]
+        create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxann'.format(base_filename, charge)
             if not os.path.isfile(self._ann_filenames[charge]):
                 do_create = True
+                create_ann_charges.append(charge)
                 logging.warning('Missing ANN index file for charge {}'.format(charge))
 
         # create the missing ANN indices
@@ -367,7 +369,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
                     # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
-                    if charge in ann_charges:
+                    if charge in create_ann_charges:
                         lib_spectrum.process_peaks()
                         if lib_spectrum.is_valid():
                             ann_indices[charge].add_item(charge_counts[charge], lib_spectrum.get_vector())
@@ -467,10 +469,12 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
         base_filename, _ = os.path.splitext(lib_filename)
         ann_charges = [charge for charge in self._library_reader.spec_info if
                        len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff]
+        create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxhnsw'.format(base_filename, charge)
             if not os.path.isfile(self._ann_filenames[charge]):
                 do_create = True
+                create_ann_charges.append(charge)
                 logging.warning('Missing ANN index file for charge {}'.format(charge))
 
         # create the missing ANN indices
@@ -484,7 +488,7 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
                     # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
-                    if charge in ann_charges:
+                    if charge in create_ann_charges:
                         lib_spectrum.process_peaks()
                         if lib_spectrum.is_valid():
                             nmslib_vector.addDataPoint(ann_indices[charge], charge_counts[charge], lib_spectrum.get_vector().tolist())
