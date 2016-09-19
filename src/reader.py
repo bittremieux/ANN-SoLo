@@ -81,6 +81,8 @@ def _parse_annotation(raw):
         first_annotation = raw.split(b',', 1)[0]
         if b'i' not in first_annotation:    # discard isotope peaks
             ion_sep = first_annotation.find(b'/')
+            if ion_sep == -1:
+                ion_sep = len(first_annotation)
             has_mod = first_annotation.find(b'-', 0, ion_sep) != -1 or first_annotation.find(b'+', 0, ion_sep) != -1
             if not has_mod:     # discard modified peaks
                 charge_sep = first_annotation.find(b'^')
@@ -366,7 +368,7 @@ class SplibReader(SpectraSTReader):
         # fullName: \n terminated string
         name = self._mm.readline().strip()
         peptide = name[name.find(b'.') + 1: name.rfind(b'.')].decode(encoding='UTF-8')
-        precursor_charge = int(name[name.rfind(b'/') + 1:])
+        precursor_charge = int(name[name.rfind(b'/') + 1: name.rfind(b'/') + 2])
         # precursor m/z (double): 8 bytes
         precursor_mz = struct.unpack('d', self._mm.read(8))[0]
         # status: \n terminated string
