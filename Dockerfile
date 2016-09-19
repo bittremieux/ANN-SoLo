@@ -11,9 +11,9 @@ RUN bash build.sh
 ENV PYTHONPATH="$HOME/build/nmslib/python_vect_bindings:$PYTHONPATH"
 
 # create working directory and add all files
-RUN mkdir -p $HOME/src/ann_spectral_library
-WORKDIR $HOME/src/ann_spectral_library
-COPY . $HOME/src/ann_spectral_library
+RUN mkdir -p $HOME/src/ann-solo
+WORKDIR $HOME/src/ann-solo
+COPY ./src $HOME/src/ann-solo
 
 # Cythonize code
 RUN python setup.py build_ext --inplace
