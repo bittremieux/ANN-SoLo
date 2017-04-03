@@ -12,6 +12,7 @@ import numpy as np
 import seaborn as sns
 
 import reader
+import spectrum_match
 from config import config
 
 
@@ -23,15 +24,15 @@ colors = {'a': 'green', 'b': 'blue', 'y': 'red', None: 'black'}
 
 
 def get_matching_peaks(library_spectrum, query_spectrum):
+    _, score, peak_matches = spectrum_match.get_best_match(query_spectrum, [library_spectrum],
+                                                           allow_shift=config.allow_peak_shifts)
     library_matches, query_matches = {}, {}
-    for library_idx, mass1 in enumerate(library_spectrum.masses):
-        for query_idx, mass2 in enumerate(query_spectrum.masses):
-            if abs(mass1 - mass2) <= config.fragment_mz_tolerance:
-                library_matches[library_idx] = query_matches[query_idx] = \
-                    colors[library_spectrum.annotations[library_idx][0][0]
-                    if library_spectrum.annotations[library_idx] is not None else None]
+    for peak_match in peak_matches:
+        library_matches[peak_match[0]] = query_matches[peak_match[1]] = \
+            colors[library_spectrum.annotations[peak_match[0]][0][0]
+            if library_spectrum.annotations[peak_match[0]] is not None else None]
 
-    return library_matches, query_matches
+    return library_matches, query_matches, score
 
 
 if __name__ == '__main__':
@@ -97,7 +98,7 @@ if __name__ == '__main__':
         raise ValueError('Could not find the specified query spectrum')
 
     # compute the matching peaks
-    library_matches, query_matches = get_matching_peaks(library_spectrum, query_spectrum)
+    library_matches, query_matches, score = get_matching_peaks(library_spectrum, query_spectrum)
 
     # plot the match
     plt.figure(figsize=(20, 10))
@@ -125,7 +126,7 @@ if __name__ == '__main__':
 
     plt.xlabel('m/z')
 
-    plt.text(0.5, 1.06, '{}, Score: {:.3f}'.format(library_spectrum.peptide, float(score)),
+    plt.text(0.5, 1.06, '{}, Score: {:.3f}'.format(library_spectrum.peptide, score),
              horizontalalignment='center', verticalalignment='bottom', fontsize='x-large', fontweight='bold',
              transform=plt.gca().transAxes)
     plt.text(0.5, 1.02, 'File: {}, Scan: {}, Precursor m/z: {:.4f}, Library m/z: {:.4f}, Charge: {}'.format(
@@ -133,5 +134,5 @@ if __name__ == '__main__':
         library_spectrum.precursor_mz, query_spectrum.precursor_charge),
              horizontalalignment='center', verticalalignment='bottom', fontsize='large', transform=plt.gca().transAxes)
 
-    plt.savefig('{}.png'.format(query_id))
+    plt.savefig('{}.pdf'.format(query_id), bbox_inches='tight')
     plt.close()

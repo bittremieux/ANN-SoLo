@@ -123,7 +123,7 @@ class SpectralLibrary(object):
 
         if len(candidates) > 0:
             # find the best matching candidate spectrum
-            match_candidate, match_score = spectrum_match.get_best_match(query, candidates)
+            match_candidate, match_score, _ = spectrum_match.get_best_match(query, candidates)
             identification = spectrum.SpectrumMatch(query, match_candidate, match_score)
         else:
             identification = spectrum.SpectrumMatch(query)

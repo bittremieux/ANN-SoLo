@@ -5,6 +5,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 from libcpp.algorithm cimport sort
+from libcpp.pair cimport pair
 from libcpp.unordered_set cimport unordered_set
 from libcpp.vector cimport vector
 
@@ -77,14 +78,18 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
             query_shifted_peaks = get_shifted_peak_list(query_masses, query_intensities, candidate_precursor_charge, mass_dif)
 
         # compute the matching score
-        score = dot(candidate_masses, candidate_intensities, candidate_annotation_charges,
+        match = dot(candidate_masses, candidate_intensities, candidate_annotation_charges,
                     query_unshifted_peaks, query_shifted_peaks, fragment_mz_tolerance)
 
-        if score > max_score:
-            max_score = score
+        if match.first > max_score:
+            max_score = match.first
+            peak_matches = match.second
             max_candidate_index = index
 
-    return candidates[max_candidate_index] if max_candidate_index != -1 else None, max_score
+    if max_candidate_index != -1:
+        return candidates[max_candidate_index], max_score, peak_matches
+    else:
+        return None, max_score, []
 
 
 """
@@ -214,9 +219,12 @@ cdef vector[SpectrumPeak] get_shifted_peak_list(np.ndarray[np.float32_t] masses,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef double dot(np.ndarray[np.float32_t] masses1, np.ndarray[np.float32_t] intensities1,
-                np.ndarray[np.uint8_t] annotation_charges1, vector[SpectrumPeak] spectrum2_unshifted_peaks,
-                vector[SpectrumPeak] spectrum2_shifted_peaks, double fragment_mz_tolerance):
+cdef pair[double, vector[pair[uint, uint]]] dot(np.ndarray[np.float32_t] masses1,
+                                                np.ndarray[np.float32_t] intensities1,
+                                                np.ndarray[np.uint8_t] annotation_charges1,
+                                                vector[SpectrumPeak] spectrum2_unshifted_peaks,
+                                                vector[SpectrumPeak] spectrum2_shifted_peaks,
+                                                double fragment_mz_tolerance):
     """
     Calculate the dot product between two spectra.
 
@@ -237,7 +245,8 @@ cdef double dot(np.ndarray[np.float32_t] masses1, np.ndarray[np.float32_t] inten
         fragment_mz_tolerance: Mass tolerance indicating the window around the mass peaks used for matching two peaks.
 
     Returns:
-        The dot product between the first spectrum and the second spectrum.
+        A 2-tuple of the dot product between the first spectrum and the second spectrum and a list of the peaks matched
+        to compute this dot product.
     """
     # internal variables
     cdef vector[SpectrumPeak] spectrum2_peaks
@@ -246,10 +255,11 @@ cdef double dot(np.ndarray[np.float32_t] masses1, np.ndarray[np.float32_t] inten
     cdef double spectrum1_mass, spectrum1_intensity
     cdef bint can_match
     cdef PeakMatch match
-    cdef vector[PeakMatch] matches
+    cdef vector[PeakMatch] peak_matches
+    cdef pair[unsigned int, unsigned int] best_matches
     cdef unordered_set[unsigned int] spectrum1_used_peaks, spectrum2_used_peaks
     # return value
-    cdef double dot_product
+    cdef pair[double, vector[pair[uint, uint]]] dot_product
 
     # if necessary, merge the unshifted and shifted peaks for spectrum2 and sort the peaks based on the mass
     if spectrum2_shifted_peaks.size() > 0:
@@ -290,16 +300,21 @@ cdef double dot(np.ndarray[np.float32_t] masses1, np.ndarray[np.float32_t] inten
                 match = PeakMatch(peak_multiplication=spectrum1_intensity * spectrum2_peaks[spectrum2_index + index].intensity,
                                   spectrum1_index=spectrum1_index,
                                   spectrum2_index=spectrum2_peaks[spectrum2_index + index].index)
-                matches.push_back(match)
+                peak_matches.push_back(match)
 
             index += 1
 
     # use the most prominent matches to compute the score
-    dot_product = 0
-    sort(matches.begin(), matches.end(), compare_peak_match)
-    for match in matches:
+    sort(peak_matches.begin(), peak_matches.end(), compare_peak_match)
+    for match in peak_matches:
         if spectrum1_used_peaks.count(match.spectrum1_index) == spectrum2_used_peaks.count(match.spectrum2_index) == 0:
-            dot_product += match.peak_multiplication
+            dot_product.first += match.peak_multiplication
+
+            # save the matched peaks
+            best_matches.first = match.spectrum1_index
+            best_matches.second = match.spectrum2_index
+            dot_product.second.push_back(best_matches)
+
             # make sure these peaks are not used anymore
             spectrum1_used_peaks.insert(match.spectrum1_index)
             spectrum2_used_peaks.insert(match.spectrum2_index)
