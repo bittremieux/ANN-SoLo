@@ -106,23 +106,33 @@ if __name__ == '__main__':
     # query spectrum on top
     for i, (mass, intensity) in enumerate(zip(query_spectrum.masses, query_spectrum.intensities)):
         is_match = i in query_matches
-        plt.plot([mass, mass], [0, intensity], color=query_matches[i] if i in query_matches else 'lightgrey')
+        plt.plot([mass, mass], [0, intensity], color=query_matches[i] if i in query_matches else 'darkgrey')
     # library spectrum mirrored underneath
     for i, (mass, intensity, annotation) in enumerate(
             zip(library_spectrum.masses, library_spectrum.intensities, library_spectrum.annotations)):
         is_match = i in library_matches
-        plt.plot([mass, mass], [0, -1 * intensity], color=library_matches[i] if i in library_matches else 'lightgrey')
+        plt.plot([mass, mass], [0, -1 * intensity], color=library_matches[i] if i in library_matches else 'darkgrey')
         if annotation is not None:
             plt.text(mass - 5, -1 * intensity - 0.01, '{}{}'.format(annotation[0], '+' * annotation[1]),
-                     color=library_matches[i] if i in library_matches else 'lightgrey', rotation=270)
+                     color=library_matches[i] if i in library_matches else 'darkgrey', rotation=270)
+
+    # consistent m/z range
+    plt.xticks(np.arange(0, config.max_mz, 200))
+    plt.xlim(config.min_mz, config.max_mz)
 
     # horizontal line between the two spectra
     plt.axhline(0, color='black')
     # make sure this is centered vertically
     ylim = np.amax(np.fabs(plt.ylim()))
-    plt.ylim(-1 * ylim, ylim)
+    plt.ylim(-1.1 * ylim, 1.1 * ylim)
     # hide the y-axis labels
-    plt.gca().yaxis.set_visible(False)
+    plt.gca().set_yticklabels([])
+
+    # show major/minor tick lines
+    plt.gca().xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
+    plt.gca().yaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
+    plt.grid(b=True, which='major', color='lightgrey', linestyle='--', linewidth=1.0)
+    plt.grid(b=True, which='minor', color='lightgrey', linestyle='--', linewidth=0.5)
 
     plt.xlabel('m/z')
 
