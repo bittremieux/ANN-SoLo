@@ -12,6 +12,10 @@ try:
     from functools import lru_cache
 except ImportError:
     from functools32 import lru_cache
+try:
+    import pathlib
+except ImportError:
+    import pathlib2 as pathlib
 
 import joblib
 import numpy as np
@@ -170,11 +174,9 @@ class SpectralLibraryReader(object):
         if do_create:
             self._create()
 
-    @abc.abstractmethod
     def __enter__(self):
         return self
 
-    @abc.abstractmethod
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
@@ -409,17 +411,9 @@ class SqliteSpecReader(SpectralLibraryReader):
 
     _supported_extensions = ['.spql']
 
-    def __enter__(self):
-        self._conn = sqlite3.connect(self._filename, detect_types=sqlite3.PARSE_DECLTYPES)
-
-        cursor = self._conn.cursor()
-        cursor.execute('PRAGMA locking_mode = EXCLUSIVE')
-        self._conn.commit()
-
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._conn.close()
+    def _connect(self):
+        return sqlite3.connect('{}?mode=ro'.format(pathlib.Path(os.path.abspath(self._filename)).as_uri()),
+                               detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, uri=True)
 
     def _create(self):
         """
@@ -428,7 +422,7 @@ class SqliteSpecReader(SpectralLibraryReader):
         logging.info('Creating the spectral library configuration for file %s', self._filename)
 
         # collect summary information about the spectra for easy retrieval
-        conn = sqlite3.connect(self._filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        conn = self._connect()
         cursor = conn.cursor()
 
         # retrieve from the database and convert to a consistent DataFrame
@@ -459,14 +453,15 @@ class SqliteSpecReader(SpectralLibraryReader):
         Returns:
             A generator that yields all spectra from the spectral library file.
         """
-        cursor = self._conn.cursor()
-
         # retrieve the specified spectrum
+        conn = self._connect()
+        cursor = conn.cursor()
         cursor.execute('SELECT id, peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity '
                        'FROM RefSpectra, RefSpectraPeaks WHERE RefSpectra.id == RefSpectraPeaks.RefSpectraID')
         while True:
             result = cursor.fetchone()
             if result is None:
+                conn.close()
                 break
 
             spec_id, peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities = result
@@ -487,13 +482,14 @@ class SqliteSpecReader(SpectralLibraryReader):
         Returns:
             The `Spectrum` from the spectral library file with the specified identifier.
         """
-        cursor = self._conn.cursor()
-
         # retrieve the specified spectrum
+        conn = self._connect()
+        cursor = conn.cursor()
         cursor.execute('SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity, peakAnnotation '
                        'FROM RefSpectra, RefSpectraPeaks '
                        'WHERE RefSpectra.id == ? AND RefSpectra.id == RefSpectraPeaks.RefSpectraID', (int(spec_id),))
         peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities, annotations = cursor.fetchone()
+        conn.close()
 
         read_spectrum = spectrum.Spectrum(spec_id, precursor_mz, precursor_charge, None, peptide, is_decoy == 1)
         read_spectrum.set_peaks(masses, intensities, annotations)
@@ -504,9 +500,11 @@ class SqliteSpecReader(SpectralLibraryReader):
         return read_spectrum
 
     def get_version(self):
-        cursor = self._conn.cursor()
+        conn = self._connect()
+        cursor = conn.cursor()
         cursor.execute('SELECT createTime, numSpecs FROM LibInfo')
         create_time, num_specs = cursor.fetchone()
+        conn.close()
 
         return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'), num_specs
 

@@ -3,6 +3,8 @@ import abc
 import collections
 import copy
 import logging
+import multiprocessing
+import multiprocessing.pool
 import os
 import six
 import time
@@ -69,7 +71,7 @@ class SpectralLibrary(object):
 
         # read all spectra in the query file and split based on their precursor charge
         logging.info('Reading all query spectra')
-        query_spectra = []
+        query_spectra = collections.defaultdict(list)
         for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra'):
             # for queries with an unknown charge, try all possible charge states
             for charge in [2, 3] if query_spectrum.precursor_charge is None else [query_spectrum.precursor_charge]:
@@ -77,24 +79,28 @@ class SpectralLibrary(object):
                 query_spectrum_charge.precursor_charge = charge
                 query_spectrum_charge.process_peaks()
                 if query_spectrum_charge.is_valid():      # discard low-quality spectra
-                    query_spectra.append(query_spectrum_charge)
-
-        # sort the spectra based on their precursor charge and precursor mass
-        query_spectra.sort(key=lambda spec: (spec.precursor_charge, spec.precursor_mz))
+                    query_spectra[query_spectrum_charge.precursor_charge].append(query_spectrum_charge)
 
         # identify all spectra
         logging.info('Identifying all query spectra')
+        total_spectra = sum(len(spectra) for spectra in query_spectra.values())
+        progress_count = 0
         query_matches = {}
-        for query_spectrum in tqdm.tqdm(query_spectra, desc='Query spectra identified', unit='spectra', smoothing=0):
-            query_match = self._find_match(query_spectrum)
+        for query_spectra_charge in query_spectra.values():
+            # sort the spectra within a single precursor charge on their precursor mass
+            query_spectra_charge.sort(key=lambda spec: spec.precursor_mz)
+            # identify the spectra within a single precursor charge separately because of multithreading issues
+            for query_match in tqdm.tqdm(
+                    multiprocessing.pool.ThreadPool().imap_unordered(self._find_match, query_spectra_charge, 10),
+                    desc='Query spectra identified', total=total_spectra, unit='spectra', smoothing=0, initial=progress_count):
+                if query_match.sequence is not None:
+                    # make sure we only retain the best identification
+                    # (i.e. for duplicated spectra if the precursor charge was unknown)
+                    if query_match.query_id not in query_matches or\
+                       query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
+                        query_matches[query_match.query_id] = query_match
 
-            # discard spectra that couldn't be identified
-            if query_match.sequence is not None:
-                # make sure we only retain the best identification
-                # (i.e. for duplicated spectra if the precursor charge was unknown)
-                if query_match.query_id not in query_matches or\
-                   query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
-                    query_matches[query_match.query_id] = query_match
+            progress_count += len(query_spectra_charge)
 
         logging.info('Finished identifying file %s', query_filename)
 
@@ -210,7 +216,6 @@ class SpectralLibraryBf(SpectralLibrary):
         candidate_idx = self._get_mass_filter_idx(query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
         # read the candidates
-
         candidates = []
         with self._library_reader as lib_reader:
             for idx in candidate_idx:
@@ -228,6 +233,8 @@ class SpectralLibraryAnn(SpectralLibrary):
     The spectral library uses an approximate nearest neighbor (ANN) technique to retrieve only the most similar library
     spectra to a query spectrum as potential matches during identification.
     """
+
+    _ann_index_lock = multiprocessing.Lock()
 
     def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None, num_candidates=None, ann_cutoff=None):
         """
@@ -410,13 +417,14 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             The ANN index for the specified precursor charge.
         """
         if self._current_index[0] != charge:
-            logging.debug('Loading the ANN index for charge {}'.format(charge))
-            # unload the previous index
-            if self._current_index[1] is not None:
-                self._current_index[1].unload()
-            # load the new index
-            self._current_index = charge, annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
-            self._current_index[1].load(self._ann_filenames[charge])
+            with self._ann_index_lock:
+                logging.debug('Loading the ANN index for charge {}'.format(charge))
+                # unload the previous index
+                if self._current_index[1] is not None:
+                    self._current_index[1].unload()
+                # load the new index
+                self._current_index = charge, annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+                self._current_index[1].load(self._ann_filenames[charge])
 
         return self._current_index[1]
 
@@ -529,26 +537,27 @@ class SpectralLibraryHnsw(SpectralLibraryAnn):
             The ANN index for the specified precursor charge.
         """
         if self._current_index[0] != charge:
-            logging.debug('Loading the ANN index for charge {}'.format(charge))
-            # unload the previous index
-            if self._current_index[1] is not None:
-                nmslib_vector.freeIndex(self._current_index[1])
-            # create the new index
-            self._current_index = charge, nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT)
-            # add all spectra with the given charge to the index (FIXME: silly nmslib behavior)
-            spec_count = 0
-            with self._library_reader as lib_reader:
-                for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
-                    # discard spectra with a dissimilar precursor charge
-                    if charge == lib_spectrum.precursor_charge:
-                        lib_spectrum.process_peaks()
-                        if lib_spectrum.is_valid():
-                            nmslib_vector.addDataPoint(self._current_index[1], spec_count, lib_spectrum.get_vector().tolist())
-                            spec_count += 1
-            # load the index
-            nmslib_vector.loadIndex(self._current_index[1], self._ann_filenames[charge])
-            # set query parameters
-            nmslib_vector.setQueryTimeParams(self._current_index[1], ['ef={}'.format(config.ef)])
+            with self._ann_index_lock:
+                logging.debug('Loading the ANN index for charge {}'.format(charge))
+                # unload the previous index
+                if self._current_index[1] is not None:
+                    nmslib_vector.freeIndex(self._current_index[1])
+                # create the new index
+                self._current_index = charge, nmslib_vector.init('cosinesimil', [], 'hnsw', nmslib_vector.DataType.VECTOR, nmslib_vector.DistType.FLOAT)
+                # add all spectra with the given charge to the index (FIXME: silly nmslib behavior)
+                spec_count = 0
+                with self._library_reader as lib_reader:
+                    for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
+                        # discard spectra with a dissimilar precursor charge
+                        if charge == lib_spectrum.precursor_charge:
+                            lib_spectrum.process_peaks()
+                            if lib_spectrum.is_valid():
+                                nmslib_vector.addDataPoint(self._current_index[1], spec_count, lib_spectrum.get_vector().tolist())
+                                spec_count += 1
+                # load the index
+                nmslib_vector.loadIndex(self._current_index[1], self._ann_filenames[charge])
+                # set query parameters
+                nmslib_vector.setQueryTimeParams(self._current_index[1], ['ef={}'.format(config.ef)])
 
         return self._current_index[1]
 
