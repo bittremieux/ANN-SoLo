@@ -28,9 +28,9 @@ def get_matching_peaks(library_spectrum, query_spectrum):
                                                            allow_shift=config.allow_peak_shifts)
     library_matches, query_matches = {}, {}
     for peak_match in peak_matches:
-        library_matches[peak_match[0]] = query_matches[peak_match[1]] = \
-            colors[library_spectrum.annotations[peak_match[0]][0][0]
-            if library_spectrum.annotations[peak_match[0]] is not None else None]
+        query_matches[peak_match[0]] = library_matches[peak_match[1]] = \
+            colors[library_spectrum.annotations[peak_match[1]][0][0]
+            if library_spectrum.annotations[peak_match[1]] is not None else None]
 
     return library_matches, query_matches, score
 
