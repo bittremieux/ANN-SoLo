@@ -26,30 +26,26 @@ namespace ann_solo
     class Spectrum
     {
         public:
-            Spectrum(double precursor_mz, unsigned int precursor_charge,
-                     std::vector<float> masses, std::vector<float> intensities, std::vector<uint8_t> charges) :
-                m_precursor_mz(precursor_mz), m_precursor_charge(precursor_charge),
+            Spectrum(double precursor_mz, unsigned int precursor_charge, unsigned int num_peaks,
+                     float *masses, float *intensities, uint8_t *charges) :
+                m_precursor_mz(precursor_mz), m_precursor_charge(precursor_charge), m_num_peaks(num_peaks),
                 m_masses(masses), m_intensities(intensities), m_charges(charges) {}
-            ~Spectrum()
-            {
-                m_masses.clear();
-                m_intensities.clear();
-                m_charges.clear();
-            }
+            ~Spectrum() {}
 
             double getPrecursorMz() const { return m_precursor_mz; }
             unsigned int getPrecursorCharge() const { return m_precursor_charge; }
-            unsigned int getNumPeaks() const { return m_masses.size(); }
-            float getPeakMass(unsigned int peak_index) const { return m_masses[peak_index]; }
-            float getPeakIntensity(unsigned int peak_index) const { return m_intensities[peak_index]; }
-            uint8_t getPeakCharge(unsigned int peak_index) const { return m_charges[peak_index]; }
+            unsigned int getNumPeaks() const { return m_num_peaks; }
+            float getPeakMass(unsigned int peak_index) const { return *(m_masses + peak_index); }
+            float getPeakIntensity(unsigned int peak_index) const { return *(m_intensities + peak_index); }
+            uint8_t getPeakCharge(unsigned int peak_index) const { return *(m_charges + peak_index); }
 
         private:
             double m_precursor_mz;
             unsigned int m_precursor_charge;
-            std::vector<float> m_masses;
-            std::vector<float> m_intensities;
-            std::vector<uint8_t> m_charges;
+            unsigned int m_num_peaks;
+            float *m_masses;
+            float *m_intensities;
+            uint8_t *m_charges;
     };
 
     class SpectrumSpectrumMatch

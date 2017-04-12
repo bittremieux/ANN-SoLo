@@ -30,8 +30,11 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
             {
                 for(unsigned int charge = 1; charge < candidate->getPrecursorCharge(); charge++)
                 {
-                    candidate_peaks.push_back(Peak(candidate->getPeakMass(peak_index) - mass_dif / charge,
-                                                   candidate->getPeakIntensity(peak_index), charge, peak_index));
+                    double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
+                    if(mass > 0)
+                    {
+                        candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), charge, peak_index));
+                    }
                 }
             }
             std::sort(candidate_peaks.begin(), candidate_peaks.end(), [](auto &peak1, auto &peak2) {

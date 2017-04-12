@@ -12,7 +12,7 @@ from config import config
 
 cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
     cdef cppclass Spectrum:
-        Spectrum(double, unsigned int, vector[float], vector[float], vector[np.uint8_t]) except +
+        Spectrum(double, unsigned int, unsigned int, np.float32_t*, np.float32_t*, np.uint8_t*) except +
 
     cdef cppclass SpectrumSpectrumMatch:
         SpectrumSpectrumMatch(unsigned int) nogil except +
@@ -59,6 +59,8 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
         allow_shift_c = config.allow_peak_shifts
 
     cdef vector[Spectrum*] candidates_vec
+    cdef np.float32_t[:] masses, intensities
+    cdef np.uint8_t[:] charges
     cdef unsigned int candidate_index
     cdef double score
     cdef vector[pair[uint, uint]] peak_matches
@@ -69,10 +71,17 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
             for index, annotation in enumerate(candidate.annotations):
                 if annotation is not None:
                     candidate_charges[index] = annotation[1]
-            candidates_vec.push_back(new Spectrum(candidate.precursor_mz, candidate.precursor_charge,
-                                                  candidate.masses, candidate.intensities, candidate_charges))
+            masses = candidate.masses
+            intensities = candidate.intensities
+            charges = candidate_charges
+            candidates_vec.push_back(new Spectrum(candidate.precursor_mz, candidate.precursor_charge, len(candidate.masses),
+                                                  &masses[0], &intensities[0], &charges[0]))
 
-        query_spec = new Spectrum(query.precursor_mz, query.precursor_charge, query.masses, query.intensities, query.annotations)
+        masses = query.masses
+        intensities = query.intensities
+        charges = np.zeros(len(candidate.annotations), dtype=np.uint8)
+        query_spec = new Spectrum(query.precursor_mz, query.precursor_charge, len(query.masses),
+                                  &masses[0], &intensities[0], &charges[0])
 
         with nogil:
             query_matcher = new SpectrumMatcher()
