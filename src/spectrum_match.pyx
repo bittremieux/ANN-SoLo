@@ -3,6 +3,7 @@
 
 import numpy as np
 cimport numpy as np
+from libcpp cimport bool as bool_t
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 
@@ -14,14 +15,14 @@ cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
         Spectrum(double, unsigned int, vector[float], vector[float], vector[np.uint8_t]) except +
 
     cdef cppclass SpectrumSpectrumMatch:
-        SpectrumSpectrumMatch(unsigned int) except +
-        unsigned int getCandidateIndex()
-        double getScore()
-        vector[pair[uint, uint]]* getPeakMatches()
+        SpectrumSpectrumMatch(unsigned int) nogil except +
+        unsigned int getCandidateIndex() nogil
+        double getScore() nogil
+        vector[pair[uint, uint]]* getPeakMatches() nogil
 
     cdef cppclass SpectrumMatcher:
-        SpectrumMatcher() except +
-        SpectrumSpectrumMatch* dot(Spectrum*, vector[Spectrum*], double, boolean)
+        SpectrumMatcher() nogil except +
+        SpectrumSpectrumMatch* dot(Spectrum*, vector[Spectrum*], double, bool_t) nogil
 
 
 def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=None):
@@ -46,12 +47,21 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
         tuples `(query_peak_id, candidate_peak_id)` of the matching peaks between the query spectrum and the optimal
         candidate spectrum.
     """
-    if fragment_mz_tolerance is None:
-        fragment_mz_tolerance = config.fragment_mz_tolerance
-    if allow_shift is None:
-        allow_shift = config.allow_peak_shifts
+    cdef double fragment_mz_tolerance_c
+    cdef bool_t allow_shift_c
+    if fragment_mz_tolerance is not None:
+        fragment_mz_tolerance_c = fragment_mz_tolerance
+    else:
+        fragment_mz_tolerance_c = config.fragment_mz_tolerance
+    if allow_shift is not None:
+        allow_shift_c = allow_shift
+    else:
+        allow_shift_c = config.allow_peak_shifts
 
     cdef vector[Spectrum*] candidates_vec
+    cdef unsigned int candidate_index
+    cdef double score
+    cdef vector[pair[uint, uint]] peak_matches
     try:
         # convert the candidates
         for candidate in candidates:
@@ -64,10 +74,14 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
 
         query_spec = new Spectrum(query.precursor_mz, query.precursor_charge, query.masses, query.intensities, query.annotations)
 
-        query_matcher = new SpectrumMatcher()
-        result = query_matcher.dot(query_spec, candidates_vec, fragment_mz_tolerance, allow_shift)
+        with nogil:
+            query_matcher = new SpectrumMatcher()
+            result = query_matcher.dot(query_spec, candidates_vec, fragment_mz_tolerance_c, allow_shift_c)
+            candidate_index = result.getCandidateIndex()
+            score = result.getScore()
+            peak_matches = result.getPeakMatches()[0]
 
-        return candidates[result.getCandidateIndex()], result.getScore(), result.getPeakMatches()[0]
+        return candidates[candidate_index], score, [peak_matches[i] for i in range(peak_matches.size())]
     finally:
         for i in range(candidates_vec.size()):
             del candidates_vec[i]
