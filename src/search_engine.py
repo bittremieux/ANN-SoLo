@@ -421,8 +421,9 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 if self._current_index[1] is not None:
                     self._current_index[1].unload()
                 # load the new index
-                self._current_index = charge, annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
-                self._current_index[1].load(self._ann_filenames[charge])
+                index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+                index.load(self._ann_filenames[charge])
+                self._current_index = charge, index
 
         return self._current_index[1]
 
