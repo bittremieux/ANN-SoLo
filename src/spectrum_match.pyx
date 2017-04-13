@@ -1,6 +1,7 @@
 # distutils: language = c++
 # distutils: sources = SpectrumMatch.cpp
 
+import cython
 import numpy as np
 cimport numpy as np
 from libcpp cimport bool as bool_t
@@ -25,6 +26,8 @@ cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
         SpectrumSpectrumMatch* dot(Spectrum*, vector[Spectrum*], double, bool_t) nogil
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=None):
     """
     Find the best matching candidate spectrum compared to the given query spectrum.
