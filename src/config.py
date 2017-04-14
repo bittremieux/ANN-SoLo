@@ -81,10 +81,9 @@ class Config:
 
         # MODE
         # use an ANN index or the conventional brute-force mode
-        self._parser.add_argument('--mode', type=str, choices=['annoy', 'bf', 'hnsw'], required=True,
+        self._parser.add_argument('--mode', type=str, choices=['ann', 'bf'], required=True,
                                   help="search using an approximate nearest neighbors or the conventional (brute-force)"
-                                       " mode; 'bf': brute-force, 'annoy': ANN using Annoy, 'hnsw': ANN using "
-                                       "hierarchical navigable small-world graph")
+                                       " mode; 'bf': brute-force, 'ann': approximate nearest neighbors indexing")
 
         # bin size for the ANN index (Dalton)
         self._parser.add_argument('--bin_size', default=1.0, type=float,
@@ -109,16 +108,6 @@ class Config:
         self._parser.add_argument('--search_k', default=50000, type=int,
                                   help='number of nodes to explore in the ANN index during searching '
                                        '(only required when using Annoy mode; default: %(default)s)')
-
-        # custom HNSW parameters
-        # size of the initial set of potential neighbors during indexing
-        self._parser.add_argument('--M', default=32, type=int,
-                                  help='size of the initial set of potential neighbors to construct the HNSW graph '
-                                       '(default: %(default)s)')
-        # depth of the ANN search
-        self._parser.add_argument('--ef', default=200, type=int,
-                                  help='depth of the search that is used to find the nearest neighbors '
-                                       '(default: %(default)s)')
 
         # filled in 'parse', contains the specified settings
         self._namespace = None

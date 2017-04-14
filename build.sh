@@ -56,14 +56,6 @@ pip install joblib==0.10.0
 
 ####################################################################################################
 
-# install nmslib
-cd $HOME/build
-
-git clone -q --branch=master git://github.com/searchivarius/nmslib.git
-(cd nmslib/similarity_search && git checkout tags/v1.5.3 && cmake . && make && cd ../python_vect_bindings && make install)
-
-####################################################################################################
-
 # minimize image size
 apt-get remove -y --purge git-core build-essential
 apt-get autoremove -y
