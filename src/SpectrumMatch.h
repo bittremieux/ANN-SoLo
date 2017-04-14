@@ -1,3 +1,6 @@
+#ifndef SPECTRUMMATCH_H
+#define SPECTRUMMATCH_H
+
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -76,3 +79,5 @@ namespace ann_solo
             SpectrumSpectrumMatch* dot(Spectrum *query, std::vector<Spectrum*> candidates, double fragment_mz_tolerance, bool allow_shift);
     };
 }
+
+#endif
