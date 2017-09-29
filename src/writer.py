@@ -41,10 +41,8 @@ def write_mztab(identifications, filename):
                    'min_dynamic_range', 'min_peaks', 'min_mz_range', 'max_peaks_used', 'scaling',
                    'precursor_tolerance_mass', 'precursor_tolerance_mode', 'fragment_mz_tolerance', 'allow_peak_shifts',
                    'mode']
-    if config.mode == 'annoy':
+    if config.mode == 'ann':
         config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff', 'num_trees', 'search_k'])
-    elif config.mode == 'hnsw':
-        config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff', 'M', 'ef'])
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i), '{} = {}'.format(key, config[key])))
 
