@@ -3,7 +3,7 @@ ANN SoLo
 
 For more information:
 
-* [Official code website](https://bitbucket.org/proteinspector/ann-solo/)
+* [Official code website](https://github.com/bittremieux/ANN-SoLo)
 
 **ANN SoLo** (Approximate Nearest Neighbor Spectral Library) uses approximate nearest neighbor indexing to significantly speed up spectral library searching in the case of (very) large search spaces, for example such as when performing an open modification search with a very wide precursor mass window.
 
@@ -14,25 +14,20 @@ Application
 
 **TODO:** Add information on command-line arguments and how to use the application.
 
-Docker
-------
-
-A [Docker](https://www.docker.com/) file is provided to easily execute ANN SoLo on any operating system. Execute the following steps in the project's directory to build and run the Docker container:
-
-    docker build -t ann-solo .
-    docker run -v [local-path-to-data]:/data ann-solo [args]
-
-And provide the required command-line arguments. The local data directory will be mounted as `/data`, so a spectral library file `lib.spql` present in this directory can be referred to as `/data/lib.spql`.
+- `spectral_library.py`
+- `convert_spectrast_to_spql.py`
+- `id_viewer.py`
 
 Dependencies
 ------------
 
-Although the Python code itself is compatible with both Python 2 and Python 3, currently only Python 2.7 is fully supported due to limitations imposed by external libraries.
-Not all external modules can be installed through `pip`, some of these can only be installed from source. Therefore, for ease of use it is recommended to run through Docker (see above).
+Python 3.5 or higher is required to run ANN SoLo.
 
-For more information on the required dependencies and the installation procedure, see `build.sh`.
+A suitable environment can easily be created using [conda](https://conda.io/):
+
+    conda env create -f environment.yml
 
 Contact
 -------
 
-For more information you can visit the [official code website](https://bitbucket.org/proteinspector/ann-solo/) and send a message through Bitbucket or send a mail to <wout.bittremieux@uantwerpen.be>.
+For more information you can visit the [official code website](https://github.com/bittremieux/ANN-SoLo) or send a mail to <wout.bittremieux@uantwerpen.be>.
