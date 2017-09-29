@@ -1,11 +1,8 @@
 import datetime
 import logging
 import os
+import pathlib
 import re
-try:
-    import pathlib
-except ImportError:
-    import pathlib2 as pathlib
 
 import reader
 from config import config

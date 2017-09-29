@@ -1,4 +1,3 @@
-from __future__ import division
 import math
 
 import numpy as np
@@ -148,7 +147,7 @@ class Spectrum:
         # remove peak(s) close to the precursor mass
         filter_peaks = filter_range
         if remove_precursor:
-            max_charge = self.precursor_charge + 1 if self.precursor_charge is not None else 2
+            max_charge = self.precursor_charge + 1 if self.precursor_charge is not None else 2  # exclusive
             filter_precursor = np.where(np.logical_or.reduce([np.logical_and(
                 self.precursor_mz / charge - remove_precursor_tolerance <= masses,
                 masses <= self.precursor_mz / charge + remove_precursor_tolerance)

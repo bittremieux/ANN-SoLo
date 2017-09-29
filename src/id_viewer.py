@@ -1,9 +1,6 @@
 import argparse
 import os
-try:
-    import urlparse                     # Python 2
-except ImportError:
-    import urllib.parse as urlparse     # Python 3
+import urllib.parse as urlparse
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -144,5 +141,5 @@ if __name__ == '__main__':
         library_spectrum.precursor_mz, query_spectrum.precursor_charge),
              horizontalalignment='center', verticalalignment='bottom', fontsize='large', transform=plt.gca().transAxes)
 
-    plt.savefig('{}.pdf'.format(query_id), bbox_inches='tight')
+    plt.savefig('{}.png'.format(query_id), bbox_inches='tight')
     plt.close()

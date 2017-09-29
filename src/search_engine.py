@@ -1,4 +1,3 @@
-from __future__ import division
 import abc
 import collections
 import copy
@@ -6,7 +5,6 @@ import logging
 import multiprocessing
 import multiprocessing.pool
 import os
-import six
 import time
 from collections import defaultdict
 
@@ -21,15 +19,7 @@ import spectrum_match
 from config import config
 
 
-# define FileNotFoundError for Python 2
-try:
-    FileNotFoundError
-except NameError:
-    FileNotFoundError = IOError
-
-
-@six.add_metaclass(abc.ABCMeta)
-class SpectralLibrary(object):
+class SpectralLibrary(metaclass=abc.ABCMeta):
     """
     Spectral library search engine.
 
@@ -384,7 +374,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
             # build only the ANN indices that contain sufficient points
             num_trees = config.num_trees
-            for charge, ann_index in six.iteritems(ann_indices):
+            for charge, ann_index in ann_indices.items():
                 logging.debug('Creating new ANN index for charge {}'.format(charge))
                 ann_index.build(num_trees)
                 logging.debug('Saving the ANN index for charge {}'.format(charge))

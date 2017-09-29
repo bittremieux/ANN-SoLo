@@ -5,17 +5,10 @@ import io
 import logging
 import mmap
 import os
-import six
+import pathlib
 import sqlite3
 import struct
-try:
-    from functools import lru_cache
-except ImportError:
-    from functools32 import lru_cache
-try:
-    import pathlib
-except ImportError:
-    import pathlib2 as pathlib
+from functools import lru_cache
 
 import joblib
 import numpy as np
@@ -25,13 +18,6 @@ from pyteomics import mgf
 
 import spectrum
 from config import config
-
-
-# define FileNotFoundError for Python 2
-try:
-    FileNotFoundError
-except NameError:
-    FileNotFoundError = IOError
 
 
 # convert NumPy arrays to/from BLOBs
@@ -115,8 +101,7 @@ def is_matching_config(match_keys, config1, config2):
     return filtered_config1 == filtered_config2
 
 
-@six.add_metaclass(abc.ABCMeta)
-class SpectralLibraryReader(object):
+class SpectralLibraryReader(metaclass=abc.ABCMeta):
     """
     Read spectra from a spectral library file.
     """
@@ -194,8 +179,7 @@ class SpectralLibraryReader(object):
         pass
 
 
-@six.add_metaclass(abc.ABCMeta)
-class SpectraSTReader(SpectralLibraryReader):
+class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
     """
     Read spectra from a SpectraST spectral library file.
     """
@@ -235,7 +219,7 @@ class SpectraSTReader(SpectralLibraryReader):
                 offsets[spec.identifier] = offset
         self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
                                    'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
-                          for charge, charge_info in six.iteritems(temp_info)}
+                          for charge, charge_info in temp_info.items()}
         self.spec_info['offset'] = offsets
 
         # store the configuration
@@ -441,7 +425,7 @@ class SqliteSpecReader(SpectralLibraryReader):
             info_charge['precursor_mass'].append(mass)
         self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
                                    'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
-                          for charge, charge_info in six.iteritems(temp_info)}
+                          for charge, charge_info in temp_info.items()}
 
         # store the configuration
         config_filename = self._filename + '.spcfg'
