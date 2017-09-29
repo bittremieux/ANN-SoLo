@@ -66,7 +66,7 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s [%(levelname)s/%(processName)s] %(module)s.%(funcName)s : %(message)s',
                         level=logging.DEBUG)
 
-    config_parser = configargparse.ArgParser(description='Convert SpectraST to BiblioSpec')
+    config_parser = configargparse.ArgParser(description='Convert SpectraST to spql')
     config_parser.add_argument('spectrast_filename', help='Input SpectraST spectral library file in sptxt/splib format')
     config_parser.add_argument('spql_filename', help='Output spectral library file in spql format')
     args = config_parser.parse_args()
