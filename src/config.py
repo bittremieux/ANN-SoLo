@@ -42,10 +42,8 @@ class Config:
                                        '(default: %(default)s Da)')
 
         # minimum fragment peak intensity to filter out noise peaks
-        self._parser.add_argument('--min_intensity', default=2.0, type=float,
-                                  help='remove peaks with a lower intensity (default: %(default)s)')
-        self._parser.add_argument('--min_dynamic_range', default=0.001, type=float,
-                                  help='remove peaks with a lower intensity than the fraction of the most intense peak '
+        self._parser.add_argument('--min_intensity', default=0.001, type=float,
+                                  help='remove peaks with a lower intensity relative to the maximum intensity '
                                        '(default: %(default)s)')
 
         # minimum number of fragment peaks or mass range (Dalton)

@@ -82,7 +82,7 @@ class Spectrum:
 
     def process_peaks(self, resolution=None, min_mz=None, max_mz=None,
                       remove_precursor=None, remove_precursor_tolerance=None, min_peaks=None, max_peaks_used=None,
-                      min_intensity=None, min_dynamic_range=None, min_mz_range=None, scaling=None):
+                      min_intensity=None, min_mz_range=None, scaling=None):
         """
         Check that the spectrum is of sufficient quality and process the peaks.
 
@@ -95,8 +95,7 @@ class Spectrum:
                                         mass to remove peaks.
             min_peaks: Discard spectra with less peaks.
             max_peaks_used: Only retain this many of the most intense peaks.
-            min_intensity: Remove peaks with a lower intensity.
-            min_dynamic_range: Remove peaks with a lower intensity than this fraction of the most intense peak.
+            min_intensity: Remove peaks with a lower intensity relative to the maximum intensity.
             min_mz_range: Discard spectra with a smaller mass range.
             scaling: Manner in which to scale the intensities ('sqrt' for square root scaling, 'rank' for rank scaling).
         """
@@ -116,8 +115,6 @@ class Spectrum:
             max_peaks_used = config.max_peaks_used
         if min_intensity is None:
             min_intensity = config.min_intensity
-        if min_dynamic_range is None:
-            min_dynamic_range = config.min_dynamic_range
         if min_mz_range is None:
             min_mz_range = config.min_mz_range
         if scaling is None:
@@ -171,7 +168,7 @@ class Spectrum:
         filter_number = np.argsort(filtered_intensities)[::-1][:max_peaks_used]
         # discard low-intensity noise peaks
         max_intensity = filtered_intensities[filter_number][0]
-        filter_noise = np.where(filtered_intensities >= max(min_intensity, min_dynamic_range * max_intensity))[0]
+        filter_noise = np.where(filtered_intensities >= min_intensity * max_intensity)[0]
 
         # apply intensity filters
         filter_intensity = np.intersect1d(filter_number, filter_noise, True)
