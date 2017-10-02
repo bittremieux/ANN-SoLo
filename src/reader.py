@@ -396,9 +396,9 @@ class SqliteSpecReader(SpectralLibraryReader):
     _supported_extensions = ['.spql']
 
     def __init__(self, filename, config_match_keys=None):
+        self._db_uri = '{}?mode=ro'.format(pathlib.Path(os.path.abspath(filename)).as_uri())
+        
         super().__init__(filename, config_match_keys)
-
-        self._db_uri = '{}?mode=ro'.format(pathlib.Path(os.path.abspath(self._filename)).as_uri())
 
     def _connect(self):
         return sqlite3.connect(self._db_uri, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, uri=True)
