@@ -549,6 +549,8 @@ def read_mztab_psms(filename):
 
     psms = pd.read_csv(filename, sep='\t', header=skiplines, index_col='PSM_ID')
     psms.drop('PSH', 1, inplace=True)
+    
+    psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'] = psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'].astype(bool)
 
     psms.df_name = os.path.splitext(os.path.basename(filename))[0]
 
