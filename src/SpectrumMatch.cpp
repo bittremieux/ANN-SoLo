@@ -92,8 +92,12 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         std::sort(peak_matches.begin(), peak_matches.end(), [](auto &peak_match1, auto &peak_match2) {
                   return std::get<0>(peak_match1) > std::get<0>(peak_match2); });
         SpectrumSpectrumMatch *this_match = new SpectrumSpectrumMatch(candidate_index);
-        bool query_peaks_used[query->getNumPeaks()] = {false};
-        bool candidate_peaks_used[candidate->getNumPeaks()] = {false};
+        const int query_num_peaks = query->getNumPeaks();
+        const int candidate_num_peaks = candidate->getNumPeaks();
+        bool query_peaks_used[query_num_peaks];
+        query_peaks_used[query_num_peaks] = {false};
+        bool candidate_peaks_used[candidate_num_peaks];
+        candidate_peaks_used[candidate_num_peaks] = {false};
         for(unsigned int peak_match_index = 0; peak_match_index < peak_matches.size(); peak_match_index++)
         {
             std::tuple<double, unsigned int, unsigned int> peak_match = peak_matches[peak_match_index];
