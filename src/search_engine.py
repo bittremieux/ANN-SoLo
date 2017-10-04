@@ -403,10 +403,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         Returns:
             The ANN index for the specified precursor charge.
         """
-        if self._current_index[0] == charge:
-            return self._current_index[1]
-        else:
-            with self._ann_index_lock:
+        with self._ann_index_lock:
+            if self._current_index[0] != charge:
                 logging.debug('Loading the ANN index for charge {}'.format(charge))
                 # unload the previous index
                 if self._current_index[1] is not None:
@@ -415,8 +413,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
                 index.load(self._ann_filenames[charge])
                 self._current_index = charge, index
-
-                return self._current_index[1]
+    
+            return self._current_index[1]
 
     def _query_ann(self, query, num_candidates):
         """
