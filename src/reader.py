@@ -110,6 +110,8 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
 
     _supported_extensions = []
 
+    is_recreated = False
+
     def __init__(self, filename, config_match_keys=None):
         """
         Initialize the spectral library reader. Metadata for future easy access of the individual Spectra is read from
@@ -159,6 +161,10 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         if do_create:
             self._create()
 
+    @abc.abstractmethod
+    def _create(self):
+        self.is_recreated = True
+
     def __enter__(self):
         return self
 
@@ -205,6 +211,8 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         reading, and its precursor mass for filtering using a precursor mass window. Finally, it also contains the
         settings used to construct this spectral library to make sure these match the runtime settings.
         """
+        super()._create()
+        
         logging.info('Creating the spectral library configuration for file %s', self._filename)
 
         # read all the spectra in the spectral library
@@ -407,6 +415,8 @@ class SqliteSpecReader(SpectralLibraryReader):
         """
         Create a new configuration file for the spectral library.
         """
+        super()._create()
+        
         logging.info('Creating the spectral library configuration for file %s', self._filename)
 
         # collect summary information about the spectra for easy retrieval

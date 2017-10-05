@@ -339,8 +339,12 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
         self._ann_filenames = {}
         self._current_index = None, None
+        
         do_create = False
-
+        verify_file_existence = True
+        if self._library_reader.is_recreated:
+            logging.warning('ANN indices were created using non-compatible settings')
+            verify_file_existence = False
         # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
         ann_charges = [charge for charge in self._library_reader.spec_info if
@@ -348,7 +352,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxann'.format(base_filename, charge)
-            if not os.path.isfile(self._ann_filenames[charge]):
+            if not verify_file_existence or not os.path.isfile(self._ann_filenames[charge]):
                 do_create = True
                 create_ann_charges.append(charge)
                 logging.warning('Missing ANN index file for charge {}'.format(charge))
