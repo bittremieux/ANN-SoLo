@@ -21,5 +21,6 @@ if __name__ == '__main__':
 
     identifications = spec_lib.search(config.query_filename)
     writer.write_mztab(identifications, config.out_filename)
+    spec_lib.shutdown()
 
     logging.shutdown()

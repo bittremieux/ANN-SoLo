@@ -46,6 +46,12 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
             logging.error(e)
             raise
 
+    def shutdown(self):
+        """
+        Release any resources to gracefully shut down.
+        """
+        pass
+
     def search(self, query_filename):
         """
         Identify all unknown spectra in the given query file.
@@ -335,7 +341,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             FileNotFoundError: The given spectral library file wasn't found or isn't supported.
         """
         # get the spectral library reader in the super-class initialization
-        super(self.__class__, self).__init__(lib_filename)
+        super().__init__(lib_filename)
 
         self._ann_filenames = {}
         self._current_index = None, None
@@ -387,6 +393,18 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 ann_index.unload()
 
             logging.info('Finished creating the spectral library ANN indices')
+
+    def shutdown(self):
+        """
+        Release any resources to gracefully shut down.
+        
+        The active ANN index is unloaded.
+        """
+        # unload the ANN index
+        if self._current_index[1] is not None:
+            self._current_index[1].unload()
+            
+        super().shutdown()
 
     def _get_ann_index(self, charge):
         """
