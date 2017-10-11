@@ -80,12 +80,13 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         logging.info('Identifying all query spectra')
         total_spectra = sum(len(spectra) for spectra in query_spectra.values())
         query_matches = {}
-        with tqdm.tqdm(desc='Query spectra identified', total=total_spectra, unit='spectra') as progress_bar:
+        with multiprocessing.pool.ThreadPool() as pool,\
+                tqdm.tqdm(desc='Query spectra identified', total=total_spectra, unit='spectra') as progress_bar:
             for query_spectra_charge in query_spectra.values():
                 # sort the spectra within a single precursor charge on their precursor mass
                 query_spectra_charge.sort(key=lambda spec: spec.precursor_mz)
                 # identify the spectra within a single precursor charge separately because of multithreading issues
-                for query_match in multiprocessing.pool.ThreadPool().imap_unordered(self._find_match, query_spectra_charge, 10):
+                for query_match in pool.imap_unordered(self._find_match, query_spectra_charge, 10):
                     progress_bar.update(1)
 
                     if query_match.sequence is not None:
@@ -385,18 +386,20 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
-
-            # build only the ANN indices that contain sufficient points
-            num_trees = config.num_trees
-            for charge, ann_index in ann_indices.items():
-                logging.debug('Creating new ANN index for charge {}'.format(charge))
-                ann_index.build(num_trees)
-                logging.debug('Saving the ANN index for charge {}'.format(charge))
-                ann_index.save(self._ann_filenames[charge])
-                # unload the index to prevent using excessive memory
-                ann_index.unload()
+            with multiprocessing.pool.ThreadPool() as pool:
+                pool.imap(self._build_ann_index, [(charge, ann_index, config.num_trees)
+                                                  for charge, ann_index in ann_indices.items()])
 
             logging.info('Finished creating the spectral library ANN indices')
+            
+    def _build_ann_index(self, args):
+        charge, ann_index, num_trees = args
+        logging.debug('Creating new ANN index for charge {}'.format(charge))
+        ann_index.build(num_trees)
+        logging.debug('Saving the ANN index for charge {}'.format(charge))
+        ann_index.save(self._ann_filenames[charge])
+        # unload the index to prevent using excessive memory
+        ann_index.unload()
 
     def shutdown(self):
         """
