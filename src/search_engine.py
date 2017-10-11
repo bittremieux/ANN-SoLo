@@ -367,7 +367,11 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         if do_create:
             # add all spectra to the ANN indices
             logging.debug('Adding the spectra to the spectral library ANN indices')
-            ann_indices = defaultdict(lambda: annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)))
+            ann_indices = {}
+            for charge in ann_charges:
+                ann_index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+                ann_index.set_seed(0)
+                ann_indices[charge] = ann_index
             charge_counts = collections.defaultdict(int)
             with self._library_reader as lib_reader:
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
@@ -433,6 +437,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                     self._current_index[1].unload()
                 # load the new index
                 index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size))
+                index.set_seed(0)
                 index.load(self._ann_filenames[charge])
                 self._current_index = charge, index
     
