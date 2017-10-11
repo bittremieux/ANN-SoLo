@@ -353,8 +353,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             verify_file_existence = False
         # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
-        ann_charges = [charge for charge in self._library_reader.spec_info if
-                       len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff]
+        ann_charges = sorted([charge for charge in self._library_reader.spec_info if
+                              len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff])
         create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxann'.format(base_filename, charge)
