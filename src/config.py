@@ -1,3 +1,5 @@
+import os
+
 import configargparse
 
 
@@ -13,8 +15,10 @@ class Config:
         Initialize the configuration settings and provide sensible default values if possible.
         """
 
-        self._parser = configargparse.ArgParser(description='Approximate nearest neighbor spectral library searching',
-                                                default_config_files=['./config.ini'])
+        self._parser = configargparse.ArgParser(
+                description='Approximate nearest neighbor spectral library searching',
+                default_config_files=['./config.ini',
+                                      os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.ini')])
 
         # IO
         self._parser.add_argument('spectral_library_filename', help='spectral library file')
