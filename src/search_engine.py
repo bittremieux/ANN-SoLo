@@ -6,7 +6,6 @@ import multiprocessing
 import multiprocessing.pool
 import os
 import time
-from collections import defaultdict
 
 import annoy
 import numexpr as ne
@@ -228,6 +227,8 @@ class SpectralLibraryAnn(SpectralLibrary):
     spectra to a query spectrum as potential matches during identification.
     """
 
+    _ann_filenames = {}
+    
     _ann_index_lock = multiprocessing.Lock()
 
     def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None, num_candidates=None, ann_cutoff=None):
@@ -344,7 +345,6 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         # get the spectral library reader in the super-class initialization
         super().__init__(lib_filename)
 
-        self._ann_filenames = {}
         self._current_index = None, None
         
         do_create = False
