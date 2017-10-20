@@ -10,7 +10,6 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
 {
     // compute a dot product score between the query spectrum and each candidate spectrum
     SpectrumSpectrumMatch *best_match = NULL;
-    #pragma omp parallel for
     for(unsigned int candidate_index = 0; candidate_index < candidates.size(); candidate_index++)
     {
         Spectrum *candidate = candidates[candidate_index];
@@ -114,21 +113,18 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         candidate_peaks_used.clear();
         peak_matches.clear();
 
-        #pragma omp critical
+        // retain the match with the highest score
+        if(best_match == NULL || best_match->getScore() < this_match->getScore())
         {
-            // retain the match with the highest score
-            if(best_match == NULL || best_match->getScore() < this_match->getScore())
+            if(best_match != NULL)
             {
-                if(best_match != NULL)
-                {
-                    delete best_match;
-                }
-                best_match = this_match;
+                delete best_match;
             }
-            else
-            {
-                delete this_match;
-            }
+            best_match = this_match;
+        }
+        else
+        {
+            delete this_match;
         }
     }
 
