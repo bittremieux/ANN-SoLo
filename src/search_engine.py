@@ -80,7 +80,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         logging.info('Identifying all query spectra')
         total_spectra = sum(len(spectra) for spectra in query_spectra.values())
         query_matches = {}
-        with multiprocessing.pool.ThreadPool() as pool,\
+        with multiprocessing.pool.ThreadPool(config.num_threads) as pool,\
                 tqdm.tqdm(desc='Query spectra identified', total=total_spectra, unit='spectra') as progress_bar:
             for query_spectra_charge in query_spectra.values():
                 # sort the spectra within a single precursor charge on their precursor mass
@@ -386,7 +386,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
-            with multiprocessing.pool.ThreadPool() as pool:
+            with multiprocessing.pool.ThreadPool(config.num_threads) as pool:
                 pool.map(self._build_ann_index, [(charge, ann_index, config.num_trees)
                                                  for charge, ann_index in ann_indices.items()])
 
