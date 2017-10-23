@@ -35,22 +35,22 @@ sqlite3.register_adapter(np.ndarray, adapt_array)
 sqlite3.register_converter('array', convert_array)
 
 
-def get_spectral_library_reader(filename, config_match_keys=None):
+def get_spectral_library_reader(filename, config_hash=None):
     if not os.path.isfile(filename):
         raise FileNotFoundError('Spectral library file {} not found'.format(filename))
 
     base_filename, ext = os.path.splitext(filename)
     if ext == '.spql':
-        return SqliteSpecReader(filename, config_match_keys)
+        return SqliteSpecReader(filename, config_hash)
     elif ext == '.splib' or ext == '.sptxt':
         splib_exists = os.path.isfile(base_filename + '.splib')
         sptxt_exists = os.path.isfile(base_filename + '.sptxt')
         if splib_exists:
             # prefer an splib file because it is faster to read
-            return SplibReader(base_filename + '.splib', config_match_keys)
+            return SplibReader(base_filename + '.splib', config_hash)
         elif sptxt_exists:
             # fall back to an sptxt file
-            return SptxtReader(base_filename + '.sptxt', config_match_keys)
+            return SptxtReader(base_filename + '.sptxt', config_hash)
     else:
         raise FileNotFoundError('Unrecognized file format (supported file formats: spql, splib, sptxt)')
 
@@ -84,23 +84,6 @@ def _parse_annotation(raw):
     return None
 
 
-def is_matching_config(match_keys, config1, config2):
-    """
-    Check if two configurations match for the specified keys.
-
-    Args:
-        match_keys: The keys on which the two configurations need to match.
-        config1: The first configuration.
-        config2: The second configuration.
-
-    Returns:
-        True if both configurations match for the specified keys, False if not.
-    """
-    filtered_config1 = {key: config1[key] for key in match_keys}
-    filtered_config2 = {key: config2[key] for key in match_keys}
-    return filtered_config1 == filtered_config2
-
-
 class SpectralLibraryReader(metaclass=abc.ABCMeta):
     """
     Read spectra from a spectral library file.
@@ -112,7 +95,7 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
 
     is_recreated = False
 
-    def __init__(self, filename, config_match_keys=None):
+    def __init__(self, filename, config_hash=None):
         """
         Initialize the spectral library reader. Metadata for future easy access of the individual Spectra is read from
         the corresponding configuration file.
@@ -123,14 +106,14 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
 
         Args:
             filename: The file name of the spectral library.
-            config_match_keys: Configuration settings that need to match between the runtime configuration and the
-                               loaded configuration.
+            config_hash: The hash representing the current spectral library configuration.
 
         Raises:
             FileNotFoundError: The given spectral library file wasn't found.
             ValueError: The configuration file wasn't found or its settings don't correspond to the runtime settings.
         """
         self._filename = filename
+        self._config_hash = config_hash
         do_create = False
 
         # test if the given spectral library file is in a supported format
@@ -139,18 +122,17 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         logging.info('Loading the spectral library configuration')
 
         # verify that the configuration file corresponding to this spectral library is present
-        config_filename = self._filename + '.spcfg'
+        config_filename = self._get_config_filename()
         if not os.path.isfile(config_filename):
             # if not we should recreate this file prior to using the spectral library
             do_create = True
             logging.warning('Missing configuration file corresponding to this spectral library')
         else:
             # load the configuration file
-            self.spec_info, load_config = joblib.load(config_filename)
+            self.spec_info, load_hash = joblib.load(config_filename)
 
             # verify that the runtime settings match the loaded settings
-            if config_match_keys is not None and\
-               not is_matching_config(config_match_keys, config._namespace, load_config):
+            if self._config_hash != load_hash:
                 # if not we should recreate the configuration file prior to using the spectral library
                 do_create = True
                 logging.warning('The spectral library search engine was created using non-compatible settings')
@@ -160,6 +142,9 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         # (re)create the spectral library configuration if it is missing or incorrect
         if do_create:
             self._create()
+            
+    def _get_config_filename(self):
+        return '{}_{}.spcfg'.format(os.path.splitext(self._filename)[0], self._config_hash[:7])
 
     @abc.abstractmethod
     def _create(self):
@@ -231,9 +216,9 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         self.spec_info['offset'] = offsets
 
         # store the configuration
-        config_filename = self._filename + '.spcfg'
+        config_filename = self._get_config_filename()
         logging.debug('Saving the spectral library configuration to file %s', config_filename)
-        joblib.dump((self.spec_info, config._namespace), config_filename, compress=9, protocol=2)
+        joblib.dump((self.spec_info, self._config_hash), config_filename, compress=9, protocol=2)
 
         logging.info('Finished creating the spectral library configuration')
 
@@ -403,10 +388,10 @@ class SqliteSpecReader(SpectralLibraryReader):
 
     _supported_extensions = ['.spql']
 
-    def __init__(self, filename, config_match_keys=None):
+    def __init__(self, filename, config_hash=None):
         self._db_uri = '{}?mode=ro'.format(pathlib.Path(os.path.abspath(filename)).as_uri())
         
-        super().__init__(filename, config_match_keys)
+        super().__init__(filename, config_hash)
 
     def _connect(self):
         return sqlite3.connect(self._db_uri, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, uri=True)
@@ -438,9 +423,9 @@ class SqliteSpecReader(SpectralLibraryReader):
                           for charge, charge_info in temp_info.items()}
 
         # store the configuration
-        config_filename = self._filename + '.spcfg'
+        config_filename = self._get_config_filename()
         logging.debug('Saving the spectral library configuration to file %s', config_filename)
-        joblib.dump((self.spec_info, config._namespace), config_filename, compress=9, protocol=2)
+        joblib.dump((self.spec_info, self._config_hash), config_filename, compress=9, protocol=2)
 
         logging.info('Finished creating the spectral library configuration')
 

@@ -1,6 +1,7 @@
 import abc
 import collections
 import copy
+import hashlib
 import logging
 import multiprocessing
 import multiprocessing.pool
@@ -40,10 +41,14 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
             FileNotFoundError: The given spectral library file wasn't found or isn't supported.
         """
         try:
-            self._library_reader = reader.get_spectral_library_reader(lib_filename, self._config_match_keys)
+            self._library_reader = reader.get_spectral_library_reader(lib_filename, self._get_config_hash())
         except FileNotFoundError as e:
             logging.error(e)
             raise
+            
+    def _get_config_hash(self):
+        config_match = {config_key: config[config_key] for config_key in self._config_match_keys}
+        return hashlib.sha1(str(config_match).encode('utf-8')).hexdigest()
 
     def shutdown(self):
         """
@@ -354,6 +359,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             verify_file_existence = False
         # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
+        base_filename = '{}_{}'.format(base_filename, self._get_config_hash()[:7])
         ann_charges = sorted([charge for charge in self._library_reader.spec_info if
                               len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff])
         create_ann_charges = []
