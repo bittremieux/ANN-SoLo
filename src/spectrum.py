@@ -193,6 +193,8 @@ class Spectrum:
         self.intensities = norm_intensities
         self.annotations = filtered_annotations
         self._is_processed = True
+        
+        return self
 
     def get_vector(self, min_mz=None, max_mz=None, bin_size=None):
         """

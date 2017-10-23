@@ -384,11 +384,9 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
                     # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
-                    if charge in create_ann_charges:
-                        lib_spectrum.process_peaks()
-                        if lib_spectrum.is_valid():
-                            ann_indices[charge].add_item(charge_counts[charge], lib_spectrum.get_vector())
-                            charge_counts[charge] += 1
+                    if charge in create_ann_charges and lib_spectrum.process_peaks().is_valid():
+                        ann_indices[charge].add_item(charge_counts[charge], lib_spectrum.get_vector())
+                        charge_counts[charge] += 1
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
