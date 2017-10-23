@@ -144,7 +144,10 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
             self._create()
             
     def _get_config_filename(self):
-        return '{}_{}.spcfg'.format(os.path.splitext(self._filename)[0], self._config_hash[:7])
+        if self._config_hash is not None:
+            return '{}_{}.spcfg'.format(os.path.splitext(self._filename)[0], self._config_hash[:7])
+        else:
+            return '{}.spcfg'.format(os.path.splitext(self._filename)[0])
 
     @abc.abstractmethod
     def _create(self):
