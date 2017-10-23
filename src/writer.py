@@ -12,7 +12,7 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 
 
-def write_mztab(identifications, filename):
+def write_mztab(identifications, filename, lib_reader):
     # check if the filename contains the mztab extension and add if required
     if os.path.splitext(filename)[1].lower() != '.mztab':
         filename += '.mztab'
@@ -42,10 +42,9 @@ def write_mztab(identifications, filename):
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i), '{} = {}'.format(key, config[key])))
 
-    with reader.get_spectral_library_reader(os.path.abspath(config.spectral_library_filename)) as lib_reader:
-        version = lib_reader.get_version()
-        database_version = '{} ({} entries)'.format(datetime.datetime.strftime(version[0], '%Y-%m-%d'), version[1])\
-                           if version is not None else 'null'
+    version = lib_reader.get_version()
+    database_version = '{} ({} entries)'.format(datetime.datetime.strftime(version[0], '%Y-%m-%d'), version[1])\
+                       if version is not None else 'null'
 
     with open(filename, 'w') as f_out:
         # metadata section

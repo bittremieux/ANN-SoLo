@@ -20,7 +20,8 @@ if __name__ == '__main__':
         spec_lib = search_engine.SpectralLibraryAnnoy(config.spectral_library_filename)
 
     identifications = spec_lib.search(config.query_filename)
-    writer.write_mztab(identifications, config.out_filename)
+    with spec_lib._library_reader as lib_reader:
+        writer.write_mztab(identifications, config.out_filename, lib_reader)
     spec_lib.shutdown()
 
     logging.shutdown()
