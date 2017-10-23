@@ -119,6 +119,9 @@ class Spectrum:
         if scaling is None:
             scaling = config.scaling
 
+        if self._is_processed:
+            return self
+
         masses = self.masses
         intensities = self.intensities
         annotations = self.annotations
