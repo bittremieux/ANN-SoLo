@@ -346,7 +346,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         Args:
             lib_filename: The spectral library file name.
             lib_spectra: All valid spectra from the spectral library. Avoids re-reading a large spectral library if not
-                         `None`.
+                         `None`. This needs to be an iterable giving tuples of which the first element is a Spectrum
+                         and the second element is ignored.
 
         Raises:
             FileNotFoundError: The given spectral library file wasn't found or isn't supported.
