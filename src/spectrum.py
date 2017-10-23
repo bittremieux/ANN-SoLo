@@ -159,7 +159,7 @@ class Spectrum:
 
         # check if sufficient peaks remain
         if len(filter_peaks) < min_peaks:
-            return
+            return self
 
         # apply mass range filter
         filtered_masses = masses[filter_peaks]
@@ -180,7 +180,7 @@ class Spectrum:
 
         # check if the peaks cover a sufficient m/z range
         if filtered_masses[-1] - filtered_masses[0] < min_mz_range:
-            return
+            return self
 
         # scale the intensities by their root to reduce the effect of extremely high intensity peaks
         if scaling == 'sqrt':
