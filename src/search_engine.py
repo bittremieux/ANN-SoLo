@@ -30,12 +30,14 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
 
     _config_match_keys = []
 
-    def __init__(self, lib_filename):
+    def __init__(self, lib_filename, lib_spectra=None):
         """
         Initialize the spectral library search engine from the given spectral library file.
 
         Args:
             lib_filename: The spectral library file name.
+            lib_spectra: All valid spectra from the spectral library. Avoids re-reading a large spectral library if not
+                         `None`.
 
         Raises:
             FileNotFoundError: The given spectral library file wasn't found or isn't supported.
@@ -334,7 +336,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
     _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'num_trees']
 
-    def __init__(self, lib_filename):
+    def __init__(self, lib_filename, lib_spectra=None):
         """
         Initialize the spectral library from the given spectral library file.
 
@@ -343,6 +345,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
         Args:
             lib_filename: The spectral library file name.
+            lib_spectra: All valid spectra from the spectral library. Avoids re-reading a large spectral library if not
+                         `None`.
 
         Raises:
             FileNotFoundError: The given spectral library file wasn't found or isn't supported.
@@ -381,7 +385,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 ann_indices[charge] = ann_index
             charge_counts = collections.defaultdict(int)
             with self._library_reader as lib_reader:
-                for lib_spectrum, _ in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra added', unit='spectra'):
+                lib_spectra_it = lib_spectra if lib_spectra is not None else lib_reader._get_all_spectra()
+                for lib_spectrum, _ in tqdm.tqdm(lib_spectra_it, desc='Library spectra added', unit='spectra'):
                     # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
                     if charge in create_ann_charges and lib_spectrum.process_peaks().is_valid():
