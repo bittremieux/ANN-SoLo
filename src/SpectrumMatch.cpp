@@ -18,9 +18,8 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         std::vector<Peak> candidate_peaks;
         for(unsigned int peak_index = 0; peak_index < candidate->getNumPeaks(); peak_index++)
         {
-            // unshifted peaks are always allowed to match irrespective of their charge: charge 0
             candidate_peaks.push_back(Peak(candidate->getPeakMass(peak_index),
-                                           candidate->getPeakIntensity(peak_index), 0, peak_index));
+                                           candidate->getPeakIntensity(peak_index), unshifted, peak_index));
         }
         // add shifted peaks if necessary
         double mass_dif = (query->getPrecursorMz() - candidate->getPrecursorMz()) * candidate->getPrecursorCharge();
@@ -28,27 +27,26 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         {
             for(unsigned int peak_index = 0; peak_index < candidate->getNumPeaks(); peak_index++)
             {
-                // peaks with a known charge are shifted with a mass difference corresponding to this charge
-                unsigned int min_charge = 0;
-                unsigned int max_charge = 0;
+                // peaks with a known charge (and therefore annotation) are shifted with a mass difference corresponding to this charge
                 if(candidate->getPeakCharge(peak_index) > 0)
                 {
-                    min_charge = candidate->getPeakCharge(peak_index);
-                    max_charge = min_charge + 1;
+                    unsigned int charge = candidate->getPeakCharge(peak_index);
+                    double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
+                    if(mass > 0)
+                    {
+                        candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), shifted_annotation, peak_index));
+                    }
                 }
                 // peaks without a known charge are shifted with a mass difference corresponding to all charges up to the precursor charge
                 else
                 {
-                    min_charge = 1;
-                    max_charge = candidate->getPrecursorCharge();
-                }
-                // create shifted peaks
-                for(unsigned int charge = min_charge; charge < max_charge; charge++)
-                {
-                    double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
-                    if(mass > 0)
+                    for(unsigned int charge = 1; charge < candidate->getPrecursorCharge(); charge++)
                     {
-                        candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), charge, peak_index));
+                        double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
+                        if(mass > 0)
+                        {
+                            candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), shifted, peak_index));
+                        }
                     }
                 }
             }
@@ -63,7 +61,6 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         {
             float query_peak_mass = query->getPeakMass(query_peak_index);
             float query_peak_intensity = query->getPeakIntensity(query_peak_index);
-            unsigned int query_peak_charge = query->getPeakCharge(query_peak_index);
             // advance while there is an excessive mass difference
             while(candidate_peak_index < candidate_peaks.size() - 1 &&
                   query_peak_mass - fragment_mz_tolerance > candidate_peaks[candidate_peak_index].getMass())
@@ -75,24 +72,17 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
             for(unsigned int index = 0; candidate_peak_index + index < candidate_peaks.size() &&
                 fabs(query_peak_mass - candidate_peaks[candidate_peak_index + index].getMass()) <= fragment_mz_tolerance; index++)
             {
-                double match_multiplier = 0.0;
-                // unshifted peak: indicated by candidate peak charge 0
-                if(candidate_peaks[candidate_peak_index + index].getCharge() == 0)
+                // slightly penalize matching peaks without an annotation
+                double match_multiplier;
+                switch(candidate_peaks[candidate_peak_index + index].getPeakStatus())
                 {
-                    match_multiplier = 1.0;
-                }
-                // annotated peak shifted according to the peak's charge: original peak's charge > 0
-                else if(candidate->getPeakCharge(candidate_peaks[candidate_peak_index + index].getIndex()) > 0)
-                {
-                    match_multiplier = 1.0;
-                }
-                // non-annotated peak shifted according to some charge
-                else
-                {
-                    match_multiplier = 2.0 / 3.0;
+                    case unshifted:          match_multiplier = 1.0; break;
+                    case shifted_annotation: match_multiplier = 1.0; break;
+                    case shifted:            match_multiplier = 2.0 / 3.0; break;
+                    default:                 match_multiplier = 0.0; break;
                 }
 
-                if(match_multiplier > 0)
+                if(match_multiplier > 0.0)
                 {
                     peak_matches.push_back(std::make_tuple(match_multiplier * query_peak_intensity * candidate_peaks[candidate_peak_index + index].getIntensity(),
                                                            query_peak_index, candidate_peaks[candidate_peak_index + index].getIndex()));
