@@ -18,6 +18,7 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         std::vector<Peak> candidate_peaks;
         for(unsigned int peak_index = 0; peak_index < candidate->getNumPeaks(); peak_index++)
         {
+            // unshifted peaks are always allowed to match irrespective of their charge: charge 0
             candidate_peaks.push_back(Peak(candidate->getPeakMass(peak_index),
                                            candidate->getPeakIntensity(peak_index), 0, peak_index));
         }
@@ -27,7 +28,22 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         {
             for(unsigned int peak_index = 0; peak_index < candidate->getNumPeaks(); peak_index++)
             {
-                for(unsigned int charge = 1; charge < candidate->getPrecursorCharge(); charge++)
+                // peaks with a known charge are shifted with a mass difference corresponding to this charge
+                unsigned int min_charge = 0;
+                unsigned int max_charge = 0;
+                if(candidate->getPeakCharge(peak_index) > 0)
+                {
+                    min_charge = candidate->getPeakCharge(peak_index);
+                    max_charge = min_charge + 1;
+                }
+                // peaks without a known charge are shifted with a mass difference corresponding to all charges up to the precursor charge
+                else
+                {
+                    min_charge = 1;
+                    max_charge = candidate->getPrecursorCharge();
+                }
+                // create shifted peaks
+                for(unsigned int charge = min_charge; charge < max_charge; charge++)
                 {
                     double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
                     if(mass > 0)
