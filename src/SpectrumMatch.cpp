@@ -75,27 +75,26 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
             for(unsigned int index = 0; candidate_peak_index + index < candidate_peaks.size() &&
                 fabs(query_peak_mass - candidate_peaks[candidate_peak_index + index].getMass()) <= fragment_mz_tolerance; index++)
             {
-                bool can_match = false;
-                // unshifted peak
+                double match_multiplier = 0.0;
+                // unshifted peak: indicated by candidate peak charge 0
                 if(candidate_peaks[candidate_peak_index + index].getCharge() == 0)
                 {
-                    can_match = true;
+                    match_multiplier = 1.0;
                 }
-                // annotated peak shifted according to the peak's charge
-                else if(query_peak_charge == candidate_peaks[candidate_peak_index + index].getCharge() &&
-                        query_peak_charge != 0 && candidate_peaks[candidate_peak_index + index].getCharge() != 0)
+                // annotated peak shifted according to the peak's charge: original peak's charge > 0
+                else if(candidate->getPeakCharge(candidate_peaks[candidate_peak_index + index].getIndex()) > 0)
                 {
-                    can_match = true;
+                    match_multiplier = 1.0;
                 }
                 // non-annotated peak shifted according to some charge
-                else if(query_peak_charge == 0)
+                else
                 {
-                    can_match = true;
+                    match_multiplier = 2.0 / 3.0;
                 }
 
-                if(can_match)
+                if(match_multiplier > 0)
                 {
-                    peak_matches.push_back(std::make_tuple(query_peak_intensity * candidate_peaks[candidate_peak_index + index].getIntensity(),
+                    peak_matches.push_back(std::make_tuple(match_multiplier * query_peak_intensity * candidate_peaks[candidate_peak_index + index].getIntensity(),
                                                            query_peak_index, candidate_peaks[candidate_peak_index + index].getIndex()));
                 }
             }
