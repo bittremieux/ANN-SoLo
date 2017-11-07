@@ -89,6 +89,9 @@ if __name__ == '__main__':
         if spec.identifier == query_id:
             query_spectrum = spec
             query_spectrum.process_peaks()
+            # make sure that the precursor charge is set for query spectra with a undefined precursor charge
+            if query_spectrum.precursor_charge is None:
+                query_spectrum.precursor_charge = library_spectrum.precursor_charge
             break
     # verify that the query spectrum was found
     if query_spectrum is None:
