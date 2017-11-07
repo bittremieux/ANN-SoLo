@@ -82,7 +82,7 @@ def get_best_match(query, candidates, fragment_mz_tolerance=None, allow_shift=No
 
         masses = query.masses
         intensities = query.intensities
-        charges = np.zeros(len(candidate.annotations), dtype=np.uint8)
+        charges = np.zeros(len(query.annotations), dtype=np.uint8)
         query_spec = new Spectrum(query.precursor_mz, query.precursor_charge, len(query.masses),
                                   &masses[0], &intensities[0], &charges[0])
 
