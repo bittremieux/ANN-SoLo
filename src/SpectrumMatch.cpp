@@ -40,7 +40,7 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
                 // peaks without a known charge are shifted with a mass difference corresponding to all charges up to the precursor charge
                 else
                 {
-                    for(unsigned int charge = 1; charge < candidate->getPrecursorCharge(); charge++)
+                    for(unsigned int charge = 1; charge <= candidate->getPrecursorCharge(); charge++)
                     {
                         double mass = candidate->getPeakMass(peak_index) + mass_dif / charge;
                         if(mass > 0)
