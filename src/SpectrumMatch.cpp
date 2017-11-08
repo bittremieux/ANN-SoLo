@@ -23,7 +23,7 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         }
         // add shifted peaks if necessary
         double mass_dif = (query->getPrecursorMz() - candidate->getPrecursorMz()) * candidate->getPrecursorCharge();
-        if(allow_shift && mass_dif > fragment_mz_tolerance)
+        if(allow_shift && fabs(mass_dif) > fragment_mz_tolerance)
         {
             for(unsigned int peak_index = 0; peak_index < candidate->getNumPeaks(); peak_index++)
             {
