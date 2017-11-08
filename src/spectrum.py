@@ -15,9 +15,14 @@ def get_dim(min_mz, max_mz, bin_size):
         bin_size: The bin size (in Da).
 
     Returns:
-        The number of bins over the given mass range for the given bin size.
+        A tuple containing (i) the number of bins over the given mass range for the given bin size, (ii) the highest
+        multiple of bin size lower than the minimum mass, (iii) the lowest multiple of the bin size greater than the
+        maximum mass. These two final values are the true boundaries of the mass range.
     """
-    return math.ceil((max_mz - min_mz + 1) / bin_size)
+    min_mz, max_mz = float(min_mz), float(max_mz)
+    start_dim = min_mz - min_mz % bin_size
+    end_dim = max_mz + bin_size - max_mz % bin_size if not math.isclose(max_mz % bin_size, 0, abs_tol=1e-09) else max_mz
+    return round((end_dim - start_dim) / bin_size), start_dim, end_dim
 
 
 class Spectrum:
@@ -221,10 +226,11 @@ class Spectrum:
             bin_size = config.bin_size
 
         if self.is_valid():
-            peaks = np.zeros((get_dim(min_mz, max_mz, bin_size),), dtype=np.float32)
+            vec_length, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
+            peaks = np.zeros((vec_length,), dtype=np.float32)
             # add each mass and intensity to their low-dimensionality bin
             for mass, intensity in zip(self.masses, self.intensities):
-                mass_bin = int((mass - min_mz) // bin_size)
+                mass_bin = math.floor((mass - min_bound) // bin_size)
                 peaks[mass_bin] += intensity
 
             # normalize
