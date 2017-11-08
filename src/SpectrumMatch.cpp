@@ -31,7 +31,7 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
                 if(candidate->getPeakCharge(peak_index) > 0)
                 {
                     unsigned int charge = candidate->getPeakCharge(peak_index);
-                    double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
+                    double mass = candidate->getPeakMass(peak_index) + mass_dif / charge;
                     if(mass > 0)
                     {
                         candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), shifted_annotation, peak_index));
@@ -42,7 +42,7 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
                 {
                     for(unsigned int charge = 1; charge < candidate->getPrecursorCharge(); charge++)
                     {
-                        double mass = candidate->getPeakMass(peak_index) - mass_dif / charge;
+                        double mass = candidate->getPeakMass(peak_index) + mass_dif / charge;
                         if(mass > 0)
                         {
                             candidate_peaks.push_back(Peak(mass, candidate->getPeakIntensity(peak_index), shifted, peak_index));
