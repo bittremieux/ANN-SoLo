@@ -153,9 +153,11 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
     def _create(self):
         self.is_recreated = True
 
+    @abc.abstractmethod
     def __enter__(self):
         return self
 
+    @abc.abstractmethod
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
@@ -397,7 +399,19 @@ class SqliteSpecReader(SpectralLibraryReader):
         super().__init__(filename, config_hash)
 
     def _connect(self):
-        return sqlite3.connect(self._db_uri, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False, uri=True)
+        return sqlite3.connect(self._db_uri, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
+        
+    def __enter__(self):
+        self._conn = self._connect()
+
+        cursor = self._conn.cursor()
+        cursor.execute('PRAGMA locking_mode = EXCLUSIVE')
+        self._conn.commit()
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._conn.close()
 
     def _create(self):
         """
@@ -440,14 +454,12 @@ class SqliteSpecReader(SpectralLibraryReader):
             A generator that yields all spectra from the spectral library file.
         """
         # retrieve the specified spectrum
-        conn = self._connect()
-        cursor = conn.cursor()
+        cursor = self._conn.cursor()
         cursor.execute('SELECT id, peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity '
                        'FROM RefSpectra, RefSpectraPeaks WHERE RefSpectra.id == RefSpectraPeaks.RefSpectraID')
         while True:
             result = cursor.fetchone()
             if result is None:
-                conn.close()
                 break
 
             spec_id, peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities = result
@@ -469,13 +481,11 @@ class SqliteSpecReader(SpectralLibraryReader):
             The `Spectrum` from the spectral library file with the specified identifier.
         """
         # retrieve the specified spectrum
-        conn = self._connect()
-        cursor = conn.cursor()
+        cursor = self._conn.cursor()
         cursor.execute('SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity, peakAnnotation '
                        'FROM RefSpectra, RefSpectraPeaks '
                        'WHERE RefSpectra.id == ? AND RefSpectra.id == RefSpectraPeaks.RefSpectraID', (int(spec_id),))
         peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities, annotations = cursor.fetchone()
-        conn.close()
 
         read_spectrum = spectrum.Spectrum(spec_id, precursor_mz, precursor_charge, None, peptide, is_decoy == 1)
         read_spectrum.set_peaks(masses, intensities, annotations)
@@ -486,11 +496,9 @@ class SqliteSpecReader(SpectralLibraryReader):
         return read_spectrum
 
     def get_version(self):
-        conn = self._connect()
-        cursor = conn.cursor()
+        cursor = self._conn.cursor()
         cursor.execute('SELECT createTime, numSpecs FROM LibInfo')
         create_time, num_specs = cursor.fetchone()
-        conn.close()
 
         return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'), num_specs
 

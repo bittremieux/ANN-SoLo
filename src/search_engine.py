@@ -72,35 +72,31 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
 
         # read all spectra in the query file and split based on their precursor charge
         logging.info('Reading all query spectra')
-        query_spectra = collections.defaultdict(list)
-        for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra'):
+        query_spectra = []
+        for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra', smoothing=0):
             # for queries with an unknown charge, try all possible charge states
             for charge in [2, 3] if query_spectrum.precursor_charge is None else [query_spectrum.precursor_charge]:
                 query_spectrum_charge = copy.copy(query_spectrum)   # TODO: don't needlessly copy
                 query_spectrum_charge.precursor_charge = charge
                 query_spectrum_charge.process_peaks()
                 if query_spectrum_charge.is_valid():      # discard low-quality spectra
-                    query_spectra[query_spectrum_charge.precursor_charge].append(query_spectrum_charge)
+                    query_spectra.append(query_spectrum_charge)
+
+        # sort the spectra based on their precursor charge and precursor mass
+        query_spectra.sort(key=lambda spec: (spec.precursor_charge, spec.precursor_mz))
 
         # identify all spectra
         logging.info('Identifying all query spectra')
-        total_spectra = sum(len(spectra) for spectra in query_spectra.values())
         query_matches = {}
-        with multiprocessing.pool.ThreadPool(config.num_threads) as pool,\
-                tqdm.tqdm(desc='Query spectra identified', total=total_spectra, unit='spectra') as progress_bar:
-            for query_spectra_charge in query_spectra.values():
-                # sort the spectra within a single precursor charge on their precursor mass
-                query_spectra_charge.sort(key=lambda spec: spec.precursor_mz)
-                # identify the spectra within a single precursor charge separately because of multithreading issues
-                for query_match in pool.imap_unordered(self._find_match, query_spectra_charge, 10):
-                    progress_bar.update(1)
+        for query_spectrum in tqdm.tqdm(query_spectra, desc='Query spectra identified', unit='spectra'):
+            query_match = self._find_match(query_spectrum)
 
-                    if query_match.sequence is not None:
-                        # make sure we only retain the best identification
-                        # (i.e. for duplicated spectra if the precursor charge was unknown)
-                        if query_match.query_id not in query_matches or\
-                           query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
-                            query_matches[query_match.query_id] = query_match
+            if query_match.sequence is not None:
+                # make sure we only retain the best identification
+                # (i.e. for duplicated spectra if the precursor charge was unknown)
+                if query_match.query_id not in query_matches or\
+                   query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
+                    query_matches[query_match.query_id] = query_match
 
         logging.info('Finished identifying file %s', query_filename)
 
