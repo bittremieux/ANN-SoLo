@@ -76,10 +76,9 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         for query_spectrum in tqdm.tqdm(reader.read_mgf(query_filename), desc='Query spectra read', unit='spectra', smoothing=0):
             # for queries with an unknown charge, try all possible charge states
             for charge in [2, 3] if query_spectrum.precursor_charge is None else [query_spectrum.precursor_charge]:
-                query_spectrum_charge = copy.copy(query_spectrum)   # TODO: don't needlessly copy
+                query_spectrum_charge = copy.copy(query_spectrum) if query_spectrum.precursor_charge is None else query_spectrum
                 query_spectrum_charge.precursor_charge = charge
-                query_spectrum_charge.process_peaks()
-                if query_spectrum_charge.is_valid():      # discard low-quality spectra
+                if query_spectrum_charge.process_peaks().is_valid():      # discard low-quality spectra
                     query_spectra.append(query_spectrum_charge)
 
         # sort the spectra based on their precursor charge and precursor mass
@@ -88,7 +87,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         # identify all spectra
         logging.info('Identifying all query spectra')
         query_matches = {}
-        for query_spectrum in tqdm.tqdm(query_spectra, desc='Query spectra identified', unit='spectra'):
+        for query_spectrum in tqdm.tqdm(query_spectra, desc='Query spectra identified', unit='spectra', smoothing=0):
             query_match = self._find_match(query_spectrum)
 
             if query_match.sequence is not None:
