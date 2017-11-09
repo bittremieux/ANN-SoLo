@@ -19,11 +19,6 @@ class Config:
                 description='Approximate nearest neighbor spectral library searching',
                 default_config_files=['./config.ini',
                                       os.path.join(os.path.dirname(os.path.realpath(__file__)), 'config.ini')])
-        
-        # RUNNING
-        self._parser.add_argument('--num_threads', default=1, const=None, type=int,
-                                  help='number of worker threads used; if specified without an argument the number of '
-                                       'CPUs will be used (default: 1)')
 
         # IO
         self._parser.add_argument('spectral_library_filename', help='spectral library file')
