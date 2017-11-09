@@ -392,7 +392,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
-            with multiprocessing.pool.ThreadPool(config.num_threads) as pool:
+            with multiprocessing.pool.ThreadPool(len(ann_indices)) as pool:
                 pool.map(self._build_ann_index, [(charge, ann_index, config.num_trees)
                                                  for charge, ann_index in ann_indices.items()])
 
