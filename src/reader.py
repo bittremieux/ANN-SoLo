@@ -16,7 +16,6 @@ import tqdm
 from pyteomics import mgf
 
 import spectrum
-from config import config
 
 
 # convert NumPy arrays to/from BLOBs
