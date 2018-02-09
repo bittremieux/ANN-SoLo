@@ -376,7 +376,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             logging.debug('Adding the spectra to the spectral library ANN indices')
             ann_indices = {}
             for charge in ann_charges:
-                ann_index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)[0])
+                ann_index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)[0], 'angular')
                 ann_index.set_seed(0)
                 ann_indices[charge] = ann_index
             charge_counts = collections.defaultdict(int)
@@ -444,7 +444,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 if self._current_index[1] is not None:
                     self._current_index[1].unload()
                 # load the new index
-                index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)[0])
+                index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)[0], 'angular')
                 index.set_seed(0)
                 index.load(self._ann_filenames[charge])
                 self._current_index = charge, index
