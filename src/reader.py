@@ -5,7 +5,6 @@ import io
 import logging
 import mmap
 import os
-import pathlib
 import sqlite3
 import struct
 from functools import lru_cache
@@ -394,12 +393,12 @@ class SqliteSpecReader(SpectralLibraryReader):
     _supported_extensions = ['.spql']
 
     def __init__(self, filename, config_hash=None):
-        self._db_uri = '{}?mode=ro'.format(pathlib.Path(os.path.abspath(filename)).as_uri())
+        self._db_filename = os.path.abspath(filename)
         
         super().__init__(filename, config_hash)
 
     def _connect(self):
-        return sqlite3.connect(self._db_uri, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
+        return sqlite3.connect(self._db_filename, detect_types=sqlite3.PARSE_DECLTYPES)
         
     def __enter__(self):
         self._conn = self._connect()
