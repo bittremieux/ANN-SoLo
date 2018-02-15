@@ -375,7 +375,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             # add all spectra to the ANN indices
             logging.debug('Adding the spectra to the spectral library ANN indices')
             ann_indices = {}
-            for charge in ann_charges:
+            for charge in create_ann_charges:
                 ann_index = annoy.AnnoyIndex(spectrum.get_dim(config.min_mz, config.max_mz, config.bin_size)[0], 'angular')
                 ann_index.set_seed(0)
                 ann_indices[charge] = ann_index
@@ -385,7 +385,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 for lib_spectrum, _ in tqdm.tqdm(lib_spectra_it, desc='Library spectra added', unit='spectra'):
                     # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
-                    if charge in create_ann_charges and lib_spectrum.process_peaks().is_valid():
+                    if charge in ann_indices.keys() and lib_spectrum.process_peaks().is_valid():
                         ann_indices[charge].add_item(charge_counts[charge], lib_spectrum.get_vector())
                         charge_counts[charge] += 1
 
