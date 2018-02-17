@@ -7,7 +7,8 @@ from config import config
 
 def get_dim(min_mz, max_mz, bin_size):
     """
-    Compute the number of bins over the given mass range for the given bin size.
+    Compute the number of bins over the given mass range for the given bin
+    size.
 
     Args:
         min_mz: The minimum mass in the mass range (inclusive).
@@ -15,13 +16,17 @@ def get_dim(min_mz, max_mz, bin_size):
         bin_size: The bin size (in Da).
 
     Returns:
-        A tuple containing (i) the number of bins over the given mass range for the given bin size, (ii) the highest
-        multiple of bin size lower than the minimum mass, (iii) the lowest multiple of the bin size greater than the
-        maximum mass. These two final values are the true boundaries of the mass range.
+        A tuple containing (i) the number of bins over the given mass range for
+        the given bin size, (ii) the highest multiple of bin size lower than
+        the minimum mass, (iii) the lowest multiple of the bin size greater
+        than the maximum mass. These two final values are the true boundaries
+        of the mass range.
     """
     min_mz, max_mz = float(min_mz), float(max_mz)
     start_dim = min_mz - min_mz % bin_size
-    end_dim = max_mz + bin_size - max_mz % bin_size if not math.isclose(max_mz % bin_size, 0, abs_tol=1e-09) else max_mz
+    end_dim = (max_mz + bin_size - max_mz % bin_size
+               if not math.isclose(max_mz % bin_size, 0, abs_tol=1e-09)
+               else max_mz)
     return round((end_dim - start_dim) / bin_size), start_dim, end_dim
 
 
@@ -29,20 +34,24 @@ class Spectrum:
     """
     Tandem mass spectrum.
 
-    A tandem mass spectrum with associated peaks and optionally an identification (for library spectra).
+    A tandem mass spectrum with associated peaks and optionally an
+    identification (for library spectra).
     """
 
-    def __init__(self, identifier, precursor_mz, precursor_charge, retention_time=None, peptide=None, is_decoy=False):
+    def __init__(self, identifier, precursor_mz, precursor_charge,
+                 retention_time=None, peptide=None, is_decoy=False):
         """
         Create a new Spectrum with the specified information.
 
         Args:
-            identifier: The unique identifier of the Spectrum (within the query file or the spectral library file).
+            identifier: The unique identifier of the Spectrum (within the query
+                file or the spectral library file).
             precursor_mz: The spectrum's precursor mass.
             precursor_charge: The spectrum's precursor charge.
             retention_time: The spectrum's retention time.
             peptide: The peptide sequence (if known).
-            is_decoy: True if the Spectrum is a decoy spectrum, False if not (target or query).
+            is_decoy: True if the Spectrum is a decoy spectrum, False if not
+                (target or query).
         """
         # unique identifier
         self.identifier = identifier
@@ -67,41 +76,52 @@ class Spectrum:
         Verify if this is a valid and high-quality Spectrum.
 
         Returns:
-            True if the Spectrum's peaks have been processed and are of high quality, False if not.
+            True if the Spectrum's peaks have been processed and are of high
+            quality, False if not.
         """
         return self._is_processed
 
     def set_peaks(self, masses, intensities, annotations=None):
         """
-        Assigns peaks to the spectrum. Note: no quality checking or processing of the spectrum is performed.
+        Assigns peaks to the spectrum. Note: no quality checking or processing
+        of the spectrum is performed.
 
         Args:
             masses: The masses at which the peaks are detected.
-            intensities: The intensities of the peaks at their corresponding masses.
-            annotations: (Optionally) the annotations of the peaks at their corresponding masses.
+            intensities: The intensities of the peaks at their corresponding
+                masses.
+            annotations: (Optionally) the annotations of the peaks at their
+                corresponding masses.
         """
         self.masses = masses.astype(np.float32)
         self.intensities = intensities.astype(np.float32)
-        self.annotations = annotations if annotations is not None else np.empty(len(masses), object)
+        self.annotations = (annotations if annotations is not None
+                            else np.empty(len(masses), object))
 
     def process_peaks(self, resolution=None, min_mz=None, max_mz=None,
-                      remove_precursor=None, remove_precursor_tolerance=None, min_peaks=None, max_peaks_used=None,
+                      remove_precursor=None, remove_precursor_tolerance=None,
+                      min_peaks=None, max_peaks_used=None,
                       min_intensity=None, min_mz_range=None, scaling=None):
         """
         Check that the spectrum is of sufficient quality and process the peaks.
 
         Args:
-            resolution: Spectral library resolution; masses will be rounded to the given number of decimals.
-            min_mz: Minimum m/z value (inclusive). Peaks at lower m/z values will be discarded.
-            max_mz: Maximum m/z value (inclusive). Peaks at higher m/z values will be discarded.
+            resolution: Spectral library resolution; masses will be rounded to
+                the given number of decimals.
+            min_mz: Minimum m/z value (inclusive). Peaks at lower m/z values
+                will be discarded.
+            max_mz: Maximum m/z value (inclusive). Peaks at higher m/z values
+                will be discarded.
             remove_precursor: If True, remove peaks around the precursor mass.
-            remove_precursor_tolerance: If remove_precursor, this specifies the window (in Da) around the precursor
-                                        mass to remove peaks.
+            remove_precursor_tolerance: If remove_precursor, this specifies the
+                window (in Da) around the precursor mass to remove peaks.
             min_peaks: Discard spectra with less peaks.
             max_peaks_used: Only retain this many of the most intense peaks.
-            min_intensity: Remove peaks with a lower intensity relative to the maximum intensity.
+            min_intensity: Remove peaks with a lower intensity relative to the
+                maximum intensity.
             min_mz_range: Discard spectra with a smaller mass range.
-            scaling: Manner in which to scale the intensities ('sqrt' for square root scaling, 'rank' for rank scaling).
+            scaling: Manner in which to scale the intensities ('sqrt' for
+                square root scaling, 'rank' for rank scaling).
         """
         if resolution is None:
             resolution = config.resolution
@@ -133,12 +153,16 @@ class Spectrum:
 
         # round masses based on the spectral library resolution
         if resolution is not None:
-            masses, indices, inverse = np.unique(np.around(masses, resolution), True, True)     # peaks get sorted here
+            # peaks get sorted here
+            masses, indices, inverse = np.unique(
+                    np.around(masses, resolution), True, True)
             if len(masses) != len(intensities):
                 # some peaks got merged, so sum their intensities
                 intensities_merged = intensities[indices]
-                merged_indices = np.setdiff1d(np.arange(len(intensities)), indices, True)
-                intensities_merged[inverse[merged_indices]] += intensities[merged_indices]
+                merged_indices = np.setdiff1d(
+                        np.arange(len(intensities)), indices, True)
+                intensities_merged[inverse[merged_indices]] +=\
+                    intensities[merged_indices]
 
                 intensities = intensities_merged
                 annotations = annotations[indices]
@@ -150,16 +174,19 @@ class Spectrum:
             annotations = annotations[order]
 
         # restrict to range [min_mz ; max_mz]
-        filter_range = np.where(np.logical_and(min_mz <= masses, masses <= max_mz))[0]
+        filter_range = np.where(
+                np.logical_and(min_mz <= masses, masses <= max_mz))[0]
 
         # remove peak(s) close to the precursor mass
         filter_peaks = filter_range
         if remove_precursor:
-            max_charge = self.precursor_charge + 1 if self.precursor_charge is not None else 2  # exclusive
+            max_charge = (self.precursor_charge + 1
+                          if self.precursor_charge is not None
+                          else 2)  # exclusive
             filter_precursor = np.where(np.logical_or.reduce([np.logical_and(
                 self.precursor_mz / charge - remove_precursor_tolerance <= masses,
                 masses <= self.precursor_mz / charge + remove_precursor_tolerance)
-                                                            for charge in range(1, max_charge)]))[0]
+                for charge in range(1, max_charge)]))[0]
             filter_peaks = np.setdiff1d(filter_peaks, filter_precursor, True)
 
         # check if sufficient peaks remain
@@ -175,7 +202,8 @@ class Spectrum:
         filter_number = np.argsort(filtered_intensities)[::-1][:max_peaks_used]
         # discard low-intensity noise peaks
         max_intensity = filtered_intensities[filter_number][0]
-        filter_noise = np.where(filtered_intensities >= min_intensity * max_intensity)[0]
+        filter_noise = np.where(
+                filtered_intensities >= min_intensity * max_intensity)[0]
 
         # apply intensity filters
         filter_intensity = np.intersect1d(filter_number, filter_noise, True)
@@ -187,7 +215,8 @@ class Spectrum:
         if filtered_masses[-1] - filtered_masses[0] < min_mz_range:
             return self
 
-        # scale the intensities by their root to reduce the effect of extremely high intensity peaks
+        # scale the intensities by their root
+        # to reduce the effect of extremely high intensity peaks
         if scaling == 'sqrt':
             scaled_intensities = np.sqrt(filtered_intensities)
         elif scaling == 'rank':
@@ -214,9 +243,10 @@ class Spectrum:
             bin_size: The size (in Da) of the mass bins.
 
         Returns:
-            None if the Spectrum doesn't have any peaks; otherwise a vector with each peak of the Spectrum assigned to
-            its mass bin. For multiple peaks assigned to the same mass bin the intensities are summed.
-            The final vector is normalized to have unit length.
+            None if the Spectrum doesn't have any peaks; otherwise a vector
+            with each peak of the Spectrum assigned to its mass bin. For
+            multiple peaks assigned to the same mass bin the intensities are
+            summed. The final vector is normalized to have unit length.
         """
         if min_mz is None:
             min_mz = config.min_mz
@@ -226,7 +256,8 @@ class Spectrum:
             bin_size = config.bin_size
 
         if self.is_valid():
-            vec_length, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
+            vec_length, min_bound, max_bound = get_dim(
+                    min_mz, max_mz, bin_size)
             peaks = np.zeros((vec_length,), dtype=np.float32)
             # add each mass and intensity to their low-dimensionality bin
             for mass, intensity in zip(self.masses, self.intensities):
@@ -241,7 +272,8 @@ class Spectrum:
 
 class SpectrumMatch:
 
-    def __init__(self, query_spectrum, library_spectrum=None, search_engine_score=0.0):
+    def __init__(self, query_spectrum,
+                 library_spectrum=None, search_engine_score=0.0):
         # query information
         self.query_id = query_spectrum.identifier
         self.retention_time = query_spectrum.retention_time

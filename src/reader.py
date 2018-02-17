@@ -35,7 +35,8 @@ sqlite3.register_converter('array', convert_array)
 
 def get_spectral_library_reader(filename, config_hash=None):
     if not os.path.isfile(filename):
-        raise FileNotFoundError('Spectral library file {} not found'.format(filename))
+        raise FileNotFoundError('Spectral library file {} not found'.format(
+                filename))
 
     base_filename, ext = os.path.splitext(filename)
     if ext == '.spql':
@@ -50,14 +51,16 @@ def get_spectral_library_reader(filename, config_hash=None):
             # fall back to an sptxt file
             return SptxtReader(base_filename + '.sptxt', config_hash)
     else:
-        raise FileNotFoundError('Unrecognized file format (supported file formats: spql, splib, sptxt)')
+        raise FileNotFoundError('Unrecognized file format (supported file '
+                                'formats: spql, splib, sptxt)')
 
 
 def verify_extension(supported_extensions, filename):
     base_name, ext = os.path.splitext(os.path.basename(filename))
     if ext.lower() not in supported_extensions:
         logging.error('Unrecognized file format: {}'.format(filename))
-        raise FileNotFoundError('Unrecognized file format: {}'.format(filename))
+        raise FileNotFoundError('Unrecognized file format: {}'.format(
+                filename))
 
 
 _annotation_ion_types = frozenset(b'abcxyz')
@@ -65,17 +68,23 @@ _ignore_annotations = False
 
 
 def _parse_annotation(raw):
-    if raw[0] in _annotation_ion_types:     # discard peaks that don't correspond to an ion type
+    # discard peaks that don't correspond to an ion type
+    if raw[0] in _annotation_ion_types:
         first_annotation = raw.split(b',', 1)[0]
-        if b'i' not in first_annotation:    # discard isotope peaks
+        # discard isotope peaks
+        if b'i' not in first_annotation:
             ion_sep = first_annotation.find(b'/')
             if ion_sep == -1:
                 ion_sep = len(first_annotation)
-            has_mod = first_annotation.find(b'-', 0, ion_sep) != -1 or first_annotation.find(b'+', 0, ion_sep) != -1
-            if not has_mod:     # discard modified peaks
+            has_mod = (first_annotation.find(b'-', 0, ion_sep) != -1 or
+                       first_annotation.find(b'+', 0, ion_sep) != -1)
+            # discard modified peaks
+            if not has_mod:
                 charge_sep = first_annotation.find(b'^')
-                ion_type = first_annotation[:charge_sep if charge_sep != -1 else ion_sep].decode('UTF-8')
-                charge = int(first_annotation[charge_sep + 1:ion_sep] if charge_sep != -1 else 1)
+                ion_type = first_annotation[:charge_sep if charge_sep != -1
+                                            else ion_sep].decode('UTF-8')
+                charge = int(first_annotation[charge_sep + 1:ion_sep]
+                             if charge_sep != -1 else 1)
 
                 return ion_type, charge
 
@@ -95,20 +104,25 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
 
     def __init__(self, filename, config_hash=None):
         """
-        Initialize the spectral library reader. Metadata for future easy access of the individual Spectra is read from
-        the corresponding configuration file.
+        Initialize the spectral library reader. Metadata for future easy access
+        of the individual Spectra is read from the corresponding configuration
+        file.
 
-        The configuration file contains minimally for each spectrum in the spectral library its precursor charge and
-        precursor mass for quickly filtering the spectra library. Furthermore, it also contains the settings used to
-        construct this spectral library to make sure these match the runtime settings.
+        The configuration file contains minimally for each spectrum in the
+        spectral library its precursor charge and precursor mass for quickly
+        filtering the spectra library. Furthermore, it also contains the
+        settings used to construct this spectral library to make sure these
+        match the runtime settings.
 
         Args:
             filename: The file name of the spectral library.
-            config_hash: The hash representing the current spectral library configuration.
+            config_hash: The hash representing the current spectral library
+                configuration.
 
         Raises:
             FileNotFoundError: The given spectral library file wasn't found.
-            ValueError: The configuration file wasn't found or its settings don't correspond to the runtime settings.
+            ValueError: The configuration file wasn't found or its settings
+                don't correspond to the runtime settings.
         """
         self._filename = filename
         self._config_hash = config_hash
@@ -119,31 +133,38 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
 
         logging.info('Loading the spectral library configuration')
 
-        # verify that the configuration file corresponding to this spectral library is present
+        # verify that the configuration file
+        # corresponding to this spectral library is present
         config_filename = self._get_config_filename()
         if not os.path.isfile(config_filename):
-            # if not we should recreate this file prior to using the spectral library
+            # if not we should recreate this file
+            # prior to using the spectral library
             do_create = True
-            logging.warning('Missing configuration file corresponding to this spectral library')
+            logging.warning('Missing configuration file corresponding to this '
+                            'spectral library')
         else:
             # load the configuration file
             self.spec_info, load_hash = joblib.load(config_filename)
 
             # verify that the runtime settings match the loaded settings
             if self._config_hash != load_hash:
-                # if not we should recreate the configuration file prior to using the spectral library
+                # if not we should recreate the configuration file
+                # prior to using the spectral library
                 do_create = True
-                logging.warning('The spectral library search engine was created using non-compatible settings')
+                logging.warning('The spectral library search engine was '
+                                'created using non-compatible settings')
 
         logging.info('Finished loading the spectral library configuration')
 
-        # (re)create the spectral library configuration if it is missing or incorrect
+        # (re)create the spectral library configuration
+        # if it is missing or incorrect
         if do_create:
             self._create()
             
     def _get_config_filename(self):
         if self._config_hash is not None:
-            return '{}_{}.spcfg'.format(os.path.splitext(self._filename)[0], self._config_hash[:7])
+            return '{}_{}.spcfg'.format(os.path.splitext(
+                    self._filename)[0], self._config_hash[:7])
         else:
             return '{}.spcfg'.format(os.path.splitext(self._filename)[0])
 
@@ -164,8 +185,9 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         """
         Generates all spectra from the spectral library file.
 
-        For each individual Spectrum a tuple consisting of the Spectrum and some additional information as a nested
-        tuple (containing on the type of spectral library file) are returned.
+        For each individual Spectrum a tuple consisting of the Spectrum and
+        some additional information as a nested tuple (containing on the type
+        of spectral library file) are returned.
 
         Returns:
             A generator that yields all spectra from the spectral library file.
@@ -195,47 +217,62 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         """
         Create a new configuration file for the spectral library.
 
-        The configuration file contains for each spectrum in the spectral library its offset for quick random-access
-        reading, and its precursor mass for filtering using a precursor mass window. Finally, it also contains the
-        settings used to construct this spectral library to make sure these match the runtime settings.
+        The configuration file contains for each spectrum in the spectral
+        library its offset for quick random-access reading, and its precursor
+        mass for filtering using a precursor mass window. Finally, it also
+        contains the settings used to construct this spectral library to make
+        sure these match the runtime settings.
         """
         super()._create()
         
-        logging.info('Creating the spectral library configuration for file %s', self._filename)
+        logging.info('Creating the spectral library configuration for file '
+                     '{}'.format(self._filename))
 
         # read all the spectra in the spectral library
-        temp_info = collections.defaultdict(lambda: {'id': [], 'precursor_mass': []})
+        temp_info = collections.defaultdict(
+                lambda: {'id': [], 'precursor_mass': []})
         offsets = {}
         with self as lib_reader:
-            for spec, offset in tqdm.tqdm(lib_reader._get_all_spectra(), desc='Library spectra read', unit='spectra'):
+            for spec, offset in tqdm.tqdm(lib_reader._get_all_spectra(),
+                                          desc='Library spectra read',
+                                          unit='spectra'):
                 # store the spectrum information for easy retrieval
                 info_charge = temp_info[spec.precursor_charge]
                 info_charge['id'].append(spec.identifier)
                 info_charge['precursor_mass'].append(spec.precursor_mz)
                 offsets[spec.identifier] = offset
-        self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
-                                   'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
-                          for charge, charge_info in temp_info.items()}
+        self.spec_info = {
+            charge: {
+                'id': np.asarray(charge_info['id'], np.uint32),
+                'precursor_mass': np.asarray(charge_info['precursor_mass'],
+                                             np.float32)
+            } for charge, charge_info in temp_info.items()}
         self.spec_info['offset'] = offsets
 
         # store the configuration
         config_filename = self._get_config_filename()
-        logging.debug('Saving the spectral library configuration to file %s', config_filename)
-        joblib.dump((self.spec_info, self._config_hash), config_filename, compress=9, protocol=2)
+        logging.debug('Saving the spectral library configuration to file '
+                      '{}'.format(config_filename))
+        joblib.dump((self.spec_info, self._config_hash), config_filename,
+                    compress=9, protocol=2)
 
         logging.info('Finished creating the spectral library configuration')
 
     @lru_cache(maxsize=_max_cache_size)
     def get_spectrum(self, spec_id, process_peaks=False):
         """
-        Read the `Spectrum` with the specified identifier from the spectral library file.
+        Read the `Spectrum` with the specified identifier from the spectral
+        library file.
 
         Args:
-            spec_id: The identifier of the `Spectrum` in the spectral library file.
-            process_peaks: Flag whether to process the `Spectrum`'s peaks or not.
+            spec_id: The identifier of the `Spectrum` in the spectral library
+                file.
+            process_peaks: Flag whether to process the `Spectrum`'s peaks or
+                not.
 
         Returns:
-            The `Spectrum` from the spectral library file with the specified identifier.
+            The `Spectrum` from the spectral library file with the specified
+            identifier.
         """
         self._mm.seek(self.spec_info['offset'][spec_id])
 
@@ -285,7 +322,9 @@ class SptxtReader(SpectraSTReader):
         comment = self._read_line().strip()
         is_decoy = b' Remark=DECOY_' in comment
 
-        read_spectrum = spectrum.Spectrum(identifier, precursor_mz, precursor_charge, None, peptide, is_decoy)
+        read_spectrum = spectrum.Spectrum(
+                identifier, precursor_mz, precursor_charge,
+                None, peptide, is_decoy)
 
         # read the peaks of the spectrum
         num_peaks = int(self._read_line().strip()[10:])
@@ -349,8 +388,10 @@ class SplibReader(SpectraSTReader):
         identifier = struct.unpack('i', read_bytes)[0]
         # fullName: \n terminated string
         name = self._mm.readline().strip()
-        peptide = name[name.find(b'.') + 1: name.rfind(b'.')].decode(encoding='UTF-8')
-        precursor_charge = int(name[name.rfind(b'/') + 1: name.rfind(b'/') + 2])
+        peptide = name[name.find(b'.') + 1: name.rfind(b'.')].decode(
+                encoding='UTF-8')
+        precursor_charge =\
+            int(name[name.rfind(b'/') + 1: name.rfind(b'/') + 2])
         # precursor m/z (double): 8 bytes
         precursor_mz = struct.unpack('d', self._mm.read(8))[0]
         # status: \n terminated string
@@ -376,7 +417,9 @@ class SplibReader(SpectraSTReader):
         comment = self._mm.readline()
         is_decoy = b' Remark=DECOY_' in comment
 
-        read_spectrum = spectrum.Spectrum(identifier, precursor_mz, precursor_charge, None, peptide, is_decoy)
+        read_spectrum = spectrum.Spectrum(
+                identifier, precursor_mz, precursor_charge,
+                None, peptide, is_decoy)
         read_spectrum.set_peaks(masses, intensities, annotations)
 
         return read_spectrum, file_offset
@@ -397,7 +440,8 @@ class SqliteSpecReader(SpectralLibraryReader):
         super().__init__(filename, config_hash)
 
     def _connect(self):
-        return sqlite3.connect(self._db_filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        return sqlite3.connect(self._db_filename,
+                               detect_types=sqlite3.PARSE_DECLTYPES)
         
     def __enter__(self):
         self._conn = self._connect()
@@ -417,30 +461,38 @@ class SqliteSpecReader(SpectralLibraryReader):
         """
         super()._create()
         
-        logging.info('Creating the spectral library configuration for file %s', self._filename)
+        logging.info('Creating the spectral library configuration for file '
+                     '{}'.format(self._filename))
 
         # collect summary information about the spectra for easy retrieval
         conn = self._connect()
         cursor = conn.cursor()
 
         # retrieve from the database and convert to a consistent DataFrame
-        cursor.execute('SELECT id, precursorCharge, precursorMZ FROM RefSpectra')
+        cursor.execute(
+                'SELECT id, precursorCharge, precursorMZ FROM RefSpectra')
         ids, precursor_charges, precursor_masses = zip(*cursor.fetchall())
         conn.close()
 
-        temp_info = collections.defaultdict(lambda: {'id': [], 'precursor_mass': []})
+        temp_info = collections.defaultdict(
+                lambda: {'id': [], 'precursor_mass': []})
         for i, charge, mass in zip(ids, precursor_charges, precursor_masses):
             info_charge = temp_info[charge]
             info_charge['id'].append(i)
             info_charge['precursor_mass'].append(mass)
-        self.spec_info = {charge: {'id': np.asarray(charge_info['id'], np.uint32),
-                                   'precursor_mass': np.asarray(charge_info['precursor_mass'], np.float32)}
-                          for charge, charge_info in temp_info.items()}
+        self.spec_info = {
+            charge: {
+                'id': np.asarray(charge_info['id'], np.uint32),
+                'precursor_mass': np.asarray(charge_info['precursor_mass'],
+                                             np.float32)
+            } for charge, charge_info in temp_info.items()}
 
         # store the configuration
         config_filename = self._get_config_filename()
-        logging.debug('Saving the spectral library configuration to file %s', config_filename)
-        joblib.dump((self.spec_info, self._config_hash), config_filename, compress=9, protocol=2)
+        logging.debug('Saving the spectral library configuration to file '
+                      '{}'.format(config_filename))
+        joblib.dump((self.spec_info, self._config_hash), config_filename,
+                    compress=9, protocol=2)
 
         logging.info('Finished creating the spectral library configuration')
 
@@ -453,15 +505,21 @@ class SqliteSpecReader(SpectralLibraryReader):
         """
         # retrieve the specified spectrum
         cursor = self._conn.cursor()
-        cursor.execute('SELECT id, peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity '
-                       'FROM RefSpectra, RefSpectraPeaks WHERE RefSpectra.id == RefSpectraPeaks.RefSpectraID')
+        cursor.execute(
+                'SELECT id, peptideSeq, precursorMZ, precursorCharge, '
+                'isDecoy, peakMZ, peakIntensity '
+                'FROM RefSpectra, RefSpectraPeaks '
+                'WHERE RefSpectra.id == RefSpectraPeaks.RefSpectraID')
         while True:
             result = cursor.fetchone()
             if result is None:
                 break
 
-            spec_id, peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities = result
-            read_spectrum = spectrum.Spectrum(spec_id, precursor_mz, precursor_charge, None, peptide, is_decoy == 1)
+            spec_id, peptide, precursor_mz, precursor_charge, is_decoy,\
+                masses, intensities = result
+            read_spectrum = spectrum.Spectrum(
+                    spec_id, precursor_mz, precursor_charge,
+                    None, peptide, is_decoy == 1)
             read_spectrum.set_peaks(masses, intensities)
 
             yield read_spectrum, ()
@@ -469,23 +527,34 @@ class SqliteSpecReader(SpectralLibraryReader):
     @lru_cache(maxsize=_max_cache_size)
     def get_spectrum(self, spec_id, process_peaks=False):
         """
-        Read the `Spectrum` with the specified identifier from the spectral library file.
+        Read the `Spectrum` with the specified identifier from the spectral
+        library file.
 
         Args:
-            spec_id: The identifier of the `Spectrum` in the spectral library file.
-            process_peaks: Flag whether to process the `Spectrum`'s peaks or not.
+            spec_id: The identifier of the `Spectrum` in the spectral library
+                file.
+            process_peaks: Flag whether to process the `Spectrum`'s peaks or
+                not.
 
         Returns:
-            The `Spectrum` from the spectral library file with the specified identifier.
+            The `Spectrum` from the spectral library file with the specified
+            identifier.
         """
         # retrieve the specified spectrum
         cursor = self._conn.cursor()
-        cursor.execute('SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, peakMZ, peakIntensity, peakAnnotation '
-                       'FROM RefSpectra, RefSpectraPeaks '
-                       'WHERE RefSpectra.id == ? AND RefSpectra.id == RefSpectraPeaks.RefSpectraID', (int(spec_id),))
-        peptide, precursor_mz, precursor_charge, is_decoy, masses, intensities, annotations = cursor.fetchone()
+        cursor.execute(
+                'SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, '
+                'peakMZ, peakIntensity, peakAnnotation '
+                'FROM RefSpectra, RefSpectraPeaks '
+                'WHERE RefSpectra.id == ? '
+                'AND RefSpectra.id == RefSpectraPeaks.RefSpectraID',
+                (int(spec_id),))
+        peptide, precursor_mz, precursor_charge, is_decoy,\
+            masses, intensities, annotations = cursor.fetchone()
 
-        read_spectrum = spectrum.Spectrum(spec_id, precursor_mz, precursor_charge, None, peptide, is_decoy == 1)
+        read_spectrum = spectrum.Spectrum(
+                spec_id, precursor_mz, precursor_charge,
+                None, peptide, is_decoy == 1)
         read_spectrum.set_peaks(masses, intensities, annotations)
 
         if process_peaks:
@@ -498,7 +567,8 @@ class SqliteSpecReader(SpectralLibraryReader):
         cursor.execute('SELECT createTime, numSpecs FROM LibInfo')
         create_time, num_specs = cursor.fetchone()
 
-        return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'), num_specs
+        return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'),\
+               num_specs
 
 
 def read_mgf(filename):
@@ -509,8 +579,8 @@ def read_mgf(filename):
         filename: The mgf filename from which to read the spectra.
 
     Returns:
-        A tuple of a `Spectrum` (containing the spectrum's information), an array of masses, and an array of
-        intensities.
+        A tuple of a `Spectrum` (containing the spectrum's information), an
+        array of masses, and an array of intensities.
     """
     # test if the given file is an mzML file
     verify_extension(['.mgf'], filename)
@@ -526,8 +596,10 @@ def read_mgf(filename):
         else:
             precursor_charge = None
 
-        read_spectrum = spectrum.Spectrum(identifier, precursor_mz, precursor_charge, retention_time)
-        read_spectrum.set_peaks(mgf_spectrum['m/z array'], mgf_spectrum['intensity array'])
+        read_spectrum = spectrum.Spectrum(
+                identifier, precursor_mz, precursor_charge, retention_time)
+        read_spectrum.set_peaks(mgf_spectrum['m/z array'],
+                                mgf_spectrum['intensity array'])
 
         yield read_spectrum
 
@@ -551,10 +623,12 @@ def read_mztab_psms(filename):
             line = next(f_in)
             skiplines += 1
 
-    psms = pd.read_csv(filename, sep='\t', header=skiplines, index_col='PSM_ID')
+    psms = pd.read_csv(filename, sep='\t', header=skiplines,
+                       index_col='PSM_ID')
     psms.drop('PSH', 1, inplace=True)
     
-    psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'] = psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'].astype(bool)
+    psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'] =\
+        psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'].astype(bool)
 
     psms.df_name = os.path.splitext(os.path.basename(filename))[0]
 
