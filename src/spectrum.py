@@ -20,13 +20,11 @@ def get_dim(min_mz, max_mz, bin_size):
         the given bin size, (ii) the highest multiple of bin size lower than
         the minimum mass, (iii) the lowest multiple of the bin size greater
         than the maximum mass. These two final values are the true boundaries
-        of the mass range.
+        of the mass range (inclusive min, exclusive max).
     """
     min_mz, max_mz = float(min_mz), float(max_mz)
     start_dim = min_mz - min_mz % bin_size
-    end_dim = (max_mz + bin_size - max_mz % bin_size
-               if not math.isclose(max_mz % bin_size, 0, abs_tol=1e-09)
-               else max_mz)
+    end_dim = max_mz + bin_size - max_mz % bin_size
     return round((end_dim - start_dim) / bin_size), start_dim, end_dim
 
 
