@@ -445,7 +445,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                     config.min_mz, config.max_mz, config.bin_size)[0]
             for charge in create_ann_charges:
                 ann_index = annoy.AnnoyIndex(dim, 'angular')
-                ann_index.set_seed(0)
+                ann_index.set_seed(42)
                 ann_indices[charge] = ann_index
             charge_counts = collections.defaultdict(int)
             with self._library_reader as lib_reader:
@@ -526,7 +526,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 dim = spectrum.get_dim(
                         config.min_mz, config.max_mz, config.bin_size)[0]
                 index = annoy.AnnoyIndex(dim, 'angular')
-                index.set_seed(0)
+                index.set_seed(42)
                 index.load(self._ann_filenames[charge])
                 self._current_index = charge, index
     
