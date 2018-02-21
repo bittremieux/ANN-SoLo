@@ -447,20 +447,19 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 ann_index = annoy.AnnoyIndex(dim, 'angular')
                 ann_index.set_seed(42)
                 ann_indices[charge] = ann_index
-            charge_counts = collections.defaultdict(int)
+            charge_counts = collections.Counter()
             with self._library_reader as lib_reader:
                 lib_spectra_it = (lib_spectra if lib_spectra is not None
                                   else lib_reader._get_all_spectra())
                 for lib_spectrum, _ in tqdm.tqdm(
                         lib_spectra_it,
                         desc='Library spectra added', unit='spectra'):
-                    # discard infrequent precursor charges
                     charge = lib_spectrum.precursor_charge
-                    if charge in ann_indices.keys() and\
-                       lib_spectrum.process_peaks().is_valid():
-                        ann_indices[charge].add_item(
-                                charge_counts[charge],
-                                lib_spectrum.get_vector())
+                    if charge in ann_indices.keys():
+                        if lib_spectrum.process_peaks().is_valid():
+                            ann_indices[charge].add_item(
+                                    charge_counts[charge],
+                                    lib_spectrum.get_vector())
                         charge_counts[charge] += 1
 
             # build the ANN indices
