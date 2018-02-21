@@ -305,19 +305,20 @@ class SpectralLibraryAnn(SpectralLibrary):
             num_candidates = config.num_candidates
         if ann_cutoff is None:
             ann_cutoff = config.ann_cutoff
+            
+        charge = query.precursor_charge
 
         # filter the candidates on the precursor mass window
         mass_filter = self._get_mass_filter_idx(
-                query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
+                query.precursor_mz, charge, tol_mass, tol_mode)
 
         # if there are too many candidates, refine using the ANN index
-        if len(mass_filter) > ann_cutoff and\
-           query.precursor_charge in self._ann_filenames:
+        if len(mass_filter) > ann_cutoff and charge in self._ann_filenames:
             # retrieve the most similar candidates from the ANN index
             ann_charge_ids = self._query_ann(query, num_candidates)
             # convert the numbered index for this specific charge
             # to global identifiers
-            ann_filter = self._library_reader.spec_info[query.precursor_charge]['id'][ann_charge_ids]
+            ann_filter = self._library_reader.spec_info[charge]['id'][ann_charge_ids]
 
             # select the candidates passing both the ANN filter
             # and precursor mass filter
@@ -421,6 +422,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         base_filename, _ = os.path.splitext(lib_filename)
         base_filename = '{}_{}'.format(
                 base_filename, self._get_config_hash()[:7])
+        # no need to build an ANN index for infrequent precursor charges
         ann_charges = sorted([
             charge for charge in self._library_reader.spec_info
             if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff])
