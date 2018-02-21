@@ -5,6 +5,7 @@ import io
 import logging
 import mmap
 import os
+import pickle
 import sqlite3
 import struct
 from functools import lru_cache
@@ -21,7 +22,7 @@ import spectrum
 # convert NumPy arrays to/from BLOBs
 def adapt_array(arr):
     buf = io.BytesIO()
-    joblib.dump(arr, buf, compress=0, protocol=2)
+    joblib.dump(arr, buf, compress=0, protocol=pickle.DEFAULT_PROTOCOL)
     return sqlite3.Binary(buf.getvalue())
 
 
