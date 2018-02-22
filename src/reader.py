@@ -1,7 +1,6 @@
 import abc
 import collections
 import datetime
-import io
 import logging
 import mmap
 import os
@@ -13,6 +12,7 @@ from functools import lru_cache
 import joblib
 import numpy as np
 import pandas as pd
+import pyarrow
 import tqdm
 from pyteomics import mgf
 
@@ -21,13 +21,11 @@ import spectrum
 
 # convert NumPy arrays to/from BLOBs
 def adapt_array(arr):
-    buf = io.BytesIO()
-    joblib.dump(arr, buf, compress=0, protocol=pickle.DEFAULT_PROTOCOL)
-    return sqlite3.Binary(buf.getvalue())
+    return pyarrow.serialize(arr).to_buffer().to_pybytes()
 
 
 def convert_array(text):
-    return joblib.load(io.BytesIO(text))
+    return pyarrow.deserialize(text)
 
 
 sqlite3.register_adapter(np.ndarray, adapt_array)
