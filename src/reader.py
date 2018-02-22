@@ -77,15 +77,18 @@ def _parse_annotation(raw):
             ion_sep = first_annotation.find(b'/')
             if ion_sep == -1:
                 ion_sep = len(first_annotation)
-            has_mod = (first_annotation.find(b'-', 0, ion_sep) != -1 or
-                       first_annotation.find(b'+', 0, ion_sep) != -1)
+            first_annotation_substring = first_annotation[:ion_sep]
+            has_mod = (b'-' in first_annotation_substring or
+                       b'+' in first_annotation_substring)
             # discard modified peaks
             if not has_mod:
                 charge_sep = first_annotation.find(b'^')
-                ion_type = first_annotation[:charge_sep if charge_sep != -1
-                                            else ion_sep].decode('UTF-8')
-                charge = int(first_annotation[charge_sep + 1:ion_sep]
-                             if charge_sep != -1 else 1)
+                if charge_sep != -1:
+                    ion_type = first_annotation[:charge_sep].decode('UTF-8')
+                    charge = int(first_annotation[charge_sep + 1: ion_sep])
+                else:
+                    ion_type = first_annotation[:ion_sep].decode('UTF-8')
+                    charge = 1
 
                 return ion_type, charge
 
