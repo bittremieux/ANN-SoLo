@@ -197,7 +197,8 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
             fall within the given mass window.
         """
         # check which mass differences fall within the precursor mass window
-        lib_masses = self._library_reader.spec_info[charge]['precursor_mass']
+        charge_spectra = self._library_reader.spec_info['charge'][charge]
+        lib_masses = charge_spectra['precursor_mass']
         if tol_mode == 'Da':
             mass_filter = ne.evaluate(
                     'abs(mass - lib_masses) * charge <= tol_mass')
@@ -207,7 +208,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         else:
             mass_filter = np.arange(len(lib_masses))
 
-        return self._library_reader.spec_info[charge]['id'][mass_filter]
+        return charge_spectra['id'][mass_filter]
 
 
 class SpectralLibraryBf(SpectralLibrary):
@@ -318,7 +319,7 @@ class SpectralLibraryAnn(SpectralLibrary):
             ann_charge_ids = self._query_ann(query, num_candidates)
             # convert the numbered index for this specific charge
             # to global identifiers
-            ann_filter = self._library_reader.spec_info[charge]['id'][ann_charge_ids]
+            ann_filter = self._library_reader.spec_info['charge'][charge]['id'][ann_charge_ids]
 
             # select the candidates passing both the ANN filter
             # and precursor mass filter
@@ -424,8 +425,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 base_filename, self._get_config_hash()[:7])
         # no need to build an ANN index for infrequent precursor charges
         ann_charges = sorted([
-            charge for charge in self._library_reader.spec_info
-            if len(self._library_reader.spec_info[charge]['id']) > config.ann_cutoff])
+            charge for charge in self._library_reader.spec_info['charge']
+            if len(self._library_reader.spec_info['charge'][charge]['id']) > config.ann_cutoff])
         create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxann'.format(

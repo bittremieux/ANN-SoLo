@@ -249,13 +249,12 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
                 info_charge['id'].append(spec.identifier)
                 info_charge['precursor_mass'].append(spec.precursor_mz)
                 offsets[spec.identifier] = offset
-        self.spec_info = {
+        self.spec_info = {'charge': {
             charge: {
                 'id': np.asarray(charge_info['id'], np.uint32),
                 'precursor_mass': np.asarray(charge_info['precursor_mass'],
                                              np.float32)
-            } for charge, charge_info in temp_info.items()}
-        self.spec_info['offset'] = offsets
+            } for charge, charge_info in temp_info.items()}, 'offset': offsets}
 
         # store the configuration
         config_filename = self._get_config_filename()
@@ -490,12 +489,12 @@ class SqliteSpecReader(SpectralLibraryReader):
             info_charge = temp_info[charge]
             info_charge['id'].append(i)
             info_charge['precursor_mass'].append(mass)
-        self.spec_info = {
+        self.spec_info = {'charge': {
             charge: {
                 'id': np.asarray(charge_info['id'], np.uint32),
                 'precursor_mass': np.asarray(charge_info['precursor_mass'],
                                              np.float32)
-            } for charge, charge_info in temp_info.items()}
+            } for charge, charge_info in temp_info.items()}}
 
         # store the configuration
         config_filename = self._get_config_filename()
