@@ -258,7 +258,7 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         logging.debug('Saving the spectral library configuration to file '
                       '{}'.format(config_filename))
         joblib.dump((self.spec_info, self._config_hash), config_filename,
-                    compress=9, protocol=2)
+                    compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
         logging.info('Finished creating the spectral library configuration')
 
@@ -496,7 +496,7 @@ class SqliteSpecReader(SpectralLibraryReader):
         logging.debug('Saving the spectral library configuration to file '
                       '{}'.format(config_filename))
         joblib.dump((self.spec_info, self._config_hash), config_filename,
-                    compress=9, protocol=2)
+                    compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
         logging.info('Finished creating the spectral library configuration')
 
