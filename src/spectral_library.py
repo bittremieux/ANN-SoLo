@@ -467,7 +467,13 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
-            with multiprocessing.pool.ThreadPool(len(ann_indices)) as pool:
+            try:
+                # os.sched_getaffinity is only available on some platforms
+                num_cpus = len(os.sched_getaffinity(0))
+            except AttributeError:
+                num_cpus = os.cpu_count()
+            with multiprocessing.pool.ThreadPool(
+                    min(len(ann_indices), num_cpus)) as pool:
                 pool.map(self._build_ann_index,
                          [(charge, ann_index, config.num_trees)
                           for charge, ann_index in ann_indices.items()])
