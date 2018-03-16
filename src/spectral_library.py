@@ -196,19 +196,23 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
             A list containing the identifiers of the candidate matches that
             fall within the given mass window.
         """
-        # check which mass differences fall within the precursor mass window
-        charge_spectra = self._library_reader.spec_info['charge'][charge]
-        lib_masses = charge_spectra['precursor_mass']
-        if tol_mode == 'Da':
-            mass_filter = ne.evaluate(
-                    'abs(mass - lib_masses) * charge <= tol_mass')
-        elif tol_mode == 'ppm':
-            mass_filter = ne.evaluate(
-                    'abs(mass - lib_masses) / lib_masses * 10**6 <= tol_mass')
+        if charge not in self._library_reader.spec_info['charge']:
+            return []
         else:
-            mass_filter = np.arange(len(lib_masses))
-
-        return charge_spectra['id'][mass_filter]
+            # check which mass differences fall
+            # within the precursor mass window
+            charge_spectra = self._library_reader.spec_info['charge'][charge]
+            lib_masses = charge_spectra['precursor_mass']
+            if tol_mode == 'Da':
+                mass_filter = ne.evaluate(
+                        'abs(mass - lib_masses) * charge <= tol_mass')
+            elif tol_mode == 'ppm':
+                mass_filter = ne.evaluate(
+                        'abs(mass - lib_masses) / lib_masses * 10**6 <= tol_mass')
+            else:
+                mass_filter = np.arange(len(lib_masses))
+    
+            return charge_spectra['id'][mass_filter]
 
 
 class SpectralLibraryBf(SpectralLibrary):
