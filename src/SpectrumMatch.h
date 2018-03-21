@@ -7,27 +7,6 @@
 
 namespace ann_solo
 {
-    enum PeakStatus { unshifted, shifted_annotation, shifted };
-
-    class Peak
-    {
-        public:
-            Peak(float mass, float intensity, PeakStatus peak_status, unsigned int index) :
-                m_mass(mass), m_intensity(intensity), m_peak_status(peak_status), m_index(index) {}
-            ~Peak() {}
-
-            float getMass() const { return m_mass; }
-            float getIntensity() const { return m_intensity; }
-            unsigned int getPeakStatus() const { return m_peak_status; }
-            unsigned int getIndex() const { return m_index; }
-
-        private:
-            float m_mass;
-            float m_intensity;
-            PeakStatus m_peak_status;
-            unsigned int m_index;
-    };
-
     class Spectrum
     {
         public:
