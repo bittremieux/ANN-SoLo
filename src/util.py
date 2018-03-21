@@ -1,9 +1,5 @@
-import collections
-
-import numpy as np
 import pandas as pd
 import pyteomics.auxiliary
-import sklearn.cluster
 
 
 def filter_fdr(psms, fdr=0.01):
