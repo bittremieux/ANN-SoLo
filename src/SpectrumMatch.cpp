@@ -16,9 +16,14 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
 
         // candidate peak indices depend on whether we allow shifts (check all shifted peaks as well) or not
         unsigned int num_shifts = allow_shift ? candidate->getPrecursorCharge() + 1 : 1;
-        unsigned int candidate_peak_index[num_shifts] = {};
+        unsigned int candidate_peak_index[num_shifts];
+        for(unsigned int charge = 0; charge < num_shifts; charge++)
+        {
+            candidate_peak_index[charge] = 0;
+        }
         double precursor_mass_diff = (query->getPrecursorMz() - candidate->getPrecursorMz()) * candidate->getPrecursorCharge();
-        double mass_diff[num_shifts] = {};
+        double mass_diff[num_shifts];
+        mass_diff[0] = 0;
         for(unsigned int charge = 1; charge < num_shifts; charge++)
         {
             mass_diff[charge] = precursor_mass_diff / charge;
