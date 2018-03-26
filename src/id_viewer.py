@@ -18,7 +18,9 @@ sns.set_context('notebook')
 sns.set_style('white')
 
 
-colors = {'a': 'green', 'b': 'blue', 'y': 'red', None: 'black'}
+colors = {'a': 'green', 'b': 'blue', 'y': 'red',
+          'unknown': 'black', None: 'darkgrey'}
+zorders = {'a': 2, 'b': 3, 'y': 3, 'unknown': 1, None: 0}
 
 
 def get_matching_peaks(library_spectrum, query_spectrum):
@@ -27,10 +29,9 @@ def get_matching_peaks(library_spectrum, query_spectrum):
             allow_shift=config.allow_peak_shifts)
     library_matches, query_matches = {}, {}
     for peak_match in peak_matches:
-        peak_is_annotated = library_spectrum.annotations[peak_match[1]]
-        query_matches[peak_match[0]] = library_matches[peak_match[1]] = \
-            colors[library_spectrum.annotations[peak_match[1]][0][0]
-            if peak_is_annotated is not None else None]
+        query_matches[peak_match[0]] = library_matches[peak_match[1]] = (
+            'unknown' if library_spectrum.annotations[peak_match[1]] is None
+            else library_spectrum.annotations[peak_match[1]][0][0])
 
     return library_matches, query_matches, score
 
@@ -46,19 +47,16 @@ if __name__ == '__main__':
 
     # read the mzTab file
     metadata = {}
-    psms = {}
-    psm_header = None
     with open(args.mztab_filename) as f_mztab:
         for line in f_mztab:
             line_split = line.strip().split('\t')
             if line_split[0] == 'MTD':
                 metadata[line_split[1]] = line_split[2]
-            elif line_split[0] == 'PSH':
-                psm_header = line_split[1:]
-            elif line_split[0] == 'PSM':
-                psm = {key: value
-                       for key, value in zip(psm_header, line_split[1:])}
-                psms[psm['PSM_ID']] = psm
+            else:
+                break   # metadata lines should be on top
+    psms = reader.read_mztab_psms(args.mztab_filename)
+    # make sure the PSM id's are strings
+    psms.index = psms.index.map(str)
 
     # recreate the search configuration
     settings = []
@@ -83,7 +81,7 @@ if __name__ == '__main__':
             metadata['ms_run[1]-location']))
     query_filename = os.path.abspath(os.path.join(
             query_uri.netloc, query_uri.path))
-    psm = psms[query_id]
+    psm = psms.loc[query_id]
     library_id = psm['accession']
     library_uri = urlparse.urlparse(urlparse.unquote(psm['database']))
     library_filename = os.path.abspath(os.path.join(
@@ -113,40 +111,43 @@ if __name__ == '__main__':
         get_matching_peaks(library_spectrum, query_spectrum)
 
     # plot the match
-    plt.figure(figsize=(20, 10))
+    fix, ax = plt.subplots(figsize=(20, 10))
 
     # query spectrum on top
+    max_intensity = np.max(query_spectrum.intensities)
     for i, (mass, intensity) in enumerate(zip(
             query_spectrum.masses, query_spectrum.intensities)):
-        is_match = i in query_matches
-        plt.plot([mass, mass], [0, intensity],
-                 color=query_matches[i] if i in query_matches else 'darkgrey')
+        color = colors[query_matches.get(i)]
+        zorder = zorders[query_matches.get(i)]
+        ax.plot([mass, mass], [0, intensity / max_intensity],
+                color=color, zorder=zorder)
     # library spectrum mirrored underneath
+    max_intensity = np.max(library_spectrum.intensities)
     for i, (mass, intensity, annotation) in enumerate(
             zip(library_spectrum.masses,
                 library_spectrum.intensities,
                 library_spectrum.annotations)):
-        is_match = i in library_matches
-        plt.plot([mass, mass], [0, -1 * intensity],
-                 color=(library_matches[i] if i in library_matches
-                        else 'darkgrey'))
+        color = colors[library_matches.get(i)]
+        zorder = zorders[library_matches.get(i)]
+        ax.plot([mass, mass], [0, -intensity / max_intensity],
+                color=color, zorder=zorder)
         if annotation is not None:
-            plt.text(mass - 5, -1 * intensity - 0.01,
-                     '{}{}'.format(annotation[0], '+' * annotation[1]),
-                     color=(library_matches[i] if i in library_matches
-                            else 'darkgrey'), rotation=270)
-
-    # consistent m/z range
-    plt.xticks(np.arange(0, config.max_mz, 200))
-    plt.xlim(config.min_mz, config.max_mz)
+            ax.text(mass - 5, -intensity / max_intensity - 0.05,
+                    '{}{}'.format(annotation[0], '+' * annotation[1]),
+                    color=color, rotation=270)
 
     # horizontal line between the two spectra
-    plt.axhline(0, color='black')
-    # make sure this is centered vertically
-    ylim = np.amax(np.fabs(plt.ylim()))
-    plt.ylim(-1.1 * ylim, 1.1 * ylim)
-    # hide the y-axis labels
-    plt.gca().set_yticklabels([])
+    ax.axhline(0, color='black')
+    # consistent axes range and labels
+    ax.set_xticks(np.arange(0, config.max_mz, 200))
+    ax.set_xlim(config.min_mz, config.max_mz)
+    y_ticks = np.arange(-1, 1.05, 0.25)
+    y_ticklabels = np.arange(-1, 1.05, 0.25)
+    y_ticklabels[y_ticklabels < 0] = -y_ticklabels[y_ticklabels < 0]
+    y_ticklabels = ['{:.0%}'.format(l) for l in y_ticklabels]
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_ticklabels)
+    ax.set_ylim(-1.15, 1.05)
 
     # show major/minor tick lines
     plt.gca().xaxis.set_minor_locator(mticker.AutoMinorLocator())
@@ -155,24 +156,28 @@ if __name__ == '__main__':
              linestyle='--', linewidth=1.0)
     plt.grid(b=True, which='minor', color='lightgrey',
              linestyle='--', linewidth=0.5)
+    
+    # small tick labels
+    ax.tick_params(axis='both', which='both', labelsize='small')
 
-    plt.xlabel('m/z')
+    ax.set_xlabel('m/z')
+    ax.set_ylabel('Intensity')
 
-    plt.text(0.5, 1.06,
-             '{}, Score: {:.3f}'.format(library_spectrum.peptide, score),
-             horizontalalignment='center', verticalalignment='bottom',
-             fontsize='x-large', fontweight='bold',
-             transform=plt.gca().transAxes)
-    plt.text(0.5, 1.02,
-             'File: {}, Scan: {}, Precursor m/z: {:.4f}, '
-             'Library m/z: {:.4f}, Charge: {}'.format(
-                     os.path.basename(query_filename),
-                     query_spectrum.identifier,
-                     query_spectrum.precursor_mz,
-                     library_spectrum.precursor_mz,
-                     query_spectrum.precursor_charge),
-             horizontalalignment='center', verticalalignment='bottom',
-             fontsize='large', transform=plt.gca().transAxes)
+    ax.text(0.5, 1.06,
+            '{}, Score: {:.3f}'.format(library_spectrum.peptide, score),
+            horizontalalignment='center', verticalalignment='bottom',
+            fontsize='x-large', fontweight='bold',
+            transform=plt.gca().transAxes)
+    ax.text(0.5, 1.02,
+            'File: {}, Scan: {}, Precursor m/z: {:.4f}, '
+            'Library m/z: {:.4f}, Charge: {}'.format(
+                    os.path.basename(query_filename),
+                    query_spectrum.identifier,
+                    query_spectrum.precursor_mz,
+                    library_spectrum.precursor_mz,
+                    query_spectrum.precursor_charge),
+            horizontalalignment='center', verticalalignment='bottom',
+            fontsize='large', transform=plt.gca().transAxes)
 
-    plt.savefig('{}.png'.format(query_id), bbox_inches='tight')
+    plt.savefig('{}.png'.format(query_id), dpi=300, bbox_inches='tight')
     plt.close()
