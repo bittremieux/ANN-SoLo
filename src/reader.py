@@ -1,35 +1,19 @@
 import abc
 import collections
-import datetime
 import logging
 import mmap
 import os
 import pickle
-import sqlite3
 import struct
 from functools import lru_cache
 
 import joblib
 import numpy as np
 import pandas as pd
-import pyarrow
 import tqdm
 from pyteomics import mgf
 
 import spectrum
-
-
-# convert NumPy arrays to/from BLOBs
-def adapt_array(arr):
-    return pyarrow.serialize(arr).to_buffer().to_pybytes()
-
-
-def convert_array(text):
-    return pyarrow.deserialize(text)
-
-
-sqlite3.register_adapter(np.ndarray, adapt_array)
-sqlite3.register_converter('array', convert_array)
 
 
 def get_spectral_library_reader(filename, config_hash=None):
@@ -38,9 +22,7 @@ def get_spectral_library_reader(filename, config_hash=None):
                 filename))
 
     base_filename, ext = os.path.splitext(filename)
-    if ext == '.spql':
-        return SqliteSpecReader(filename, config_hash)
-    elif ext == '.splib' or ext == '.sptxt':
+    if ext == '.splib' or ext == '.sptxt':
         splib_exists = os.path.isfile(base_filename + '.splib')
         sptxt_exists = os.path.isfile(base_filename + '.sptxt')
         if splib_exists:
@@ -430,154 +412,6 @@ class SplibReader(SpectraSTReader):
         read_spectrum.set_peaks(masses, intensities, annotations)
 
         return read_spectrum, file_offset
-
-
-class SqliteSpecReader(SpectralLibraryReader):
-    """
-    Read spectra from a custom SQLite spectral library file.
-    """
-
-    _max_cache_size = None
-
-    _supported_extensions = ['.spql']
-
-    def __init__(self, filename, config_hash=None):
-        self._db_filename = os.path.abspath(filename)
-        
-        super().__init__(filename, config_hash)
-
-    def _connect(self):
-        return sqlite3.connect(self._db_filename,
-                               detect_types=sqlite3.PARSE_DECLTYPES)
-        
-    def __enter__(self):
-        self._conn = self._connect()
-
-        cursor = self._conn.cursor()
-        cursor.execute('PRAGMA locking_mode = EXCLUSIVE')
-        self._conn.commit()
-
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._conn.close()
-
-    def _create(self):
-        """
-        Create a new configuration file for the spectral library.
-        """
-        super()._create()
-        
-        logging.info('Creating the spectral library configuration for file '
-                     '{}'.format(self._filename))
-
-        # collect summary information about the spectra for easy retrieval
-        conn = self._connect()
-        cursor = conn.cursor()
-
-        # retrieve from the database and convert to a consistent DataFrame
-        cursor.execute(
-                'SELECT id, precursorCharge, precursorMZ FROM RefSpectra')
-        ids, precursor_charges, precursor_masses = zip(*cursor.fetchall())
-        conn.close()
-
-        temp_info = collections.defaultdict(
-                lambda: {'id': [], 'precursor_mass': []})
-        for i, charge, mass in zip(ids, precursor_charges, precursor_masses):
-            info_charge = temp_info[charge]
-            info_charge['id'].append(i)
-            info_charge['precursor_mass'].append(mass)
-        self.spec_info = {'charge': {
-            charge: {
-                'id': np.asarray(charge_info['id'], np.uint32),
-                'precursor_mass': np.asarray(charge_info['precursor_mass'],
-                                             np.float32)
-            } for charge, charge_info in temp_info.items()}}
-
-        # store the configuration
-        config_filename = self._get_config_filename()
-        logging.debug('Saving the spectral library configuration to file '
-                      '{}'.format(config_filename))
-        joblib.dump(
-                (os.path.basename(self._filename),
-                 self.spec_info, self._config_hash),
-                config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
-
-        logging.info('Finished creating the spectral library configuration')
-
-    def _get_all_spectra(self):
-        """
-        Generates all spectra from the spectral library file.
-
-        Returns:
-            A generator that yields all spectra from the spectral library file.
-        """
-        # retrieve the specified spectrum
-        cursor = self._conn.cursor()
-        cursor.execute(
-                'SELECT id, peptideSeq, precursorMZ, precursorCharge, '
-                'isDecoy, peakMZ, peakIntensity '
-                'FROM RefSpectra, RefSpectraPeaks '
-                'WHERE RefSpectra.id == RefSpectraPeaks.RefSpectraID')
-        while True:
-            result = cursor.fetchone()
-            if result is None:
-                break
-
-            spec_id, peptide, precursor_mz, precursor_charge, is_decoy,\
-                masses, intensities = result
-            read_spectrum = spectrum.Spectrum(
-                    spec_id, precursor_mz, precursor_charge,
-                    None, peptide, is_decoy == 1)
-            read_spectrum.set_peaks(masses, intensities)
-
-            yield read_spectrum, ()
-
-    @lru_cache(maxsize=_max_cache_size)
-    def get_spectrum(self, spec_id, process_peaks=False):
-        """
-        Read the `Spectrum` with the specified identifier from the spectral
-        library file.
-
-        Args:
-            spec_id: The identifier of the `Spectrum` in the spectral library
-                file.
-            process_peaks: Flag whether to process the `Spectrum`'s peaks or
-                not.
-
-        Returns:
-            The `Spectrum` from the spectral library file with the specified
-            identifier.
-        """
-        # retrieve the specified spectrum
-        cursor = self._conn.cursor()
-        cursor.execute(
-                'SELECT peptideSeq, precursorMZ, precursorCharge, isDecoy, '
-                'peakMZ, peakIntensity, peakAnnotation '
-                'FROM RefSpectra, RefSpectraPeaks '
-                'WHERE RefSpectra.id == ? '
-                'AND RefSpectra.id == RefSpectraPeaks.RefSpectraID',
-                (int(spec_id),))
-        peptide, precursor_mz, precursor_charge, is_decoy,\
-            masses, intensities, annotations = cursor.fetchone()
-
-        read_spectrum = spectrum.Spectrum(
-                spec_id, precursor_mz, precursor_charge,
-                None, peptide, is_decoy == 1)
-        read_spectrum.set_peaks(masses, intensities, annotations)
-
-        if process_peaks:
-            read_spectrum.process_peaks()
-
-        return read_spectrum
-
-    def get_version(self):
-        cursor = self._conn.cursor()
-        cursor.execute('SELECT createTime, numSpecs FROM LibInfo')
-        create_time, num_specs = cursor.fetchone()
-
-        return datetime.datetime.strptime(create_time, '%Y-%m-%d %H:%M:%S'),\
-               num_specs
 
 
 def read_mgf(filename):
