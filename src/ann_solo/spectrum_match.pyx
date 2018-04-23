@@ -8,7 +8,7 @@ from libcpp cimport bool as bool_t
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 
-from config import config
+from ann_solo.config import config
 
 
 cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':

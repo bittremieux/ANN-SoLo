@@ -1,11 +1,10 @@
 import logging
 
-import spectral_library
-import writer
-from config import config
+from ann_solo import spectral_library, writer
+from ann_solo.config import config
 
 
-if __name__ == '__main__':
+def main():
     # initialize logging
     logging.basicConfig(
             format='%(asctime)s [%(levelname)s/%(processName)s] '
@@ -29,3 +28,7 @@ if __name__ == '__main__':
     spec_lib.shutdown()
 
     logging.shutdown()
+
+
+if __name__ == '__main__':
+    main()

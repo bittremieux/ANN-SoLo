@@ -4,7 +4,7 @@ import os
 import pathlib
 import re
 
-from config import config
+from ann_solo.config import config
 
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):

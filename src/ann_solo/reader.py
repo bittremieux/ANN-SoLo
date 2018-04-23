@@ -13,7 +13,7 @@ import pandas as pd
 import tqdm
 from pyteomics import mgf
 
-import spectrum
+from ann_solo import spectrum
 
 
 def get_spectral_library_reader(filename, config_hash=None):

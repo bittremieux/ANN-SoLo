@@ -5,7 +5,7 @@ For more information:
 
 * [Official code website](https://github.com/bittremieux/ANN-SoLo)
 
-**ANN SoLo** (Approximate Nearest Neighbor Spectral Library) uses approximate nearest neighbor indexing to significantly speed up spectral library searching in the case of (very) large search spaces, for example such as when performing an open modification search with a very wide precursor mass window.
+**ANN-SoLo** (**A**pproximate **N**earest **N**eighbor **S**pectral **L**ibrary) uses approximate nearest neighbor indexing to significantly speed up spectral library searching in the case of (very) large search spaces, for example such as when performing an open modification search with a very wide precursor mass window.
 
 The software is available as open-source under the Apache 2.0 license.
 
@@ -15,7 +15,6 @@ Application
 **TODO:** Add information on command-line arguments and how to use the application.
 
 - `spectral_library.py`
-- `convert_spectrast_to_spql.py`
 - `id_viewer.py`
 
 Dependencies

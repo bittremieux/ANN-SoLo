@@ -9,9 +9,8 @@ import matplotlib.ticker as mticker
 import numpy as np
 import seaborn as sns
 
-import reader
-import spectrum_match
-from config import config
+from ann_solo import reader, spectrum_match
+from ann_solo.config import config
 
 
 sns.set_context('notebook')

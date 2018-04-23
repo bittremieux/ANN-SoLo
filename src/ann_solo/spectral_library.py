@@ -13,10 +13,8 @@ import numexpr as ne
 import numpy as np
 import tqdm
 
-import reader
-import spectrum
-import spectrum_match
-from config import config
+from ann_solo import reader, spectrum, spectrum_match
+from ann_solo.config import config
 
 
 class SpectralLibrary(metaclass=abc.ABCMeta):

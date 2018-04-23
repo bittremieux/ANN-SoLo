@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from config import config
+from ann_solo.config import config
 
 
 def get_dim(min_mz, max_mz, bin_size):
