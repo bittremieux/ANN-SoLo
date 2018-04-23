@@ -1,9 +1,15 @@
 import setuptools
 
-import Cython.Distutils
 import numpy as np
 
 import ann_solo
+
+try:
+    import Cython.Distutils
+except ImportError:
+    use_cython = False
+else:
+    use_cython = True
 
 
 DISTNAME = 'ann-solo'
@@ -25,6 +31,10 @@ ext_module = setuptools.Extension(
         ['ann_solo/spectrum_match.pyx', 'ann_solo/SpectrumMatch.cpp'],
         language='c++', extra_compile_args=compile_args,
         extra_link_args=compile_args, include_dirs=[np.get_include()])
+
+cmdclass = {}
+if use_cython:
+    cmdclass.update({'build_ext': Cython.Distutils.build_ext})
 
 setuptools.setup(
         name=DISTNAME,
@@ -54,8 +64,7 @@ setuptools.setup(
         packages=['ann_solo'],
         entry_points={
             'console_scripts': ['ann-solo = ann_solo.ann_solo:main']},
-        cmdclass={
-            'build_ext': Cython.Distutils.build_ext},
+        cmdclass=cmdclass,
         install_requires=[
             'annoy',
             'ConfigArgParse',
