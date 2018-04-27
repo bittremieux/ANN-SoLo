@@ -4,6 +4,7 @@ import os
 import pathlib
 import re
 
+from . import __version__
 from ann_solo.config import config
 
 
@@ -27,7 +28,7 @@ def write_mztab(identifications, filename, lib_reader):
         ('description', 'Identification results of file "{}" against spectral '
                         'library file "{}"'.format(
                 config.query_filename, config.spectral_library_filename)),
-        ('software[1]', '[MS, MS:1001456, ANN SoLo, 0.0.dev]'),
+        ('software[1]', '[MS, MS:1001456, ANN SoLo, {}]'.format(__version__)),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
         ('ms_run[1]-location', pathlib.Path(
