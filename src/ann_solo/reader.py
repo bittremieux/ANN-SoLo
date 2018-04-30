@@ -161,6 +161,14 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         self.is_recreated = True
 
     @abc.abstractmethod
+    def open(self):
+        pass
+
+    @abc.abstractmethod
+    def close(self):
+        pass
+
+    @abc.abstractmethod
     def __enter__(self):
         return self
 
@@ -191,15 +199,21 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
     _max_cache_size = None
 
     _supported_extensions = []
-
-    def __enter__(self):
+    
+    def open(self):
         self._file = open(self._filename, 'rb')
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        
+    def close(self):
+        self._mm.close()
+        self._file.close()
+        
+    def __enter__(self):
+        self.open()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._mm.close()
-        self._file.close()
+        self.close()
 
     def _create(self):
         """
@@ -270,6 +284,10 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
             read_spectrum.process_peaks()
 
         return read_spectrum
+
+    @abc.abstractmethod
+    def _read_spectrum(self):
+        pass
 
     def get_version(self):
         return None

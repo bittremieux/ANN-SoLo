@@ -46,6 +46,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         try:
             self._library_reader = reader.get_spectral_library_reader(
                     lib_filename, self._get_config_hash())
+            self._library_reader.open()
         except FileNotFoundError as e:
             logging.error(e)
             raise
@@ -59,7 +60,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         """
         Release any resources to gracefully shut down.
         """
-        pass
+        self._library_reader.close()
 
     def search(self, query_filename):
         """
@@ -287,11 +288,10 @@ class SpectralLibraryBf(SpectralLibrary):
 
         # read the candidates
         candidates = []
-        with self._library_reader as lib_reader:
-            for idx in candidate_idx:
-                candidate = lib_reader.get_spectrum(idx, True)
-                if candidate.is_valid():
-                    candidates.append(candidate)
+        for idx in candidate_idx:
+            candidate = self._library_reader.get_spectrum(idx, True)
+            if candidate.is_valid():
+                candidates.append(candidate)
 
         return candidates
 
@@ -361,11 +361,10 @@ class SpectralLibraryAnn(SpectralLibrary):
 
         # read the candidates
         candidates = []
-        with self._library_reader as lib_reader:
-            for idx in candidate_idx:
-                candidate = lib_reader.get_spectrum(idx, True)
-                if candidate.is_valid():
-                    candidates.append(candidate)
+        for idx in candidate_idx:
+            candidate = self._library_reader.get_spectrum(idx, True)
+            if candidate.is_valid():
+                candidates.append(candidate)
 
         return candidates
 
@@ -483,19 +482,18 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 ann_index.set_seed(42)
                 ann_indices[charge] = ann_index
             charge_counts = collections.Counter()
-            with self._library_reader as lib_reader:
-                lib_spectra_it = (lib_spectra if lib_spectra is not None
-                                  else lib_reader._get_all_spectra())
-                for lib_spectrum, _ in tqdm.tqdm(
-                        lib_spectra_it,
-                        desc='Library spectra added', unit='spectra'):
-                    charge = lib_spectrum.precursor_charge
-                    if charge in ann_indices.keys():
-                        if lib_spectrum.process_peaks().is_valid():
-                            ann_indices[charge].add_item(
-                                    charge_counts[charge],
-                                    lib_spectrum.get_vector())
-                        charge_counts[charge] += 1
+            lib_spectra_it = (lib_spectra if lib_spectra is not None
+                              else self._library_reader._get_all_spectra())
+            for lib_spectrum, _ in tqdm.tqdm(
+                    lib_spectra_it,
+                    desc='Library spectra added', unit='spectra'):
+                charge = lib_spectrum.precursor_charge
+                if charge in ann_indices.keys():
+                    if lib_spectrum.process_peaks().is_valid():
+                        ann_indices[charge].add_item(
+                                charge_counts[charge],
+                                lib_spectrum.get_vector())
+                    charge_counts[charge] += 1
 
             # build the ANN indices
             logging.debug('Building the spectral library ANN indices')
