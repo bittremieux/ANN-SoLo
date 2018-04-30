@@ -271,7 +271,7 @@ class Spectrum:
 class SpectrumMatch:
 
     def __init__(self, query_spectrum,
-                 library_spectrum=None, search_engine_score=0.0):
+                 library_spectrum=None, search_engine_score=0.0, q=math.nan):
         # query information
         self.query_id = query_spectrum.identifier
         self.retention_time = query_spectrum.retention_time
@@ -288,6 +288,7 @@ class SpectrumMatch:
             self.library_id = self.sequence = self.calc_mass = self.is_decoy = None
 
         self.search_engine_score = search_engine_score
+        self.q = q
 
         # performance information
         self.num_candidates = self.time_candidates = self.time_match = self.time_total = 0

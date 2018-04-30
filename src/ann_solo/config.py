@@ -98,6 +98,13 @@ class Config:
                 '--precursor_tolerance_mode', type=str,
                 choices=['Da', 'ppm'], required=True,
                 help='precursor mass tolerance unit (options: %(choices)s)')
+        self._parser.add_argument(
+                '--precursor_tolerance_mass_open', type=float,
+                help='precursor mass tolerance')
+        self._parser.add_argument(
+                '--precursor_tolerance_mode_open', type=str,
+                choices=['Da', 'ppm'],
+                help='precursor mass tolerance unit (options: %(choices)s)')
 
         # fragment peak matching
         self._parser.add_argument(
@@ -110,11 +117,28 @@ class Config:
                 help='allow shifted peaks according to the  precursor mass '
                      'difference to  accommodate for PTMs while calculating '
                      'the dot product match score')
+        
+        # maximum FDR
+        self._parser.add_argument(
+                '--fdr', default=0.01, type=float,
+                help='FDR threshold to retain identifications '
+                     '(default: %(default)s)')
+
+        self._parser.add_argument(
+                '--fdr_tolerance_mass', default=0.1, type=float,
+                help='TODO')
+        self._parser.add_argument(
+                '--fdr_tolerance_mode', default='Da', type=str,
+                choices=['Da', 'ppm'],
+                help='TODO')
+        self._parser.add_argument(
+                '--fdr_min_group_size', default=5, type=int,
+                help='TODO')
 
         # MODE
         # use an ANN index or the conventional brute-force mode
         self._parser.add_argument(
-                '--mode', type=str, choices=['ann', 'bf'], required=True,
+                '--mode', default='ann', type=str, choices=['ann', 'bf'],
                 help="search using an approximate nearest neighbors or the "
                      "conventional (brute-force) mode; 'bf': brute-force, "
                      "'ann': approximate nearest neighbors indexing")
@@ -141,14 +165,13 @@ class Config:
         # number of ANN trees
         self._parser.add_argument(
                 '--num_trees', default=100, type=int,
-                help='number of ANN trees (default: %(default)s)')
+                help='number of trees in the ANN index (default: %(default)s)')
 
         # number of nodes to explore during ANN searching
         self._parser.add_argument(
                 '--search_k', default=50000, type=int,
                 help='number of nodes to explore in the ANN index during '
-                     'searching (only required when using Annoy mode; '
-                     'default: %(default)s)')
+                     'searching (default: %(default)s)')
 
         # filled in 'parse', contains the specified settings
         self._namespace = None

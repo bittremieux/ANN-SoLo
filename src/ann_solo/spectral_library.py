@@ -13,7 +13,7 @@ import numexpr as ne
 import numpy as np
 import tqdm
 
-from ann_solo import reader, spectrum, spectrum_match
+from ann_solo import reader, spectrum, spectrum_match, util
 from ann_solo.config import config
 
 
@@ -72,7 +72,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         Returns:
             A list of SpectrumMatch identifications.
         """
-        logging.info('Identifying file %s', query_filename)
+        logging.info('Processing file %s', query_filename)
 
         # read all spectra in the query file and
         # split based on their precursor charge
@@ -98,26 +98,62 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
                 key=lambda spec: (spec.precursor_charge, spec.precursor_mz))
 
         # identify all spectra
-        logging.info('Identifying all query spectra')
+        logging.info('Processing all query spectra')
         query_matches = {}
-        for query_spectrum in tqdm.tqdm(
-                query_spectra,
-                desc='Query spectra identified', unit='spectra', smoothing=0):
-            query_match = self._find_match(query_spectrum)
+        # standard search settings
+        precursor_tols = [(config.precursor_tolerance_mass,
+                           config.precursor_tolerance_mode)]
+        # cascade search: open search settings
+        if config.precursor_tolerance_mass_open is not None and \
+                config.precursor_tolerance_mode_open is not None:
+            precursor_tols.append((config.precursor_tolerance_mass_open,
+                                   config.precursor_tolerance_mode_open))
+        for cascade_level, (tol_mass, tol_mode) in enumerate(precursor_tols):
+            level_matches = {}
+            logging.debug('Level {} precursor mass tolerance: {} {}'.format(
+                    cascade_level + 1, tol_mass, tol_mode))
+            for query_spectrum in tqdm.tqdm(
+                    query_spectra, desc='Query spectra processed',
+                    unit='spectra', smoothing=0):
+                # identify the query spectra in this cascade level
+                query_match = self._find_match(
+                        query_spectrum, tol_mass, tol_mode)
+    
+                if query_match.sequence is not None:
+                    # make sure we only retain the best identification
+                    # (i.e. for duplicated spectra if the
+                    # precursor charge was unknown)
+                    if query_match.query_id not in level_matches or\
+                       query_match.search_engine_score > level_matches[query_match.query_id].search_engine_score:
+                        level_matches[query_match.query_id] = query_match
+                
+            # filter SSMs on FDR
+            if cascade_level == 0:
+                # small precursor mass window: standard FDR
+                for accepted_ssm in util.filter_fdr(
+                        level_matches.values(), config.fdr):
+                    query_matches[accepted_ssm.query_id] = accepted_ssm
+            else:
+                # open search: group FDR
+                for accepted_ssm in util.filter_group_fdr(
+                        level_matches.values(), config.fdr,
+                        config.fdr_tolerance_mass, config.fdr_tolerance_mode,
+                        config.fdr_min_group_size):
+                    query_matches[accepted_ssm.query_id] = accepted_ssm
+            logging.debug(
+                    '{} spectra identified at {:.0%} FDR '
+                    'after search level {}'.format(
+                            len(query_matches), config.fdr, cascade_level + 1))
+            
+            # process the remaining spectra in the next cascade level
+            query_spectra = [spec for spec in query_spectra
+                             if spec.identifier not in query_matches]
 
-            if query_match.sequence is not None:
-                # make sure we only retain the best identification
-                # (i.e. for duplicated spectra if the
-                # precursor charge was unknown)
-                if query_match.query_id not in query_matches or\
-                   query_match.search_engine_score > query_matches[query_match.query_id].search_engine_score:
-                    query_matches[query_match.query_id] = query_match
-
-        logging.info('Finished identifying file %s', query_filename)
+        logging.info('Finished processing file %s', query_filename)
 
         return query_matches.values()
 
-    def _find_match(self, query):
+    def _find_match(self, query, tol_mass, tol_mode):
         """
         Identifies the given query Spectrum.
 
@@ -136,7 +172,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
 
         # find all candidate library spectra
         # for which a match has to be computed
-        candidates = self._filter_library_candidates(query)
+        candidates = self._filter_library_candidates(query, tol_mass, tol_mode)
 
         stop_candidates = start_match = time.time()
 
@@ -160,7 +196,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         return identification
 
     @abc.abstractmethod
-    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None):
+    def _filter_library_candidates(self, query, tol_mass, tol_mode):
         """
         Find all candidate matches for the given query in the spectral library.
 
@@ -223,7 +259,7 @@ class SpectralLibraryBf(SpectralLibrary):
     spectrum.
     """
 
-    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None):
+    def _filter_library_candidates(self, query, tol_mass, tol_mode):
         """
         Find all candidate matches for the given query in the spectral library.
 
@@ -242,11 +278,6 @@ class SpectralLibraryBf(SpectralLibrary):
             The candidate Spectra in the spectral library that need to be
             compared to the given query Spectrum.
         """
-        if tol_mass is None:
-            tol_mass = config.precursor_tolerance_mass
-        if tol_mode is None:
-            tol_mode = config.precursor_tolerance_mode
-
         # filter the candidates on the precursor mass window
         candidate_idx = self._get_mass_filter_idx(
                 query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
@@ -275,7 +306,7 @@ class SpectralLibraryAnn(SpectralLibrary):
     
     _ann_index_lock = multiprocessing.Lock()
 
-    def _filter_library_candidates(self, query, tol_mass=None, tol_mode=None,
+    def _filter_library_candidates(self, query, tol_mass, tol_mode,
                                    num_candidates=None, ann_cutoff=None):
         """
         Find all candidate matches for the given query in the spectral library.
@@ -300,10 +331,6 @@ class SpectralLibraryAnn(SpectralLibrary):
             The candidate Spectra in the spectral library that need to be
                 compared to the given query Spectrum.
         """
-        if tol_mass is None:
-            tol_mass = config.precursor_tolerance_mass
-        if tol_mode is None:
-            tol_mode = config.precursor_tolerance_mode
         if num_candidates is None:
             num_candidates = config.num_candidates
         if ann_cutoff is None:
