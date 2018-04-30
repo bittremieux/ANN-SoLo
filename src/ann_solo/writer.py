@@ -28,9 +28,10 @@ def write_mztab(identifications, filename, lib_reader):
         ('description', 'Identification results of file "{}" against spectral '
                         'library file "{}"'.format(
                 config.query_filename, config.spectral_library_filename)),
-        ('software[1]', '[MS, MS:1001456, ANN SoLo, {}]'.format(__version__)),
+        ('software[1]', '[MS, MS:1001456, ANN-SoLo, {}]'.format(__version__)),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
+        ('psm_search_engine_score[2]', '[MS, MS:1002354, PSM-level q-value,]'),
         ('ms_run[1]-location', pathlib.Path(
                 os.path.abspath(config.query_filename)).as_uri()),
         ('fixed_mod[1]', '[MS, MS:1002453, No fixed modifications searched,]'),
