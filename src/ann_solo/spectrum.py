@@ -163,6 +163,7 @@ class Spectrum:
                     intensities[merged_indices]
 
                 intensities = intensities_merged
+                # TODO: select the most likely annotation
                 annotations = annotations[indices]
         else:
             # make sure the peaks are always sorted by mass
@@ -177,15 +178,24 @@ class Spectrum:
 
         # remove peak(s) close to the precursor mass
         filter_peaks = filter_range
-        if remove_precursor:
+        if (remove_precursor and self.precursor_mz is not None and
+                    self.precursor_charge is not None):
+            pep_mass = (self.precursor_mz * self.precursor_charge
+                        if self.precursor_charge is not None
+                        else self.precursor_mz)
             max_charge = (self.precursor_charge + 1
                           if self.precursor_charge is not None
                           else 2)  # exclusive
-            filter_precursor = np.where(np.logical_or.reduce([np.logical_and(
-                self.precursor_mz / charge - remove_precursor_tolerance <= masses,
-                masses <= self.precursor_mz / charge + remove_precursor_tolerance)
-                for charge in range(1, max_charge)]))[0]
-            filter_peaks = np.setdiff1d(filter_peaks, filter_precursor, True)
+            filter_precursor = []
+            for charge in range(1, max_charge):
+                for isotope in range(3):
+                    filter_precursor.append(np.where(np.logical_and(
+                            (pep_mass + isotope) / charge
+                            - remove_precursor_tolerance <= masses,
+                            masses <= (pep_mass + isotope) / charge
+                            + remove_precursor_tolerance))[0])
+            filter_peaks = np.setdiff1d(
+                    filter_peaks, np.concatenate(filter_precursor), True)
 
         # check if sufficient peaks remain
         if len(filter_peaks) < min_peaks:
@@ -222,7 +232,9 @@ class Spectrum:
         else:
             scaled_intensities = filtered_intensities
         # normalize the intensities to get a unit vector
-        norm_intensities = (scaled_intensities / np.linalg.norm(scaled_intensities)).astype(np.float32)
+        norm_intensities = (
+            scaled_intensities / np.linalg.norm(scaled_intensities)).astype(
+                np.float32)
 
         self.masses = filtered_masses
         self.intensities = norm_intensities
