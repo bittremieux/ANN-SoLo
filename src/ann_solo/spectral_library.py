@@ -100,10 +100,10 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         # identify all spectra
         logging.info('Processing all query spectra')
         query_matches = {}
-        # standard search settings
+        # cascade level 1: standard search settings
         precursor_tols = [(config.precursor_tolerance_mass,
                            config.precursor_tolerance_mode)]
-        # cascade search: open search settings
+        # cascade level 2: open search settings
         if config.precursor_tolerance_mass_open is not None and \
                 config.precursor_tolerance_mode_open is not None:
             precursor_tols.append((config.precursor_tolerance_mass_open,
@@ -123,23 +123,26 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
                     # make sure we only retain the best identification
                     # (i.e. for duplicated spectra if the
                     # precursor charge was unknown)
-                    if query_match.query_id not in level_matches or\
-                       query_match.search_engine_score > level_matches[query_match.query_id].search_engine_score:
+                    if (query_match.query_id not in level_matches or
+                                query_match.search_engine_score >
+                                level_matches[query_match.query_id].search_engine_score):
                         level_matches[query_match.query_id] = query_match
                 
             # filter SSMs on FDR
             if cascade_level == 0:
                 # small precursor mass window: standard FDR
-                for accepted_ssm in util.filter_fdr(
-                        level_matches.values(), config.fdr):
-                    query_matches[accepted_ssm.query_id] = accepted_ssm
+                def filter_fdr(ssms):
+                    return util.filter_fdr(ssms, config.fdr)
             else:
                 # open search: group FDR
-                for accepted_ssm in util.filter_group_fdr(
-                        level_matches.values(), config.fdr,
-                        config.fdr_tolerance_mass, config.fdr_tolerance_mode,
-                        config.fdr_min_group_size):
+                def filter_fdr(ssms):
+                    return util.filter_group_fdr(ssms, config.fdr,
+                                                 config.fdr_tolerance_mass,
+                                                 config.fdr_tolerance_mode,
+                                                 config.fdr_min_group_size)
+            for accepted_ssm in filter_fdr(level_matches.values()):
                     query_matches[accepted_ssm.query_id] = accepted_ssm
+            
             logging.debug(
                     '{} spectra identified at {:.0%} FDR '
                     'after search level {}'.format(
