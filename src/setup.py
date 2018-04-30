@@ -12,7 +12,7 @@ else:
     use_cython = True
 
 
-DISTNAME = 'ann-solo'
+DISTNAME = 'ann_solo'
 VERSION = ann_solo.__version__
 DESCRIPTION = 'Spectral library search engine optimized for fast open ' \
               'modification searching'
@@ -63,17 +63,20 @@ setuptools.setup(
             'Topic :: Scientific/Engineering :: Bio-Informatics'],
         packages=['ann_solo'],
         entry_points={
-            'console_scripts': ['ann-solo = ann_solo.ann_solo:main']},
+            'console_scripts': ['ann_solo = ann_solo.ann_solo:main',
+                                'ann_solo_plot = ann_solo.plot_ssm:main']},
         cmdclass=cmdclass,
         install_requires=[
             'annoy',
             'ConfigArgParse',
             'Cython',
             'joblib',
+            'matplotlib',
             'numexpr',
             'numpy',
             'pandas',
             'pyteomics',
+            'seaborn',
             'scipy',
             'tqdm'],
         setup_requires=[

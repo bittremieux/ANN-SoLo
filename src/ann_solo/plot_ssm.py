@@ -35,7 +35,7 @@ def get_matching_peaks(library_spectrum, query_spectrum):
     return library_matches, query_matches, score
 
 
-if __name__ == '__main__':
+def main():
     # load the cmd arguments
     parser = argparse.ArgumentParser(description='Visualize PSMs')
     parser.add_argument(
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         raise ValueError('Could not find the specified query spectrum')
 
     # compute the matching peaks
-    library_matches, query_matches, score =\
+    library_matches, query_matches, _ =\
         get_matching_peaks(library_spectrum, query_spectrum)
 
     # plot the match
@@ -149,12 +149,12 @@ if __name__ == '__main__':
     ax.set_ylim(-1.15, 1.05)
 
     # show major/minor tick lines
-    plt.gca().xaxis.set_minor_locator(mticker.AutoMinorLocator())
-    plt.gca().yaxis.set_minor_locator(mticker.AutoMinorLocator())
-    plt.grid(b=True, which='major', color='lightgrey',
-             linestyle='--', linewidth=1.0)
-    plt.grid(b=True, which='minor', color='lightgrey',
-             linestyle='--', linewidth=0.5)
+    ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(mticker.AutoMinorLocator())
+    ax.grid(b=True, which='major', color='lightgrey',
+            linestyle='--', linewidth=1.0)
+    ax.grid(b=True, which='minor', color='lightgrey',
+            linestyle='--', linewidth=0.5)
     
     # small tick labels
     ax.tick_params(axis='both', which='both', labelsize='small')
@@ -180,3 +180,7 @@ if __name__ == '__main__':
 
     plt.savefig('{}.png'.format(query_id), dpi=300, bbox_inches='tight')
     plt.close()
+
+
+if __name__ == '__main__':
+    main()
