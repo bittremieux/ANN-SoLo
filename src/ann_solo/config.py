@@ -41,7 +41,7 @@ class Config:
                 formatter_class=NewlineTextHelpFormatter)
 
         self._parser.add_argument(
-                '--config', default='config.ini',
+                '--config', default='config.ini', is_config_file=True,
                 help='config file (default: %(default)s)')
 
         # IO
