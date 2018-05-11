@@ -37,7 +37,9 @@ def get_matching_peaks(library_spectrum, query_spectrum):
 
 def main():
     # load the cmd arguments
-    parser = argparse.ArgumentParser(description='Visualize PSMs')
+    parser = argparse.ArgumentParser(
+            description='Visualize spectrum-spectrum matches from your '
+                        'ANN-SoLo identification results')
     parser.add_argument(
             'mztab_filename', help='Identifications in mzTab format')
     parser.add_argument(

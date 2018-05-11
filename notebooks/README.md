@@ -8,7 +8,7 @@ These notebooks allow you to easily recreate all figures and tables in the ANN-S
 * `hek293_mass_diff.ipynb`: Precursor mass differences for the ANN-SoLo identification results for the HEK293 data set.
 * `hek293_stats.ipynb`: Comparison between ANN-SoLo and SpectraST on the HEK293 data set.
 * `iprg2012_ann_hyperparameters.ipynb`: Runtime versus number of identifications for brute-force and ANN searches on the iPRG2012 data set. Shows the trade-off between time and accuracy formed by the ANN index hyperparameters.
-* `iprg2012_fdr.ipynb`: Difference in number of identifications for the iPRG2012 data set between a standard search, an open searching using the standard dot product, and an open search using the shifted dot product.
+* `iprg2012_fdr.ipynb`: Difference in number of identifications for the iPRG2012 data set between a standard search, an open search using the standard dot product, and an open search using the shifted dot product.
 * `iprg2012_profiling.ipynb`: Code profiling of brute-force versus ANN searches on the iPRG2012 data set.
 * `iprg2012_spectrum_representation.ipynb`: Evaluation of spectrum representation options for the iPRG2012 data set.
 * `spec_lib_size.ipynb`: Historical evolution of spectral library sizes.

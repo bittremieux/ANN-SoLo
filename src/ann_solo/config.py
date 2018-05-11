@@ -61,10 +61,10 @@ class Config:
         # minimum and maximum fragment peak mass values
         self._parser.add_argument(
                 '--min_mz', default=11, type=int,
-                help='minimum m/z value (inclusive, default: %(default)s Da)')
+                help='minimum m/z value (inclusive, default: %(default)s m/z)')
         self._parser.add_argument(
                 '--max_mz', default=2010, type=int,
-                help='maximum m/z value (inclusive, default: %(default)s Da)')
+                help='maximum m/z value (inclusive, default: %(default)s m/z)')
 
         # remove peaks around the precursor mass from fragment spectra
         self._parser.add_argument(
@@ -73,8 +73,8 @@ class Config:
                      '(default: no peaks are removed)')
         self._parser.add_argument(
                 '--remove_precursor_tolerance', default=0, type=float,
-                help='the window (in Da) around the precursor mass to remove '
-                     'peaks (default: %(default)s Da)')
+                help='the window (in m/z) around the precursor mass to remove '
+                     'peaks (default: %(default)s m/z)')
 
         # minimum fragment peak intensity to filter out noise peaks
         self._parser.add_argument(
@@ -89,7 +89,7 @@ class Config:
         self._parser.add_argument(
                 '--min_mz_range', default=250, type=int,
                 help='discard spectra with a smaller mass range '
-                     '(default: %(default)s)')
+                     '(default: %(default)s m/z)')
 
         # maximum number of fragment peaks to use for each spectrum
         self._parser.add_argument(
@@ -118,7 +118,7 @@ class Config:
         self._parser.add_argument(
                 '--precursor_tolerance_mass_open', type=float,
                 help='precursor mass tolerance (wide window for the second '
-                     'level of the cascade search')
+                     'level of the cascade search)')
         self._parser.add_argument(
                 '--precursor_tolerance_mode_open', type=str,
                 choices=['Da', 'ppm'],
@@ -127,7 +127,7 @@ class Config:
         # fragment peak matching
         self._parser.add_argument(
                 '--fragment_mz_tolerance', type=float, required=True,
-                help='fragment mass tolerance (Da)')
+                help='fragment mass tolerance (m/z)')
 
         # shifted dot product
         self._parser.add_argument(
@@ -144,7 +144,8 @@ class Config:
         self._parser.add_argument(
                 '--fdr_tolerance_mass', default=0.1, type=float,
                 help='mass difference bin width for the group FDR calculation '
-                     'during the second cascade level (default: %(default)s)')
+                     'during the second cascade level (default: %(default)s '
+                     'Da)')
         self._parser.add_argument(
                 '--fdr_tolerance_mode', default='Da', type=str,
                 choices=['Da', 'ppm'],
@@ -160,8 +161,9 @@ class Config:
         self._parser.add_argument(
                 '--mode', default='ann', type=str, choices=['ann', 'bf'],
                 help="search using an approximate nearest neighbors or the "
-                     "standard (brute-force) mode; 'bf': brute-force, "
-                     "'ann': approximate nearest neighbors")
+                     "traditional (brute-force) mode; 'bf': brute-force, "
+                     "'ann': approximate nearest neighbors (default: "
+                     "%(default)s)")
 
         # bin size for the ANN index (Dalton)
         self._parser.add_argument(
