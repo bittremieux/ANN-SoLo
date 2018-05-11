@@ -38,11 +38,8 @@ class Config:
                             'Official code website: '
                             'https://github.com/bittremieux/ANN-SoLo\n\n',
                 default_config_files=['config.ini'],
+                args_for_setting_config_path=['-c', '--config'],
                 formatter_class=NewlineTextHelpFormatter)
-
-        self._parser.add_argument(
-                '--config', default='config.ini', is_config_file=True,
-                help='config file (default: %(default)s)')
 
         # IO
         self._parser.add_argument(
