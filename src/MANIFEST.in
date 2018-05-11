@@ -1,3 +1,2 @@
 recursive-include ann_solo *.cpp *.h *.py *.pyx
-recursive-include ann_solo *.ini
 include README.md
