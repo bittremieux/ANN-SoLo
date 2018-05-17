@@ -25,6 +25,8 @@ def write_mztab(identifications, filename, lib_reader):
         ('mzTab-version', '1.0.0'),
         ('mzTab-mode', 'Summary'),
         ('mzTab-type', 'Identification'),
+        ('mzTab-ID', 'ANN-SoLo_{}'.format(filename)),
+        ('title', 'ANN-SoLo identification file "{}"'.format(filename)),
         ('description', 'Identification results of file "{}" against spectral '
                         'library file "{}"'.format(
                 config.query_filename, config.spectral_library_filename)),
