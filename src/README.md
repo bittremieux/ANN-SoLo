@@ -1,4 +1,4 @@
-ANN SoLo
+ANN-SoLo
 ========
 
 For more information:

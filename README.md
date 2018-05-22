@@ -1,5 +1,7 @@
-ANN SoLo
+ANN-SoLo
 ========
+
+![ANN-SoLo](ann-solo.png)
 
 For more information:
 

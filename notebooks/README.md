@@ -15,7 +15,7 @@ These notebooks allow you to easily recreate all figures and tables in the ANN-S
 
 ## Data
 
-The necessary data to execute the notebooks is available on the PRIDE repository at identifier **TODO**.
+The necessary data to execute the notebooks is available on the PRIDE repository at identifier [PXD009861](https://www.ebi.ac.uk/pride/archive/projects/PXD009861).
 
 The directory structure is based on the [Cookiecutter Data Science](https://drivendata.github.io/cookiecutter-data-science/) project. A `data` directory is expected at the same level of the `notebooks` directory. Additionally, the ANN-SoLo source code should be present in the `src` directory. The full directory and file structure is as follows:
 
@@ -30,10 +30,10 @@ The directory structure is based on the [Cookiecutter Data Science](https://driv
 │   │   ├── hek293
 │   │   │   ├── massive_human_hcd_unique_targetdecoy.splib <--- The compiled spectral library for the HEK293 data set.
 │   │   │   ├── ann-solo                 <--- The ANN-SoLo mztab identification results and logs.
-│   │   │   │   ├── closed
+│   │   │   │   ├── std
 │   │   │   │   └── oms
 │   │   │   └── spectrast                <--- The SpectraST tab-separated (xls extension converted to txt) identification results and logs.
-│   │   │       ├── closed
+│   │   │       ├── std
 │   │   │       └── oms
 │   │   └── iprg2012
 │   │       ├── human_yeast_targetdecoy.splib <--- The compiled spectral library for the iPRG2012 data set.
