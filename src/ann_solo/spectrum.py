@@ -297,7 +297,7 @@ class SpectrumMatch:
             self.calc_mass_to_charge = library_spectrum.precursor_mz
             self.is_decoy = library_spectrum.is_decoy
         else:
-            self.library_id = self.sequence = self.calc_mass = self.is_decoy = None
+            self.library_id = self.sequence = self.calc_mass_to_charge = self.is_decoy = None
 
         self.search_engine_score = search_engine_score
         self.q = q

@@ -29,7 +29,7 @@ def filter_fdr(psms, fdr=0.01):
             break
 
 
-def filter_group_fdr(psms, fdr=0.01, tol_mass=0, tol_mode=None,
+def filter_group_fdr(psms, fdr=0.01, tol_mass=0., tol_mode=None,
                      min_group_size=5):
     """
     Filter PSMs exceeding the given FDR.
@@ -62,7 +62,6 @@ def filter_group_fdr(psms, fdr=0.01, tol_mass=0, tol_mode=None,
     groups_common, groups_uncommon = [], []
     while len(psms_remaining) > 0:
         # find all remaining PSMs within the mass difference window
-        mass_diff_top = mass_diffs[0]
         if tol_mass is None or tol_mode not in ('Da', 'ppm'):
             mask = np.full(len(psms_remaining), True, dtype=bool)
         elif tol_mode == 'Da':
