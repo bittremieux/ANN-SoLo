@@ -152,7 +152,7 @@ class Config:
                 help='mass difference bin unit for the group FDR calculation '
                      'during the second cascade level (default: %(default)s)')
         self._parser.add_argument(
-                '--fdr_min_group_size', default=5, type=int,
+                '--fdr_min_group_size', default=20, type=int,
                 help='minimum group size for the group FDR calculation '
                      'during the second cascade level (default: %(default)s)')
 
