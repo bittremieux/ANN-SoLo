@@ -11,6 +11,10 @@ For more information:
 
 The software is available as open-source under the Apache 2.0 license.
 
+If you use ANN-SoLo in your work, please cite the following publication:
+
+- Wout Bittremieux, Pieter Meysman, William Stafford Noble, Kris Laukens. **Fast Open Modification Spectral Library Searching through Approximate Nearest Neighbor Indexing.** _Journal of Proteome Research_ (2018). [doi:10.1021/acs.jproteome.8b00359](https://doi.org/10.1021/acs.jproteome.8b00359)
+
 Running ANN-SoLo
 ----------------
 

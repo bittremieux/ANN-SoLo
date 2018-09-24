@@ -1,6 +1,6 @@
 # ANN-SoLo notebooks
 
-These notebooks allow you to easily recreate all figures and tables in the ANN-SoLo manuscript (**TODO**: ref).
+These notebooks allow you to easily recreate all figures and tables in the ANN-SoLo manuscript ([doi:10.1021/acs.jproteome.8b00359](https://doi.org/10.1021/acs.jproteome.8b00359)).
 
 ## Notebook overview
 

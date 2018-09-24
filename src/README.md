@@ -125,7 +125,7 @@ optional arguments:
                         during the second cascade level (default: Da)
   --fdr_min_group_size FDR_MIN_GROUP_SIZE
                         minimum group size for the group FDR calculation
-                        during the second cascade level (default: 5)
+                        during the second cascade level (default: 20)
   --mode {ann,bf}       search using an approximate nearest neighbors or the
                         traditional (brute-force) mode; 'bf': brute-force,
                         'ann': approximate nearest neighbors (default: ann)
