@@ -18,12 +18,12 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
         double precursor_mass_diff = (query->getPrecursorMz() - candidate->getPrecursorMz()) * candidate->getPrecursorCharge();
         // only take peak shifts into account if the mass difference is relevant
         unsigned int num_shifts = allow_shift && fabs(precursor_mass_diff) >= fragment_mz_tolerance ? candidate->getPrecursorCharge() + 1 : 1;
-        unsigned int candidate_peak_index[num_shifts];
+        unsigned int* candidate_peak_index = new unsigned int[num_shifts];
         for(unsigned int charge = 0; charge < num_shifts; charge++)
         {
             candidate_peak_index[charge] = 0;
         }
-        double mass_diff[num_shifts];
+        double* mass_diff = new double[num_shifts];
         mass_diff[0] = 0;
         for(unsigned int charge = 1; charge < num_shifts; charge++)
         {
@@ -84,6 +84,9 @@ SpectrumSpectrumMatch* SpectrumMatcher::dot(
                 }
             }
         }
+
+        delete[] candidate_peak_index;
+        delete[] mass_diff;
 
         // use the most prominent peak matches to compute the score (sort in descending order)
         std::sort(peak_matches.begin(), peak_matches.end(), [](auto &peak_match1, auto &peak_match2) {
