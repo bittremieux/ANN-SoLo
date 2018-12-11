@@ -53,7 +53,7 @@ def filter_group_fdr(psms, fdr=0.01, tol_mass=0., tol_mode=None,
         threshold. Each PSM is assigned its q-value in the `q` variable.
     """
     psms_remaining = np.asarray(sorted(
-            psms, key=lambda psm: psm.search_engine_score, reverse=True))
+        psms, key=lambda psm: psm.search_engine_score, reverse=True))
     exp_masses = np.asarray([psm.exp_mass_to_charge for psm in psms_remaining])
     mass_diffs = np.asarray([(psm.exp_mass_to_charge - psm.calc_mass_to_charge)
                              * psm.charge for psm in psms_remaining])

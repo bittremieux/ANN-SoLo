@@ -84,7 +84,7 @@ def get_best_match(query, candidates,
         for candidate in candidates:
             if not hasattr(candidate, 'charges'):
                 candidate.charges = np.zeros(
-                        len(candidate.annotations), dtype=np.uint8)
+                    len(candidate.annotations), dtype=np.uint8)
                 for index, annotation in enumerate(candidate.annotations):
                     if annotation is not None:
                         candidate.charges[index] = annotation[1]
@@ -92,17 +92,17 @@ def get_best_match(query, candidates,
             intensities = candidate.intensities
             charges = candidate.charges
             candidates_vec.push_back(new Spectrum(
-                    candidate.precursor_mz, candidate.precursor_charge,
-                    len(candidate.masses),
-                    &masses[0], &intensities[0], &charges[0]))
+                candidate.precursor_mz, candidate.precursor_charge,
+                len(candidate.masses),
+                &masses[0], &intensities[0], &charges[0]))
 
         masses = query.masses
         intensities = query.intensities
         query.charges = np.zeros(len(query.annotations), dtype=np.uint8)
         charges = query.charges
         query_spec = new Spectrum(
-                query.precursor_mz, query.precursor_charge, len(query.masses),
-                &masses[0], &intensities[0], &charges[0])
+            query.precursor_mz, query.precursor_charge, len(query.masses),
+            &masses[0], &intensities[0], &charges[0])
 
         with nogil:
             query_matcher = new SpectrumMatcher()

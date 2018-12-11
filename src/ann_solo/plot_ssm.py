@@ -24,8 +24,8 @@ zorders = {'a': 2, 'b': 3, 'y': 3, 'unknown': 1, None: 0}
 
 def get_matching_peaks(library_spectrum, query_spectrum):
     _, score, peak_matches = spectrum_match.get_best_match(
-            query_spectrum, [library_spectrum],
-            allow_shift=config.allow_peak_shifts)
+        query_spectrum, [library_spectrum],
+        allow_shift=config.allow_peak_shifts)
     library_matches, query_matches = {}, {}
     for peak_match in peak_matches:
         query_matches[peak_match[0]] = library_matches[peak_match[1]] = (
@@ -38,12 +38,12 @@ def get_matching_peaks(library_spectrum, query_spectrum):
 def main():
     # load the cmd arguments
     parser = argparse.ArgumentParser(
-            description='Visualize spectrum-spectrum matches from your '
-                        'ANN-SoLo identification results')
+        description='Visualize spectrum-spectrum matches from your '
+                    'ANN-SoLo identification results')
     parser.add_argument(
-            'mztab_filename', help='Identifications in mzTab format')
+        'mztab_filename', help='Identifications in mzTab format')
     parser.add_argument(
-            'query_id', help='The identifier of the query to visualize')
+        'query_id', help='The identifier of the query to visualize')
     args = parser.parse_args()
 
     # read the mzTab file
@@ -68,7 +68,7 @@ def main():
             value = metadata[key][metadata[key].rfind(' ') + 1:]
             if value != 'False':
                 settings.append('--{}'.format(param))
-            if value != 'False' and value != 'True':
+            if value not in ('False', 'True'):
                 settings.append(value)
     # file names
     settings.append('dummy_spectral_library_filename')
@@ -79,14 +79,14 @@ def main():
     # retrieve information on the requested query
     query_id = args.query_id
     query_uri = urlparse.urlparse(urlparse.unquote(
-            metadata['ms_run[1]-location']))
+        metadata['ms_run[1]-location']))
     query_filename = os.path.abspath(os.path.join(
-            query_uri.netloc, query_uri.path))
+        query_uri.netloc, query_uri.path))
     psm = psms.loc[query_id]
     library_id = psm['accession']
     library_uri = urlparse.urlparse(urlparse.unquote(psm['database']))
     library_filename = os.path.abspath(os.path.join(
-            library_uri.netloc, library_uri.path))
+        library_uri.netloc, library_uri.path))
     score = psm['search_engine_score[1]']
 
     # read library and query spectrum
@@ -112,7 +112,7 @@ def main():
         get_matching_peaks(library_spectrum, query_spectrum)
 
     # plot the match
-    fix, ax = plt.subplots(figsize=(20, 10))
+    fig, ax = plt.subplots(figsize=(20, 10))
 
     # query spectrum on top
     max_intensity = np.max(query_spectrum.intensities)
@@ -172,11 +172,11 @@ def main():
     ax.text(0.5, 1.02,
             'File: {}, Scan: {}, Precursor m/z: {:.4f}, '
             'Library m/z: {:.4f}, Charge: {}'.format(
-                    os.path.basename(query_filename),
-                    query_spectrum.identifier,
-                    query_spectrum.precursor_mz,
-                    library_spectrum.precursor_mz,
-                    query_spectrum.precursor_charge),
+                os.path.basename(query_filename),
+                query_spectrum.identifier,
+                query_spectrum.precursor_mz,
+                library_spectrum.precursor_mz,
+                query_spectrum.precursor_charge),
             horizontalalignment='center', verticalalignment='bottom',
             fontsize='large', transform=plt.gca().transAxes)
 

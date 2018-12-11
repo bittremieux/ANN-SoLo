@@ -154,12 +154,12 @@ class Spectrum:
         if resolution is not None:
             # peaks get sorted here
             masses, indices, inverse = np.unique(
-                    np.around(masses, resolution), True, True)
+                np.around(masses, resolution), True, True)
             if len(masses) != len(intensities):
                 # some peaks got merged, so sum their intensities
                 intensities_merged = intensities[indices]
                 merged_indices = np.setdiff1d(
-                        np.arange(len(intensities)), indices, True)
+                    np.arange(len(intensities)), indices, True)
                 intensities_merged[inverse[merged_indices]] +=\
                     intensities[merged_indices]
 
@@ -175,7 +175,7 @@ class Spectrum:
 
         # restrict to range [min_mz ; max_mz]
         filter_range = np.where(
-                np.logical_and(min_mz <= masses, masses <= max_mz))[0]
+            np.logical_and(min_mz <= masses, masses <= max_mz))[0]
 
         # remove peak(s) close to the precursor mass
         filter_peaks = filter_range
@@ -191,12 +191,12 @@ class Spectrum:
             for charge in range(1, max_charge):
                 for isotope in range(3):
                     filter_precursor.append(np.where(np.logical_and(
-                            (pep_mass + isotope) / charge
-                            - remove_precursor_tolerance <= masses,
-                            masses <= (pep_mass + isotope) / charge
-                            + remove_precursor_tolerance))[0])
+                        (pep_mass + isotope) / charge
+                        - remove_precursor_tolerance <= masses,
+                        masses <= (pep_mass + isotope) / charge
+                        + remove_precursor_tolerance))[0])
             filter_peaks = np.setdiff1d(
-                    filter_peaks, np.concatenate(filter_precursor), True)
+                filter_peaks, np.concatenate(filter_precursor), True)
 
         # check if sufficient peaks remain
         if len(filter_peaks) < min_peaks:
@@ -212,7 +212,7 @@ class Spectrum:
         # discard low-intensity noise peaks
         max_intensity = filtered_intensities[filter_number][0]
         filter_noise = np.where(
-                filtered_intensities >= min_intensity * max_intensity)[0]
+            filtered_intensities >= min_intensity * max_intensity)[0]
 
         # apply intensity filters
         filter_intensity = np.intersect1d(filter_number, filter_noise, True)
@@ -268,7 +268,7 @@ class Spectrum:
 
         if self.is_valid():
             vec_length, min_bound, max_bound = get_dim(
-                    min_mz, max_mz, bin_size)
+                min_mz, max_mz, bin_size)
             peaks = np.zeros((vec_length,), dtype=np.float32)
             # add each mass and intensity to their low-dimensionality bin
             for mass, intensity in zip(self.masses, self.intensities):

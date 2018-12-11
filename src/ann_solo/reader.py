@@ -19,21 +19,21 @@ from ann_solo import spectrum
 def get_spectral_library_reader(filename, config_hash=None):
     if not os.path.isfile(filename):
         raise FileNotFoundError('Spectral library file {} not found'.format(
-                filename))
+            filename))
 
     base_filename, ext = os.path.splitext(filename)
-    if ext == '.splib' or ext == '.sptxt':
-        splib_exists = os.path.isfile(base_filename + '.splib')
-        sptxt_exists = os.path.isfile(base_filename + '.sptxt')
-        if splib_exists:
-            # prefer an splib file because it is faster to read
-            return SplibReader(base_filename + '.splib', config_hash)
-        elif sptxt_exists:
-            # fall back to an sptxt file
-            return SptxtReader(base_filename + '.sptxt', config_hash)
-    else:
+    if ext not in ('.splib', '.sptxt'):
         raise FileNotFoundError('Unrecognized file format (supported file '
                                 'formats: spql, splib, sptxt)')
+
+    splib_exists = os.path.isfile(base_filename + '.splib')
+    sptxt_exists = os.path.isfile(base_filename + '.sptxt')
+    if splib_exists:
+        # prefer an splib file because it is faster to read
+        return SplibReader(base_filename + '.splib', config_hash)
+    elif sptxt_exists:
+        # fall back to an sptxt file
+        return SptxtReader(base_filename + '.sptxt', config_hash)
 
 
 def verify_extension(supported_extensions, filename):
@@ -41,7 +41,7 @@ def verify_extension(supported_extensions, filename):
     if ext.lower() not in supported_extensions:
         logging.error('Unrecognized file format: {}'.format(filename))
         raise FileNotFoundError('Unrecognized file format: {}'.format(
-                filename))
+            filename))
 
 
 _annotation_ion_types = frozenset(b'abcxyz')
@@ -152,7 +152,7 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
     def _get_config_filename(self):
         if self._config_hash is not None:
             return '{}_{}.spcfg'.format(os.path.splitext(
-                    self._filename)[0], self._config_hash[:7])
+                self._filename)[0], self._config_hash[:7])
         else:
             return '{}.spcfg'.format(os.path.splitext(self._filename)[0])
 
@@ -232,7 +232,7 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
 
         # read all the spectra in the spectral library
         temp_info = collections.defaultdict(
-                lambda: {'id': [], 'precursor_mass': []})
+            lambda: {'id': [], 'precursor_mass': []})
         offsets = {}
         with self as lib_reader:
             for spec, offset in tqdm.tqdm(lib_reader._get_all_spectra(),
@@ -255,9 +255,9 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         logging.debug('Saving the spectral library configuration to file '
                       '{}'.format(config_filename))
         joblib.dump(
-                (os.path.basename(self._filename),
-                 self.spec_info, self._config_hash),
-                config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
+            (os.path.basename(self._filename), self.spec_info,
+             self._config_hash),
+            config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
         logging.info('Finished creating the spectral library configuration')
 
@@ -329,9 +329,9 @@ class SptxtReader(SpectraSTReader):
         comment = self._read_line().strip()
         is_decoy = b' Remark=DECOY_' in comment
 
-        read_spectrum = spectrum.Spectrum(
-                identifier, precursor_mz, precursor_charge,
-                None, peptide, is_decoy)
+        read_spectrum = spectrum.Spectrum(identifier, precursor_mz,
+                                          precursor_charge, None, peptide,
+                                          is_decoy)
 
         # read the peaks of the spectrum
         num_peaks = int(self._read_line().strip()[10:])
@@ -376,7 +376,7 @@ class SplibReader(SpectraSTReader):
             # splib information
             filename = self._mm.readline()
             num_lines = struct.unpack('i', self._mm.read(4))[0]
-            for i in range(num_lines):
+            for _ in range(num_lines):
                 self._mm.readline()
 
             # read all spectra
@@ -396,7 +396,7 @@ class SplibReader(SpectraSTReader):
         # fullName: \n terminated string
         name = self._mm.readline().strip()
         peptide = name[name.find(b'.') + 1: name.rfind(b'.')].decode(
-                encoding='UTF-8')
+            encoding='UTF-8')
         precursor_charge =\
             int(name[name.rfind(b'/') + 1: name.rfind(b'/') + 2])
         # precursor m/z (double): 8 bytes
@@ -424,9 +424,9 @@ class SplibReader(SpectraSTReader):
         comment = self._mm.readline()
         is_decoy = b' Remark=DECOY_' in comment
 
-        read_spectrum = spectrum.Spectrum(
-                identifier, precursor_mz, precursor_charge,
-                None, peptide, is_decoy)
+        read_spectrum = spectrum.Spectrum(identifier, precursor_mz,
+                                          precursor_charge, None, peptide,
+                                          is_decoy)
         read_spectrum.set_peaks(masses, intensities, annotations)
 
         return read_spectrum, file_offset
@@ -458,7 +458,7 @@ def read_mgf(filename):
             precursor_charge = None
 
         read_spectrum = spectrum.Spectrum(
-                identifier, precursor_mz, precursor_charge, retention_time)
+            identifier, precursor_mz, precursor_charge, retention_time)
         read_spectrum.set_peaks(mgf_spectrum['m/z array'],
                                 mgf_spectrum['intensity array'])
 
@@ -480,7 +480,7 @@ def read_mztab_psms(filename):
     skiplines = 0
     with open(filename) as f_in:
         line = next(f_in)
-        while 'PSH' != line.split('\t', 1)[0]:
+        while line.split('\t', 1)[0] != 'PSH':
             line = next(f_in)
             skiplines += 1
 
