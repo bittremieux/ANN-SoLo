@@ -45,12 +45,12 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         """
         try:
             self._library_reader = reader.get_spectral_library_reader(
-                    lib_filename, self._get_config_hash())
+                lib_filename, self._get_config_hash())
             self._library_reader.open()
         except FileNotFoundError as e:
             logging.error(e)
             raise
-            
+
     def _get_config_hash(self):
         config_match = {config_key: config[config_key]
                         for config_key in self._config_match_keys}
@@ -96,7 +96,7 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
 
         # sort the spectra based on their precursor charge and precursor mass
         query_spectra.sort(
-                key=lambda spec: (spec.precursor_charge, spec.precursor_mz))
+            key=lambda spec: (spec.precursor_charge, spec.precursor_mz))
 
         # identify all spectra
         logging.info('Processing all query spectra')
@@ -112,23 +112,23 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
         for cascade_level, (tol_mass, tol_mode) in enumerate(precursor_tols):
             level_matches = {}
             logging.debug('Level {} precursor mass tolerance: {} {}'.format(
-                    cascade_level + 1, tol_mass, tol_mode))
+                cascade_level + 1, tol_mass, tol_mode))
             for query_spectrum in tqdm.tqdm(
                     query_spectra, desc='Query spectra processed',
                     unit='spectra', smoothing=0):
                 # identify the query spectra in this cascade level
                 query_match = self._find_match(
-                        query_spectrum, tol_mass, tol_mode)
-    
+                    query_spectrum, tol_mass, tol_mode)
+
                 if query_match.sequence is not None:
                     # make sure we only retain the best identification
                     # (i.e. for duplicated spectra if the
                     # precursor charge was unknown)
                     if (query_match.query_id not in level_matches or
-                                query_match.search_engine_score >
-                                level_matches[query_match.query_id].search_engine_score):
+                            query_match.search_engine_score >
+                            level_matches[query_match.query_id].search_engine_score):
                         level_matches[query_match.query_id] = query_match
-                
+
             # filter SSMs on FDR
             if cascade_level == 0:
                 # small precursor mass window: standard FDR
@@ -142,13 +142,12 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
                                                  config.fdr_tolerance_mode,
                                                  config.fdr_min_group_size)
             for accepted_ssm in filter_fdr(level_matches.values()):
-                    query_matches[accepted_ssm.query_id] = accepted_ssm
-            
-            logging.debug(
-                    '{} spectra identified at {:.0%} FDR '
-                    'after search level {}'.format(
-                            len(query_matches), config.fdr, cascade_level + 1))
-            
+                query_matches[accepted_ssm.query_id] = accepted_ssm
+
+            logging.debug('{} spectra identified at {:.0%} FDR after search '
+                          'level {}'.format(len(query_matches), config.fdr,
+                                            cascade_level + 1))
+
             # process the remaining spectra in the next cascade level
             query_spectra = [spec for spec in query_spectra
                              if spec.identifier not in query_matches]
@@ -180,12 +179,12 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
 
         stop_candidates = start_match = time.time()
 
-        if len(candidates) > 0:
+        if candidates:
             # find the best matching candidate spectrum
             match_candidate, match_score, _ = spectrum_match.get_best_match(
-                    query, candidates)
+                query, candidates)
             identification = spectrum.SpectrumMatch(
-                    query, match_candidate, match_score)
+                query, match_candidate, match_score)
         else:
             identification = spectrum.SpectrumMatch(query)
 
@@ -243,13 +242,13 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
             lib_masses = charge_spectra['precursor_mass']
             if tol_mode == 'Da':
                 mass_filter = ne.evaluate(
-                        'abs(mass - lib_masses) * charge <= tol_mass')
+                    'abs(mass - lib_masses) * charge <= tol_mass')
             elif tol_mode == 'ppm':
                 mass_filter = ne.evaluate(
-                        'abs(mass - lib_masses) / lib_masses * 10**6 <= tol_mass')
+                    'abs(mass - lib_masses) / lib_masses * 10**6 <= tol_mass')
             else:
                 mass_filter = np.arange(len(lib_masses))
-    
+
             return charge_spectra['id'][mass_filter]
 
 
@@ -284,7 +283,7 @@ class SpectralLibraryBf(SpectralLibrary):
         """
         # filter the candidates on the precursor mass window
         candidate_idx = self._get_mass_filter_idx(
-                query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
+            query.precursor_mz, query.precursor_charge, tol_mass, tol_mode)
 
         # read the candidates
         candidates = []
@@ -306,7 +305,7 @@ class SpectralLibraryAnn(SpectralLibrary):
     """
 
     _ann_filenames = {}
-    
+
     _ann_index_lock = multiprocessing.Lock()
 
     def _filter_library_candidates(self, query, tol_mass, tol_mode,
@@ -338,12 +337,12 @@ class SpectralLibraryAnn(SpectralLibrary):
             num_candidates = config.num_candidates
         if ann_cutoff is None:
             ann_cutoff = config.ann_cutoff
-            
+
         charge = query.precursor_charge
 
         # filter the candidates on the precursor mass window
         mass_filter = self._get_mass_filter_idx(
-                query.precursor_mz, charge, tol_mass, tol_mode)
+            query.precursor_mz, charge, tol_mass, tol_mode)
 
         # if there are too many candidates, refine using the ANN index
         if len(mass_filter) > ann_cutoff and charge in self._ann_filenames:
@@ -418,7 +417,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
     Annoy constructs a random projection tree forest for ANN retrieval.
     """
 
-    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'num_trees']
+    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'hash_len',
+                          'num_trees']
 
     def __init__(self, lib_filename, lib_spectra=None):
         """
@@ -443,17 +443,17 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         super().__init__(lib_filename)
 
         self._current_index = None, None
-        
+
         do_create = False
         verify_file_existence = True
         if self._library_reader.is_recreated:
             logging.warning(
-                    'ANN indices were created using non-compatible settings')
+                'ANN indices were created using non-compatible settings')
             verify_file_existence = False
         # check if an ANN index exists for each charge
         base_filename, _ = os.path.splitext(lib_filename)
         base_filename = '{}_{}'.format(
-                base_filename, self._get_config_hash()[:7])
+            base_filename, self._get_config_hash()[:7])
         # no need to build an ANN index for infrequent precursor charges
         ann_charges = sorted([
             charge for charge in self._library_reader.spec_info['charge']
@@ -461,24 +461,22 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         create_ann_charges = []
         for charge in ann_charges:
             self._ann_filenames[charge] = '{}_{}.idxann'.format(
-                    base_filename, charge)
+                base_filename, charge)
             if not verify_file_existence or\
                not os.path.isfile(self._ann_filenames[charge]):
                 do_create = True
                 create_ann_charges.append(charge)
                 logging.warning(
-                        'Missing ANN index file for charge {}'.format(charge))
+                    'Missing ANN index file for charge {}'.format(charge))
 
         # create the missing ANN indices
         if do_create:
             # add all spectra to the ANN indices
             logging.debug(
-                    'Adding the spectra to the spectral library ANN indices')
+                'Adding the spectra to the spectral library ANN indices')
             ann_indices = {}
-            dim = spectrum.get_dim(
-                    config.min_mz, config.max_mz, config.bin_size)[0]
             for charge in create_ann_charges:
-                ann_index = annoy.AnnoyIndex(dim, 'angular')
+                ann_index = annoy.AnnoyIndex(config.hash_len, 'angular')
                 ann_index.set_seed(42)
                 ann_indices[charge] = ann_index
             charge_counts = collections.Counter()
@@ -491,8 +489,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                 if charge in ann_indices.keys():
                     if lib_spectrum.process_peaks().is_valid():
                         ann_indices[charge].add_item(
-                                charge_counts[charge],
-                                lib_spectrum.get_vector())
+                            charge_counts[charge],
+                            lib_spectrum.get_hashed_vector())
                     charge_counts[charge] += 1
 
             # build the ANN indices
@@ -509,7 +507,7 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
                           for charge, ann_index in ann_indices.items()])
 
             logging.info('Finished creating the spectral library ANN indices')
-            
+
     def _build_ann_index(self, args):
         charge, ann_index, num_trees = args
         logging.debug('Creating new ANN index for charge {}'.format(charge))
@@ -522,13 +520,13 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
     def shutdown(self):
         """
         Release any resources to gracefully shut down.
-        
+
         The active ANN index is unloaded.
         """
         # unload the ANN index
         if self._current_index[1] is not None:
             self._current_index[1].unload()
-            
+
         super().shutdown()
 
     def _get_ann_index(self, charge):
@@ -556,18 +554,16 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         with self._ann_index_lock:
             if self._current_index[0] != charge:
                 logging.debug(
-                        'Loading the ANN index for charge {}'.format(charge))
+                    'Loading the ANN index for charge {}'.format(charge))
                 # unload the previous index
                 if self._current_index[1] is not None:
                     self._current_index[1].unload()
                 # load the new index
-                dim = spectrum.get_dim(
-                        config.min_mz, config.max_mz, config.bin_size)[0]
-                index = annoy.AnnoyIndex(dim, 'angular')
+                index = annoy.AnnoyIndex(config.hash_len, 'angular')
                 index.set_seed(42)
                 index.load(self._ann_filenames[charge])
                 self._current_index = charge, index
-    
+
             return self._current_index[1]
 
     def _query_ann(self, query, num_candidates):
@@ -585,4 +581,4 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
         """
         ann_index = self._get_ann_index(query.precursor_charge)
         return np.asarray(ann_index.get_nns_by_vector(
-                query.get_vector(), num_candidates, config.search_k))
+            query.get_hashed_vector(), num_candidates, config.search_k))

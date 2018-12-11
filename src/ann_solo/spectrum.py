@@ -1,5 +1,6 @@
 import math
 
+import mmh3
 import numpy as np
 
 from ann_solo.config import config
@@ -179,7 +180,7 @@ class Spectrum:
         # remove peak(s) close to the precursor mass
         filter_peaks = filter_range
         if (remove_precursor and self.precursor_mz is not None and
-                    self.precursor_charge is not None):
+                self.precursor_charge is not None):
             pep_mass = (self.precursor_mz * self.precursor_charge
                         if self.precursor_charge is not None
                         else self.precursor_mz)
@@ -240,7 +241,7 @@ class Spectrum:
         self.intensities = norm_intensities
         self.annotations = filtered_annotations
         self._is_processed = True
-        
+
         return self
 
     def get_vector(self, min_mz=None, max_mz=None, bin_size=None):
@@ -276,6 +277,31 @@ class Spectrum:
 
             # normalize
             return peaks / np.linalg.norm(peaks)
+        else:
+            return None
+
+    def get_hashed_vector(self, min_mz=None, max_mz=None, bin_size=None,
+                          hash_len=None):
+        if min_mz is None:
+            min_mz = config.min_mz
+        if max_mz is None:
+            max_mz = config.max_mz
+        if bin_size is None:
+            bin_size = config.bin_size
+        if hash_len is None:
+            hash_len = config.hash_len
+
+        if self.is_valid():
+            peaks = np.zeros((hash_len,), dtype=np.float32)
+            vec_length, min_bound, max_bound = get_dim(
+                min_mz, max_mz, bin_size)
+            for mass, intensity in zip(self.masses, self.intensities):
+                mass_bin = math.floor((mass - min_bound) // bin_size)
+                mass_bin_hash = (mmh3.hash(str(mass_bin), 42, signed=False)
+                                 % hash_len)
+                peaks[mass_bin_hash] += intensity
+
+            return peaks
         else:
             return None
 

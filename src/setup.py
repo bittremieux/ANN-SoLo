@@ -73,6 +73,7 @@ setuptools.setup(
             'Cython',
             'joblib',
             'matplotlib',
+            'mmh3',
             'numexpr',
             'numpy',
             'pandas',

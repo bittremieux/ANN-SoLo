@@ -76,7 +76,7 @@ def filter_group_fdr(psms, fdr=0.01, tol_mass=0., tol_mode=None,
         psms_remaining = psms_remaining[~mask]
         exp_masses = exp_masses[~mask]
         mass_diffs = mass_diffs[~mask]
-        
+
     # calculate the FDR combined for all uncommon mass difference groups
     # and separately for each common mass difference group
     for psm in itertools.chain(

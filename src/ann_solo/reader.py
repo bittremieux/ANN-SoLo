@@ -148,7 +148,7 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         # if it is missing or invalid
         if do_create:
             self._create()
-            
+
     def _get_config_filename(self):
         if self._config_hash is not None:
             return '{}_{}.spcfg'.format(os.path.splitext(
@@ -199,15 +199,15 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
     _max_cache_size = None
 
     _supported_extensions = []
-    
+
     def open(self):
         self._file = open(self._filename, 'rb')
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        
+
     def close(self):
         self._mm.close()
         self._file.close()
-        
+
     def __enter__(self):
         self.open()
         return self
@@ -226,7 +226,7 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
         sure these match the runtime settings.
         """
         super()._create()
-        
+
         logging.info('Creating the spectral library configuration for file '
                      '{}'.format(self._filename))
 
@@ -487,7 +487,7 @@ def read_mztab_psms(filename):
     psms = pd.read_csv(filename, sep='\t', header=skiplines,
                        index_col='PSM_ID')
     psms.drop('PSH', 1, inplace=True)
-    
+
     psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'] =\
         psms['opt_ms_run[1]_cv_MS:1002217_decoy_peptide'].astype(bool)
 

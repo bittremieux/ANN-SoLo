@@ -134,7 +134,7 @@ class Config:
                 '--allow_peak_shifts', action='store_true',
                 help='use the shifted dot product instead of the standard dot '
                      'product')
-        
+
         # maximum FDR
         self._parser.add_argument(
                 '--fdr', default=0.01, type=float,
@@ -167,8 +167,12 @@ class Config:
 
         # bin size for the ANN index (Dalton)
         self._parser.add_argument(
-                '--bin_size', default=1.0, type=float,
-                help='ANN vector bin width (default: %(default)s Da)')
+            '--bin_size', default=1.0, type=float,
+            help='ANN vector bin width (default: %(default)s Da)')
+        # ANN vector length after hashing
+        self._parser.add_argument(
+            '--hash_len', default=200, type=int,
+            help='ANN vector length (default: %(default)s)')
 
         # number of candidates to retrieve from the ANN index for each query
         self._parser.add_argument(

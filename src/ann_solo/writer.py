@@ -29,7 +29,7 @@ def write_mztab(identifications, filename, lib_reader):
         ('title', 'ANN-SoLo identification file "{}"'.format(filename)),
         ('description', 'Identification results of file "{}" against spectral '
                         'library file "{}"'.format(
-                config.query_filename, config.spectral_library_filename)),
+            config.query_filename, config.spectral_library_filename)),
         ('software[1]', '[MS, MS:1001456, ANN-SoLo, {}]'.format(__version__)),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
@@ -50,8 +50,8 @@ def write_mztab(identifications, filename, lib_reader):
         'precursor_tolerance_mass_open', 'precursor_tolerance_mode_open',
         'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr', 'mode']
     if config.mode == 'ann':
-        config_keys.extend(['bin_size', 'num_candidates', 'ann_cutoff',
-                            'num_trees', 'search_k'])
+        config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
+                            'ann_cutoff', 'num_trees', 'search_k'])
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i),
                          '{} = {}'.format(key, config[key])))

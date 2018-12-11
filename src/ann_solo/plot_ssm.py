@@ -157,7 +157,7 @@ def main():
             linestyle='--', linewidth=1.0)
     ax.grid(b=True, which='minor', color='lightgrey',
             linestyle='--', linewidth=0.5)
-    
+
     # small tick labels
     ax.tick_params(axis='both', which='both', labelsize='small')
 
