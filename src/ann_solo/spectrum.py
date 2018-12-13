@@ -301,7 +301,7 @@ class Spectrum:
                                  % hash_len)
                 peaks[mass_bin_hash] += intensity
 
-            return peaks
+            return peaks / np.linalg.norm(peaks)
         else:
             return None
 
