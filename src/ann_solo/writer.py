@@ -52,7 +52,7 @@ def write_mztab(identifications, filename, lib_reader):
         'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr', 'mode']
     if config.mode == 'ann':
         config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
-                            'ann_cutoff', 'num_trees', 'search_k'])
+                            'ann_cutoff', 'num_list', 'num_probe'])
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i),
                          '{} = {}'.format(key, config[key])))

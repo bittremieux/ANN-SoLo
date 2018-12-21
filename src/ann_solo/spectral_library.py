@@ -1,14 +1,12 @@
 import abc
-import collections
 import copy
 import hashlib
 import logging
-import multiprocessing
 import multiprocessing.pool
 import os
 import time
 
-import annoy
+import faiss
 import numexpr as ne
 import numpy as np
 import tqdm
@@ -347,10 +345,7 @@ class SpectralLibraryAnn(SpectralLibrary):
         # if there are too many candidates, refine using the ANN index
         if len(mass_filter) > ann_cutoff and charge in self._ann_filenames:
             # retrieve the most similar candidates from the ANN index
-            ann_charge_ids = self._query_ann(query, num_candidates)
-            # convert the numbered index for this specific charge
-            # to global identifiers
-            ann_filter = self._library_reader.spec_info['charge'][charge]['id'][ann_charge_ids]
+            ann_filter = self._query_ann(query, num_candidates)
 
             # select the candidates passing both the ANN filter
             # and precursor mass filter
@@ -409,16 +404,15 @@ class SpectralLibraryAnn(SpectralLibrary):
         pass
 
 
-class SpectralLibraryAnnoy(SpectralLibraryAnn):
+class SpectralLibraryFaiss(SpectralLibraryAnn):
+
     """
     Approximate nearest neighbors (ANN) spectral library search engine using
-    the Annoy library for ANN retrieval.
-
-    Annoy constructs a random projection tree forest for ANN retrieval.
+    the FAISS library for ANN retrieval.
     """
 
     _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'hash_len',
-                          'num_trees']
+                          'num_list']
 
     def __init__(self, lib_filename, lib_spectra=None):
         """
@@ -439,95 +433,73 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             FileNotFoundError: The given spectral library file wasn't found or
                 isn't supported.
         """
-        # get the spectral library reader in the super-class initialization
+        # Get the spectral library reader in the super-class initialization.
         super().__init__(lib_filename)
 
         self._current_index = None, None
 
-        do_create = False
         verify_file_existence = True
         if self._library_reader.is_recreated:
             logging.warning(
                 'ANN indices were created using non-compatible settings')
             verify_file_existence = False
-        # check if an ANN index exists for each charge
+        # Check if an ANN index exists for each charge.
         base_filename, _ = os.path.splitext(lib_filename)
         base_filename = '{}_{}'.format(
             base_filename, self._get_config_hash()[:7])
-        # no need to build an ANN index for infrequent precursor charges
-        ann_charges = sorted([
-            charge for charge in self._library_reader.spec_info['charge']
-            if len(self._library_reader.spec_info['charge'][charge]['id']) > config.ann_cutoff])
+        # No need to build an ANN index for infrequent precursor charges.
+        min_num_items = max(config.ann_cutoff, config.num_list)
+        ann_charges = [charge for charge, charge_info in
+                       self._library_reader.spec_info['charge'].items()
+                       if len(charge_info['id']) > min_num_items]
         create_ann_charges = []
-        for charge in ann_charges:
+        for charge in sorted(ann_charges):
             self._ann_filenames[charge] = '{}_{}.idxann'.format(
                 base_filename, charge)
-            if not verify_file_existence or\
-               not os.path.isfile(self._ann_filenames[charge]):
-                do_create = True
+            if not verify_file_existence or \
+                    not os.path.isfile(self._ann_filenames[charge]):
                 create_ann_charges.append(charge)
                 logging.warning(
                     'Missing ANN index file for charge {}'.format(charge))
 
-        # create the missing ANN indices
-        if do_create:
-            # add all spectra to the ANN indices
+        # Create the missing FAISS indices.
+        if create_ann_charges:
             logging.debug(
                 'Adding the spectra to the spectral library ANN indices')
-            ann_indices = {}
-            for charge in create_ann_charges:
-                ann_index = annoy.AnnoyIndex(config.hash_len, 'angular')
-                ann_index.set_seed(42)
-                ann_indices[charge] = ann_index
-            charge_counts = collections.Counter()
+            # Collect vectors for all spectra per precursor charge.
+            charge_vectors = {charge: {'x': [], 'ids': []}
+                              for charge in create_ann_charges}
             lib_spectra_it = (lib_spectra if lib_spectra is not None
                               else self._library_reader._get_all_spectra())
             for lib_spectrum, _ in tqdm.tqdm(
                     lib_spectra_it,
                     desc='Library spectra added', unit='spectra'):
                 charge = lib_spectrum.precursor_charge
-                if charge in ann_indices.keys():
-                    if lib_spectrum.process_peaks().is_valid():
-                        ann_indices[charge].add_item(
-                            charge_counts[charge],
-                            lib_spectrum.get_hashed_vector())
-                    charge_counts[charge] += 1
-
-            # build the ANN indices
+                if charge in charge_vectors.keys() and \
+                        lib_spectrum.process_peaks().is_valid():
+                    charge_vectors[charge]['x'].append(
+                        lib_spectrum.get_hashed_vector())
+                    charge_vectors[charge]['ids'].append(
+                        lib_spectrum.identifier)
+            # Build an individual FAISS index per precursor charge.
             logging.debug('Building the spectral library ANN indices')
-            try:
-                # os.sched_getaffinity is only available on some platforms
-                num_cpus = len(os.sched_getaffinity(0))
-            except AttributeError:
-                num_cpus = os.cpu_count()
-            with multiprocessing.pool.ThreadPool(
-                    min(len(ann_indices), num_cpus)) as pool:
-                pool.map(self._build_ann_index,
-                         [(charge, ann_index, config.num_trees)
-                          for charge, ann_index in ann_indices.items()])
+            for charge, vector_ids in charge_vectors.items():
+                logging.debug(
+                    'Creating new ANN index for charge {}'.format(charge))
+                # TODO: GPU
+                quantizer = faiss.IndexFlatIP(config.hash_len)
+                ann_index = faiss.IndexIVFFlat(quantizer, config.hash_len,
+                                               config.num_list,
+                                               faiss.METRIC_INNER_PRODUCT)
+                vectors = np.asarray(vector_ids['x'])
+                ids = np.asarray(vector_ids['ids'], np.int64)
+                ann_index.train(vectors)
+                ann_index.add_with_ids(vectors, ids)
+                logging.debug(
+                    'Saving the ANN index for charge {}'.format(charge))
+                faiss.write_index(ann_index, self._ann_filenames[charge])
 
             logging.info('Finished creating the spectral library ANN indices')
-
-    def _build_ann_index(self, args):
-        charge, ann_index, num_trees = args
-        logging.debug('Creating new ANN index for charge {}'.format(charge))
-        ann_index.build(num_trees)
-        logging.debug('Saving the ANN index for charge {}'.format(charge))
-        ann_index.save(self._ann_filenames[charge])
-        # unload the index to prevent using excessive memory
-        ann_index.unload()
-
-    def shutdown(self):
-        """
-        Release any resources to gracefully shut down.
-
-        The active ANN index is unloaded.
-        """
-        # unload the ANN index
-        if self._current_index[1] is not None:
-            self._current_index[1].unload()
-
-        super().shutdown()
 
     def _get_ann_index(self, charge):
         """
@@ -555,13 +527,8 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             if self._current_index[0] != charge:
                 logging.debug(
                     'Loading the ANN index for charge {}'.format(charge))
-                # unload the previous index
-                if self._current_index[1] is not None:
-                    self._current_index[1].unload()
-                # load the new index
-                index = annoy.AnnoyIndex(config.hash_len, 'angular')
-                index.set_seed(42)
-                index.load(self._ann_filenames[charge])
+                index = faiss.read_index(self._ann_filenames[charge])
+                index.nprobe = config.num_probe
                 self._current_index = charge, index
 
             return self._current_index[1]
@@ -580,5 +547,6 @@ class SpectralLibraryAnnoy(SpectralLibraryAnn):
             retrieved from the ANN index.
         """
         ann_index = self._get_ann_index(query.precursor_charge)
-        return np.asarray(ann_index.get_nns_by_vector(
-            query.get_hashed_vector(), num_candidates, config.search_k))
+        _, candidate_idx = ann_index.search(
+            np.expand_dims(query.get_hashed_vector(), axis=0), num_candidates)
+        return candidate_idx[candidate_idx != -1]

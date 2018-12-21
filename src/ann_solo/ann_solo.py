@@ -19,7 +19,7 @@ def main():
         spec_lib = spectral_library.SpectralLibraryBf(
             config.spectral_library_filename)
     elif config.mode == 'ann':
-        spec_lib = spectral_library.SpectralLibraryAnnoy(
+        spec_lib = spectral_library.SpectralLibraryFaiss(
             config.spectral_library_filename)
 
     identifications = spec_lib.search(config.query_filename)

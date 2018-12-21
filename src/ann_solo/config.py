@@ -185,17 +185,17 @@ class Config:
                  'indexing is used to refine the candidates '
                  '(default: %(default)s)')
 
-        # custom Annoy parameters
-        # number of ANN trees
+        # Custom FAISS parameters.
+        # Number of lists in the IVF.
         self._parser.add_argument(
-            '--num_trees', default=1000, type=int,
-            help='number of trees in the ANN index (default: %(default)s)')
-
-        # number of nodes to explore during ANN searching
+            '--num_list', default=1024, type=int,
+            help='number of partitions in the ANN index '
+                 '(default: %(default)s)')
+        # Number of lists to inspect during querying.
         self._parser.add_argument(
-            '--search_k', default=50000, type=int,
-            help='number of nodes to explore in the ANN index during searching'
-                 ' (default: %(default)s)')
+            '--num_probe', default=10, type=int,
+            help='number of partitions in the ANN index to inspect during '
+                 'querying (default: %(default)s)')
 
         # filled in 'parse', contains the specified settings
         self._namespace = None

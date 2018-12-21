@@ -69,9 +69,9 @@ setuptools.setup(
                             'ann_solo_plot = ann_solo.plot_ssm:main']},
     cmdclass=cmdclass,
     install_requires=[
-        'annoy',
         'ConfigArgParse',
         'Cython',
+        'faiss',
         'joblib',
         'matplotlib',
         'mmh3',
