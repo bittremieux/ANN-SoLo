@@ -5,16 +5,15 @@ from ann_solo.config import config
 
 
 def main():
-    # initialize logging
-    logging.basicConfig(
-        format='%(asctime)s [%(levelname)s/%(processName)s] '
-               '%(module)s.%(funcName)s : %(message)s',
-        level=logging.DEBUG)
+    # Initialize logging.
+    logging.basicConfig(format='{asctime} [{levelname}/{processName}] '
+                               '{module}.{funcName} : {message}',
+                        style='{', level=logging.DEBUG)
 
-    # load the config
+    # Load the configuration.
     config.parse()
 
-    # execute the search
+    # Perform the search.
     if config.mode == 'bf':
         spec_lib = spectral_library.SpectralLibraryBf(
             config.spectral_library_filename)
