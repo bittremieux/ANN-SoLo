@@ -16,7 +16,7 @@ import tqdm
 
 from ann_solo import reader
 from ann_solo import spectrum_match
-from ann_solo import util
+from ann_solo import utils
 from ann_solo.config import config
 from ann_solo.spectrum import spectrum_to_vector
 from ann_solo.spectrum import Spectrum
@@ -143,6 +143,7 @@ class SpectralLibrary:
             logging.debug('Create a new ANN index for charge %d', charge)
             # TODO: Use a GPU if available.
             #       https://github.com/erikbern/ann-benchmarks/blob/master/ann_benchmarks/algorithms/faiss_gpu.py
+            #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_gpu_1bn.py
             quantizer = faiss.IndexFlatIP(config.hash_len)
             # TODO: Use HNSW as quantizer?
             #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_hnsw.py#L136
@@ -247,7 +248,7 @@ class SpectralLibrary:
         Returns
         -------
         Iterator[SpectrumSpectrumMatch]
-            An iterable of spectrum-spectrum matches that are below the FDR
+            An iterator of spectrum-spectrum matches that are below the FDR
             threshold (specified in the config).
         """
         if mode == 'std':
@@ -281,12 +282,12 @@ class SpectralLibrary:
         logging.debug('Filter the spectrum—spectrum matches on FDR '
                       '(threshold = %s)', config.fdr)
         if mode == 'std':
-            return util.filter_fdr(ssms.values(), config.fdr)
+            return utils.filter_fdr(ssms.values(), config.fdr)
         elif mode == 'open':
-            return util.filter_group_fdr(ssms.values(), config.fdr,
-                                         config.fdr_tolerance_mass,
-                                         config.fdr_tolerance_mode,
-                                         config.fdr_min_group_size)
+            return utils.filter_group_fdr(ssms.values(), config.fdr,
+                                          config.fdr_tolerance_mass,
+                                          config.fdr_tolerance_mode,
+                                          config.fdr_min_group_size)
 
     def _search_batch(self, query_spectra: List[Spectrum],
                       charge: int, mode: str)\
@@ -310,7 +311,7 @@ class SpectralLibrary:
         Returns
         -------
         Iterator[SpectrumSpectrumMatch]
-            An iterable of spectrum-spectrum matches for every query spectrum
+            An iterator of spectrum-spectrum matches for every query spectrum
             that could be successfully matched to its most similar library
             spectrum.
         """
@@ -348,7 +349,7 @@ class SpectralLibrary:
         Returns
         -------
         Iterator[List[Spectrum]]
-            An iterable of lists of library candidate spectra for each query
+            An iterator of lists of library candidate spectra for each query
             spectrum.
 
         Raises

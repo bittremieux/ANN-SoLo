@@ -3,35 +3,73 @@ import logging
 import os
 import pathlib
 import re
+from typing import AnyStr
+from typing import List
+from typing import Pattern
+from typing import Union
 
 from . import __version__
 from ann_solo.config import config
+from ann_solo.reader import SpectralLibraryReader
+from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
-def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
+def natural_sort_key(s: str, _nsre: Pattern[AnyStr] = re.compile('([0-9]+)'))\
+        -> List[Union[str, int]]:
+    """
+    Key to be used for natural sorting of mixed alphanumeric strings.
+
+    Source: https://stackoverflow.com/a/16090640
+
+    Parameters
+    ----------
+    s : str
+        The string to be converted to a sort key.
+    _nsre : Pattern[AnyStr]
+        Pattern to split the given string into alphanumeric substrings.
+
+    Returns
+    -------
+    List[Union[str, int]]
+        A list of separate int (numeric) and string (alphabetic) parts of the
+        given string.
+    """
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(_nsre, s)]
 
 
-def write_mztab(identifications, filename, lib_reader):
-    # check if the filename contains the mztab extension and add if required
+def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
+                lib_reader: SpectralLibraryReader) -> None:
+    """
+    Write the given SSMs to an mzTab file.
+
+    Parameters
+    ----------
+    identifications : List[SpectrumSpectrumMatch]
+        The identifications to be exported.
+    filename : str
+        The file name of the mzTab output file. If it does not end with a
+        '.mztab' extension this will be added.
+    lib_reader : SpectralLibraryReader
+        The spectral library reader used during identifications.
+    """
+    # Check if the filename contains the mztab extension and add if required.
     if os.path.splitext(filename)[1].lower() != '.mztab':
         filename += '.mztab'
 
-    logging.info('Saving identifications to file %s', filename)
+    logging.info('Save identifications to file %s', filename)
 
-    # collect the necessary metadata
+    # Collect the necessary metadata.
     metadata = [
         ('mzTab-version', '1.0.0'),
         ('mzTab-mode', 'Summary'),
         ('mzTab-type', 'Identification'),
-        ('mzTab-ID', 'ANN-SoLo_{}'.format(filename)),
-        ('title', 'ANN-SoLo identification file "{}"'.format(filename)),
-        ('description', 'Identification results of file "{}" against spectral '
-                        'library file "{}"'.format(
-                            config.query_filename,
-                            config.spectral_library_filename)),
-        ('software[1]', '[MS, MS:1001456, ANN-SoLo, {}]'.format(__version__)),
+        ('mzTab-ID', f'ANN-SoLo_{filename}'),
+        ('title', f'ANN-SoLo identification file "{filename}"'),
+        ('description', f'Identification results of file '
+                        f'"{config.query_filename}" against spectral library '
+                        f'file "{config.spectral_library_filename}"'),
+        ('software[1]', '[MS, MS:1001456, ANN-SoLo, {__version__}]'),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
         ('psm_search_engine_score[2]', '[MS, MS:1002354, PSM-level q-value,]'),
@@ -42,7 +80,7 @@ def write_mztab(identifications, filename, lib_reader):
                             'searched,]'),
     ]
 
-    # add relevant configuration settings
+    # Add relevant configuration settings.
     config_keys = [
         'resolution', 'min_mz', 'max_mz', 'remove_precursor',
         'remove_precursor_tolerance', 'min_intensity', 'min_peaks',
@@ -54,20 +92,20 @@ def write_mztab(identifications, filename, lib_reader):
         config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
                             'num_list', 'num_probe'])
     for i, key in enumerate(config_keys):
-        metadata.append(('software[1]-setting[{}]'.format(i),
-                         '{} = {}'.format(key, config[key])))
+        metadata.append((f'software[1]-setting[{i}]',
+                         f'{key} = {config[key]}'))
 
     version = lib_reader.get_version()
-    database_version = '{} ({} entries)'.format(
-        datetime.datetime.strftime(version[0], '%Y-%m-%d'), version[1])\
-        if version is not None else 'null'
+    database_version = (f'{datetime.datetime.strftime(version[0], "%Y-%m-%d")}'
+                        f' ({version[1]} entries)'
+                        if version is not None else 'null')
 
     with open(filename, 'w') as f_out:
-        # metadata section
+        # Metadata section.
         for m in metadata:
             f_out.write('\t'.join(['MTD'] + list(m)) + '\n')
 
-        # PSMs
+        # SSMs.
         f_out.write('\t'.join([
             'PSH', 'sequence', 'PSM_ID', 'accession', 'unique', 'database',
             'database_version', 'search_engine', 'search_engine_score[1]',
@@ -75,9 +113,7 @@ def write_mztab(identifications, filename, lib_reader):
             'charge', 'exp_mass_to_charge', 'calc_mass_to_charge',
             'spectra_ref', 'pre', 'post', 'start', 'end',
             'opt_ms_run[1]_cv_MS:1002217_decoy_peptide',
-            'opt_ms_run[1]_num_candidates', 'opt_ms_run[1]_time_total',
-            'opt_ms_run[1]_time_candidates', 'opt_ms_run[1]_time_match'])
-                    + '\n')
+            'opt_ms_run[1]_num_candidates']) + '\n')
         # SSMs sorted by their query identifier.
         for ssm in sorted(identifications,
                           key=lambda ssm: natural_sort_key(ssm.identifier)):
@@ -102,5 +138,3 @@ def write_mztab(identifications, filename, lib_reader):
                 'null', 'null', 'null', 'null',
                 f'{ssm.is_decoy:d}',
                 str(ssm.num_candidates)]) + '\n')
-
-    logging.info('Identifications saved to file %s', filename)

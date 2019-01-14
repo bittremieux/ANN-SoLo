@@ -17,11 +17,11 @@ class Config:
     """
     Spectral library configuration.
 
-    Configuration settings can be specified in a config.ini file in the working
-    directory, or as command-line arguments.
+    Configuration settings can be specified in a config.ini file (by default in
+    the working directory), or as command-line arguments.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the configuration settings and provide sensible default
         values if possible.
@@ -30,8 +30,8 @@ class Config:
         self._parser = configargparse.ArgParser(
             description='ANN-SoLo: Approximate nearest neighbor spectral '
                         'library searching\n'
-                        '====================================================='
-                        '============\n\n'
+                        '================================================'
+                        '=================\n\n'
                         'Bittremieux et al. Fast open modification spectral '
                         'library searching through approximate nearest '
                         'neighbor indexing. Journal of Proteome Research 17, '
@@ -46,19 +46,19 @@ class Config:
         self._parser.add_argument(
             'spectral_library_filename', help='spectral library file')
         self._parser.add_argument(
-            'query_filename', help='query mgf file')
+            'query_filename', help='query file')
         self._parser.add_argument(
             'out_filename',
             help='name of the mzTab output file containing the search results')
 
         # PREPROCESSING
-        # spectral library resolution to round mass values
+        # Spectral library resolution to round mass values.
         self._parser.add_argument(
             '--resolution', default=None, type=int,
             help='spectral library resolution; masses will be rounded to the '
                  'given number of decimals (default: no rounding)')
 
-        # minimum and maximum fragment peak mass values
+        # Minimum and maximum fragment peak mass values.
         self._parser.add_argument(
             '--min_mz', default=11, type=int,
             help='minimum m/z value (inclusive, default: %(default)s m/z)')
@@ -66,7 +66,7 @@ class Config:
             '--max_mz', default=2010, type=int,
             help='maximum m/z value (inclusive, default: %(default)s m/z)')
 
-        # remove peaks around the precursor mass from fragment spectra
+        # Remove peaks around the precursor mass from fragment spectra.
         self._parser.add_argument(
             '--remove_precursor', action='store_true',
             help='remove peaks around the precursor mass '
@@ -76,13 +76,13 @@ class Config:
             help='the window (in m/z) around the precursor mass to remove '
                  'peaks (default: %(default)s m/z)')
 
-        # minimum fragment peak intensity to filter out noise peaks
+        # Minimum fragment peak intensity to filter out noise peaks.
         self._parser.add_argument(
             '--min_intensity', default=0.01, type=float,
             help='remove peaks with a lower intensity relative to the maximum '
                  'intensity (default: %(default)s)')
 
-        # minimum number of fragment peaks or mass range (Dalton)
+        # Minimum number of fragment peaks or mass range (m/z).
         self._parser.add_argument(
             '--min_peaks', default=10, type=int,
             help='discard spectra with less peaks (default: %(default)s)')
@@ -91,13 +91,13 @@ class Config:
             help='discard spectra with a smaller mass range '
                  '(default: %(default)s m/z)')
 
-        # maximum number of fragment peaks to use for each spectrum
+        # Maximum number of fragment peaks to use for each spectrum.
         self._parser.add_argument(
             '--max_peaks_used', default=50, type=int,
             help='only use the specified most intense peaks '
                  '(default: %(default)s)')
 
-        # manner in which to scale the peak intensities
+        # Manner in which to scale the peak intensities.
         self._parser.add_argument(
             '--scaling', default='rank', type=str,
             choices=['sqrt', 'rank'],
@@ -106,7 +106,7 @@ class Config:
                  '(default: %(default)s)')
 
         # MATCHING
-        # maximum SSM precursor mass tolerance
+        # Maximum SSM precursor mass tolerance.
         self._parser.add_argument(
             '--precursor_tolerance_mass', type=float, required=True,
             help='precursor mass tolerance (small window for the first level '
@@ -124,18 +124,18 @@ class Config:
             choices=['Da', 'ppm'],
             help='precursor mass tolerance unit (options: %(choices)s)')
 
-        # fragment peak matching
+        # Fragment peak matching.
         self._parser.add_argument(
             '--fragment_mz_tolerance', type=float, required=True,
             help='fragment mass tolerance (m/z)')
 
-        # shifted dot product
+        # Shifted dot product.
         self._parser.add_argument(
             '--allow_peak_shifts', action='store_true',
             help='use the shifted dot product instead of the standard dot '
                  'product')
 
-        # maximum FDR
+        # Maximum FDR.
         self._parser.add_argument(
             '--fdr', default=0.01, type=float,
             help='FDR threshold to accept identifications during the cascade '
@@ -156,23 +156,23 @@ class Config:
                  'second cascade level (default: %(default)s)')
 
         # MODE
-        # use an ANN index or the conventional brute-force mode
+        # Use an ANN index or the conventional brute-force mode.
         self._parser.add_argument(
             '--mode', default='ann', type=str, choices=['ann', 'bf'],
             help="search using an approximate nearest neighbors or the "
                  "traditional (brute-force) mode; 'bf': brute-force, 'ann': "
                  "approximate nearest neighbors (default: %(default)s)")
 
-        # bin size for the ANN index (Dalton)
+        # Bin size for the ANN index (Dalton).
         self._parser.add_argument(
-            '--bin_size', default=1.0, type=float,
+            '--bin_size', default=0.04, type=float,
             help='ANN vector bin width (default: %(default)s Da)')
-        # ANN vector length after hashing
+        # ANN vector length after hashing.
         self._parser.add_argument(
             '--hash_len', default=200, type=int,
             help='ANN vector length (default: %(default)s)')
 
-        # number of candidates to retrieve from the ANN index for each query
+        # Number of candidates to retrieve from the ANN index for each query.
         self._parser.add_argument(
             '--num_candidates', default=5000, type=int,
             help='number of candidates to retrieve from the ANN index for each'
@@ -190,17 +190,19 @@ class Config:
             help='number of partitions in the ANN index to inspect during '
                  'querying (default: %(default)s)')
 
-        # filled in 'parse', contains the specified settings
+        # Filled in 'parse', contains the specified settings.
         self._namespace = None
 
-    def parse(self, args_str=None):
+    def parse(self, args_str: str = None) -> None:
         """
         Parse the configuration settings.
 
-        Args:
-            args_str: If None, the arguments are taken from sys.argv. Arguments
-                that are not explicitly specified are taken from the
-                configuration file.
+        Parameters
+        ----------
+            args_str : str
+                If None, the arguments are taken from sys.argv. Arguments that
+                are not explicitly specified are taken from the configuration
+                file.
         """
         self._namespace = vars(self._parser.parse_args(args_str))
 
