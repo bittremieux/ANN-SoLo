@@ -178,13 +178,6 @@ class Config:
             help='number of candidates to retrieve from the ANN index for each'
                  ' query (default: %(default)s)')
 
-        # minimum number of candidates for a query before ANN indexing is used
-        self._parser.add_argument(
-            '--ann_cutoff', default=5000, type=int,
-            help='minimum number of candidates for a query before ANN '
-                 'indexing is used to refine the candidates '
-                 '(default: %(default)s)')
-
         # Custom FAISS parameters.
         # Number of lists in the IVF.
         self._parser.add_argument(

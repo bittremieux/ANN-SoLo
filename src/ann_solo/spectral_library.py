@@ -1,84 +1,196 @@
-import abc
 import collections
 import copy
 import hashlib
+import json
 import logging
-import multiprocessing.pool
+import multiprocessing
 import os
-import time
+from typing import Dict
+from typing import Iterator
+from typing import List
 
 import faiss
 import numexpr as ne
 import numpy as np
 import tqdm
 
-from ann_solo import reader, spectrum, spectrum_match, util
+from ann_solo import reader
+from ann_solo import spectrum_match
+from ann_solo import util
 from ann_solo.config import config
+from ann_solo.spectrum import spectrum_to_vector
+from ann_solo.spectrum import Spectrum
+from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
-class SpectralLibrary(metaclass=abc.ABCMeta):
+class SpectralLibrary:
     """
     Spectral library search engine.
 
-    Spectral library search engines identify unknown query spectra by comparing
-    each query spectrum against relevant known spectra in the spectral library,
-    after which the query spectrum is assigned the identity of the library
-    spectrum to which is matches best.
+    The spectral library search engine identifies unknown query spectra by
+    comparing each query spectrum against candidate spectra with a known
+    peptide identity in the spectral library. The query spectrum is assigned
+    the peptide sequence as its best matching library spectrum.
     """
 
-    _config_match_keys = []
+    # Hyperparameters used to initialize the spectral library.
+    _hyperparameters = ['min_mz', 'max_mz', 'bin_size', 'hash_len', 'num_list']
 
-    def __init__(self, lib_filename):
+    # File names of the ANN indices for each charge.
+    _ann_filenames = {}
+
+    # Lock to allow only a single process to access the active ANN index.
+    _ann_index_lock = multiprocessing.Lock()
+
+    def __init__(self, filename: str) -> None:
         """
-        Initialize the spectral library search engine from the given spectral
-        library file.
+        Create a spectral library from the given spectral library file.
 
-        Args:
-            lib_filename: The spectral library file name.
+        New ANN indexes for every charge in the spectral library are created if
+        they don't exist yet for the current ANN configuration.
 
-        Raises:
-            FileNotFoundError: The given spectral library file wasn't found or
-                isn't supported.
+        Parameters
+        ----------
+        filename : str
+            The spectral library file name.
+
+        Raises
+        ------
+        FileNotFoundError: The given spectral library file wasn't found or
+            isn't supported.
         """
         try:
             self._library_reader = reader.get_spectral_library_reader(
-                lib_filename, self._get_config_hash())
+                filename, self._get_hyperparameter_hash())
             self._library_reader.open()
         except FileNotFoundError as e:
             logging.error(e)
             raise
 
-    def _get_config_hash(self):
-        config_match = {config_key: config[config_key]
-                        for config_key in self._config_match_keys}
-        return hashlib.sha1(str(config_match).encode('utf-8')).hexdigest()
+        self._current_index = None, None
 
-    def shutdown(self):
+        verify_file_existence = True
+        if self._library_reader.is_recreated:
+            logging.warning('ANN indexes were created using '
+                            'non-compatible settings')
+            verify_file_existence = False
+        # Check if an ANN index exists for each charge.
+        base_filename = f'{os.path.splitext(filename)[0]}_' \
+                        f'{self._get_hyperparameter_hash()[:7]}'
+        create_ann_charges = []
+        # No need to build an ANN index for infrequent precursor charges.
+        ann_charges = [charge for charge, charge_info in
+                       self._library_reader.spec_info['charge'].items()
+                       if len(charge_info['id']) >= config.num_list * 39]
+        for charge in sorted(ann_charges):
+            self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
+            if (not verify_file_existence or
+                    not os.path.isfile(self._ann_filenames[charge])):
+                create_ann_charges.append(charge)
+                logging.warning('Missing ANN index for charge %d', charge)
+
+        # Create the missing FAISS indices.
+        if create_ann_charges:
+            self._create_ann_indexes(create_ann_charges)
+
+    def _get_hyperparameter_hash(self) -> str:
+        """
+        Get a unique string representation of the hyperparameters used to
+        initialize the spectral library.
+
+        Returns
+        -------
+        str
+            A hexadecimal hashed string representing the initialization
+            hyperparameters.
+        """
+        hyperparameters_bytes = json.dumps(
+            {hp: config[hp] for hp in self._hyperparameters}).encode('utf-8')
+        return hashlib.sha1(hyperparameters_bytes).hexdigest()
+
+    def _create_ann_indexes(self, charges: List[int]) -> None:
+        """
+        Create FAISS indexes for fast ANN candidate selection.
+
+        Parameters
+        ----------
+        charges : List[int]
+            Charges for which a FAISS index will be created. Sufficient library
+            spectra with the corresponding precursor charge should exist.
+        """
+        logging.debug('Add the spectra to the spectral library ANN indexes')
+        # Collect vectors for all spectra per charge.
+        charge_vectors = {
+            charge: np.zeros((len(self._library_reader.spec_info
+                                  ['charge'][charge]['id']), config.hash_len),
+                             np.float32)
+            for charge in charges}
+        i = {charge: 0 for charge in charge_vectors.keys()}
+        for lib_spectrum, _ in tqdm.tqdm(
+                self._library_reader._get_all_spectra(),
+                desc='Library spectra added', leave=False, unit='spectra',
+                smoothing=0.1):
+            charge = lib_spectrum.precursor_charge
+            if charge in charge_vectors.keys():
+                spectrum_to_vector(lib_spectrum.process_peaks(),
+                                   config.min_mz, config.max_mz,
+                                   config.bin_size, config.hash_len, True,
+                                   charge_vectors[charge][i[charge]])
+                i[charge] += 1
+        # Build an individual FAISS index per charge.
+        logging.info('Build the spectral library ANN indexes')
+        for charge, vectors in charge_vectors.items():
+            logging.debug('Create a new ANN index for charge %d', charge)
+            # TODO: Use a GPU if available.
+            #       https://github.com/erikbern/ann-benchmarks/blob/master/ann_benchmarks/algorithms/faiss_gpu.py
+            quantizer = faiss.IndexFlatIP(config.hash_len)
+            # TODO: Use HNSW as quantizer?
+            #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_hnsw.py#L136
+            # quantizer = faiss.IndexHNSWFlat(config.hash_len, 32)
+            # quantizer.hnsw.efSearch = 64
+            # ann_index -> faiss.METRIC_L2
+            # ann_index.quantizer_trains_alone = 2
+            ann_index = faiss.IndexIVFFlat(quantizer, config.hash_len,
+                                           config.num_list,
+                                           faiss.METRIC_INNER_PRODUCT)
+            ann_index.train(vectors)
+            ann_index.add(vectors)
+            faiss.write_index(ann_index, self._ann_filenames[charge])
+
+        logging.debug('Finished creating the spectral library ANN indexes')
+
+    def shutdown(self) -> None:
         """
         Release any resources to gracefully shut down.
         """
         self._library_reader.close()
 
-    def search(self, query_filename):
+    def search(self, query_filename: str) -> List[SpectrumSpectrumMatch]:
         """
         Identify all unknown spectra in the given query file.
 
-        Args:
-            query_filename: The query file in .mgf format containing the
-                unknown spectra.
+        Parameters
+        ----------
+        query_filename : str
+            The query file name.
 
-        Returns:
-            A list of SpectrumMatch identifications.
+        Returns
+        -------
+        List[SpectrumSpectrumMatch]
+            A list of identified `SpectrumSpectrumMatch`es between the query
+            spectra and library spectra below the given FDR threshold
+            (specified in the config).
         """
-        logging.info('Processing file %s', query_filename)
+        logging.info('Process file %s', query_filename)
 
         # Read all spectra in the query file and
         # split based on their precursor charge.
-        logging.info('Reading all query spectra')
+        logging.debug('Read all query spectra')
         query_spectra = collections.defaultdict(list)
+        # TODO: Parallelize query spectrum peak processing?
         for query_spectrum in tqdm.tqdm(
-                reader.read_mgf(query_filename),
-                desc='Query spectra read', unit='spectra', smoothing=0):
+                reader.read_mgf(query_filename), desc='Query spectra read',
+                leave=False, unit='spectra', smoothing=0.1):
             # For queries with an unknown charge, try all possible charges.
             if query_spectrum.precursor_charge is not None:
                 query_spectra_charge = [query_spectrum]
@@ -93,454 +205,244 @@ class SpectralLibrary(metaclass=abc.ABCMeta):
                     (query_spectra[query_spectrum_charge.precursor_charge]
                      .append(query_spectrum_charge))
 
-        # Identify all spectra.
-        logging.info('Processing all query spectra')
-        query_matches = {}
-        # Cascade level 1: standard search settings.
-        precursor_tols = [(config.precursor_tolerance_mass,
-                           config.precursor_tolerance_mode)]
-        # Cascade level 2: open search settings.
-        if config.precursor_tolerance_mass_open is not None and \
-                config.precursor_tolerance_mode_open is not None:
-            precursor_tols.append((config.precursor_tolerance_mass_open,
-                                   config.precursor_tolerance_mode_open))
-        for level, (tol_mass, tol_mode) in enumerate(precursor_tols, 1):
-            level_matches = {}
-            logging.debug('Level %d precursor mass tolerance: %s %s',
-                          level, tol_mass, tol_mode)
+        # Identify all query spectra.
+        logging.debug('Process all query spectra')
+        identifications = {}
+        # Cascade level 1: standard search.
+        for ssm in self._search_cascade(query_spectra, 'std'):
+            identifications[ssm.identifier] = ssm
+        if (config.precursor_tolerance_mass_open is not None and
+                config.precursor_tolerance_mode_open is not None):
+            # Collect the remaining query spectra for the second cascade level.
             for charge, query_spectra_charge in query_spectra.items():
-                logging.debug('Process %d spectra with precursor charge %d',
-                              len(query_spectra_charge), charge)
-                for query_match in self._find_match_batch(
-                        query_spectra_charge, charge, tol_mass, tol_mode):
+                query_spectra[charge] = [
+                    spectrum for spectrum in query_spectra_charge
+                    if spectrum.identifier not in identifications]
+            logging.info('%d spectra identified after the standard search',
+                         len(identifications))
+            # Cascade level 2: open search.
+            for ssm in self._search_cascade(query_spectra, 'open'):
+                identifications[ssm.identifier] = ssm
+            logging.info('%d spectra identified after the open search',
+                         len(identifications))
+
+        return list(identifications.values())
+
+    def _search_cascade(self, query_spectra: Dict[int, List[Spectrum]],
+                        mode: str) -> Iterator[SpectrumSpectrumMatch]:
+        """
+        Perform a single level of the cascade search.
+
+        Parameters
+        ----------
+        query_spectra : Dict[int, List[Spectrum]]
+            A dictionary with as keys the different charges and as values lists
+            of query spectra for each charge.
+        mode : {'std', 'open'}
+            The search mode. Either 'std' for a standard search with a small
+            precursor mass window, or 'open' for an open search with a wide
+            precursor mass window.
+
+
+        Returns
+        -------
+        Iterator[SpectrumSpectrumMatch]
+            An iterable of spectrum-spectrum matches that are below the FDR
+            threshold (specified in the config).
+        """
+        if mode == 'std':
+            logging.debug('Identify the query spectra using a standard search'
+                          '(Δm = %s %s)',
+                          config.precursor_tolerance_mass,
+                          config.precursor_tolerance_mode)
+        elif mode == 'open':
+            logging.debug('Identify the query spectra using an open search'
+                          '(Δm = %s %s)',
+                          config.precursor_tolerance_mass_open,
+                          config.precursor_tolerance_mode_open)
+
+        ssms = {}
+        num_spectra = sum([len(q) for q in query_spectra.values()])
+        with tqdm.tqdm(desc='Query spectra processed', total=num_spectra,
+                       leave=False, unit='spectra', smoothing=0.1) as pbar:
+            for charge, query_spectra_charge in query_spectra.items():
+                for ssm in self._search_batch(query_spectra_charge, charge,
+                                              mode):
                     # Make sure we only retain the best identification
-                    # (i.e. for duplicated spectra if the
-                    # precursor charge was unknown).
-                    if (query_match.query_id not in level_matches or
-                            query_match.search_engine_score >
-                            (level_matches[query_match.query_id]
-                                .search_engine_score)):
-                        level_matches[query_match.query_id] = query_match
+                    # (i.e. in case of duplicated spectra
+                    # if the precursor charge was unknown).
+                    if (ssm is not None and
+                            (ssm.identifier not in ssms or
+                             (ssm.search_engine_score >
+                              ssms[ssm.identifier].search_engine_score))):
+                        ssms[ssm.identifier] = ssm
+                    pbar.update(1)
+        # Store the SSMs below the FDR threshold.
+        logging.debug('Filter the spectrum—spectrum matches on FDR '
+                      '(threshold = %s)', config.fdr)
+        if mode == 'std':
+            return util.filter_fdr(ssms.values(), config.fdr)
+        elif mode == 'open':
+            return util.filter_group_fdr(ssms.values(), config.fdr,
+                                         config.fdr_tolerance_mass,
+                                         config.fdr_tolerance_mode,
+                                         config.fdr_min_group_size)
 
-            # Filter SSMs on FDR after each cascade level.
-            if level == 1:
-                # Small precursor mass window: standard FDR.
-                def filter_fdr(ssms):
-                    return util.filter_fdr(ssms, config.fdr)
-            else:
-                # Open search: group FDR.
-                def filter_fdr(ssms):
-                    return util.filter_group_fdr(ssms, config.fdr,
-                                                 config.fdr_tolerance_mass,
-                                                 config.fdr_tolerance_mode,
-                                                 config.fdr_min_group_size)
-            for accepted_ssm in filter_fdr(level_matches.values()):
-                query_matches[accepted_ssm.query_id] = accepted_ssm
-
-            logging.debug('%d spectra identified at %.2f FDR after search '
-                          'level %d', len(query_matches), config.fdr, level)
-
-            # Process the remaining spectra in the next cascade level.
-            query_spectra_remaining = {}
-            for charge, query_spectra_charge in query_spectra.items():
-                query_spectra_remaining[charge] = [
-                    spec for spec in query_spectra_charge
-                    if spec.identifier not in query_matches]
-            query_spectra = query_spectra_remaining
-
-        logging.info('Finished processing file %s', query_filename)
-
-        return query_matches.values()
-
-    def _find_match_batch(self, queries, charge, tol_mass, tol_mode):
+    def _search_batch(self, query_spectra: List[Spectrum],
+                      charge: int, mode: str)\
+            -> Iterator[SpectrumSpectrumMatch]:
         """
-        Finds the best library matches for a batch of query spectra with the
-        same precursor charge.
+        Generate spectrum-spectrum matches for a batch of query spectra with
+        the same precursor charge.
 
-        Args:
-            queries: The query spectra to be identified.
-            charge: The query spectra's precursor charge.
-            tol_mass: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified
-                ('Da' or 'ppm').
+        Parameters
+        ----------
+        query_spectra : List[Spectrum]
+            The query spectra for which spectrum-spectrum matches are
+            generated.
+        charge : int
+            The precursor charge of the query spectra.
+        mode : {'std', 'open'}
+            The search mode. Either 'std' for a standard search with a small
+            precursor mass window, or 'open' for an open search with a wide
+            precursor mass window.
 
-        Returns:
-            A list of SpectrumMatch identifications for each query spectrum.
-        """
-        identifications = []
-        # Find all candidate library spectra
-        # to which a match has to be computed.
-        for query, candidates in zip(queries, self._filter_library_candidates(
-                queries, charge, tol_mass, tol_mode)):
-            # Find the best matching candidate.
-            if candidates:
-                candidate, score, _ = spectrum_match.get_best_match(
-                    query, candidates)
-                identification = spectrum.SpectrumMatch(
-                    query, candidate, score)
-                identification.num_candidates = len(candidates)
-                identifications.append(identification)
-
-        return identifications
-
-    @abc.abstractmethod
-    def _filter_library_candidates(self, queries, charge, tol_mass, tol_mode):
-        """
-        Find all candidate matches for the given query in the spectral library.
-
-        Args:
-            queries: The query spectra for which candidate spectra are
-                retrieved from the spectral library.
-            charge: The query spectra's precursor charge.
-            tol_mass: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified
-                ('Da' or 'ppm').
-
-        Returns:
-            An iterator over the library candidate spectra for each query
+        Returns
+        -------
+        Iterator[SpectrumSpectrumMatch]
+            An iterable of spectrum-spectrum matches for every query spectrum
+            that could be successfully matched to its most similar library
             spectrum.
         """
-        pass
+        # Find all library candidates for each query spectrum.
+        for query_spectrum, library_candidates in zip(
+                query_spectra, self._get_library_candidates(
+                    query_spectra, charge, mode)):
+            # Find the best match candidate.
+            if library_candidates:
+                library_match, score, _ = spectrum_match.get_best_match(
+                    query_spectrum, library_candidates,
+                    config.fragment_mz_tolerance,
+                    config.allow_peak_shifts)
+                yield SpectrumSpectrumMatch(
+                    query_spectrum, library_match, score,
+                    num_candidates=len(library_candidates))
 
-    def _get_mass_filter_idx(self, query_mzs, charge, tol_val, tol_mode):
+    def _get_library_candidates(self, query_spectra: List[Spectrum],
+                                charge: int, mode: str)\
+            -> Iterator[List[Spectrum]]:
         """
-        Get the identifiers of all library candidates that fall within the
-        given window around the specified precursor masses.
+        Get the library spectra to be matched against the query spectra.
 
-        Args:
-            query_mzs: The precursor masses around which the window to
-                identify the candidates is centered.
-            charge: The query spectra's precursor charge.
-            tol_val: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified
-                ('Da' or 'ppm').
+        Parameters
+        ----------
+        query_spectra : List[Spectrum]
+            The query spectra for which library candidates are retrieved.
+        charge : int
+            The precursor charge of the query spectra.
+        mode : {'std', 'open'}
+            The search mode. Either 'std' for a standard search with a small
+            precursor mass window, or 'open' for an open search with a wide
+            precursor mass window.
 
-        Returns:
-            An iterator over the library identifiers of the candidate matches
-            for each query spectrum, or an iterator in case the spectral
-            library doesn't contain any spectra with the given precursor
-            charge.
+        Returns
+        -------
+        Iterator[List[Spectrum]]
+            An iterable of lists of library candidate spectra for each query
+            spectrum.
+
+        Raises
+        ------
+        ValueError: Invalid search settings:
+            - Unsupported search mode (either 'std' or 'open')
+            - Unsupported precursor mass tolerance mode (either 'Da' or 'ppm')
         """
-        if charge not in self._library_reader.spec_info['charge']:
-            yield from ()
+        if mode == 'std':
+            tol_val = config.precursor_tolerance_mass
+            tol_mode = config.precursor_tolerance_mode
+        elif mode == 'open':
+            tol_val = config.precursor_tolerance_mass_open
+            tol_mode = config.precursor_tolerance_mode_open
         else:
-            charge_spectra = self._library_reader.spec_info['charge'][charge]
-            lib_mzs = charge_spectra['precursor_mass'].reshape((1, -1))
-            # TODO: Check speed difference with numpy.where() or with a single
-            #       loop through the library spectra.
-            if tol_mode == 'Da':
-                mass_filter = ne.evaluate(
-                    'abs(query_mzs - lib_mzs) * charge <= tol_val')
-            elif tol_mode == 'ppm':
-                mass_filter = ne.evaluate(
-                    'abs(query_mzs - lib_mzs) / lib_mzs * 10**6 <= tol_val')
-            else:
-                mass_filter = np.full(
-                    (query_mzs.shape[0], lib_mzs.shape[1]), True)
+            raise ValueError('Unknown search mode')
 
-            for query_filter in mass_filter:
-                yield charge_spectra['id'][query_filter]
+        # No library matches possible.
+        if charge not in self._library_reader.spec_info['charge']:
+            return
 
+        library_candidates = self._library_reader.spec_info['charge'][charge]
 
-class SpectralLibraryBf(SpectralLibrary):
-    """
-    Traditional spectral library search engine.
+        # First filter: precursor m/z.
+        query_mzs = np.empty((len(query_spectra), 1), float)
+        for i, query_spectrum in enumerate(query_spectra):
+            query_mzs[i] = query_spectrum.precursor_mz
+        library_mzs = library_candidates['precursor_mass'].reshape((1, -1))
+        if tol_mode == 'Da':
+            candidate_filters = ne.evaluate(
+                'abs(query_mzs - library_mzs) * charge <= tol_val')
+        elif tol_mode == 'ppm':
+            candidate_filters = ne.evaluate(
+                'abs(query_mzs - library_mzs) / library_mzs * 10**6'
+                '<= tol_val')
+        else:
+            raise ValueError('Unknown precursor tolerance mode')
 
-    A traditional spectral library search engine uses the 'brute force'
-    approach. This means that all library spectra within the precursor mass
-    window are considered as candidate matches when identifying a query
-    spectrum.
-    """
+        # Second filter: ANN.
+        if (config.mode == 'ann' and mode == 'open' and
+                charge in self._ann_filenames):
+            ann_index = self._get_ann_index(charge)
+            query_vectors = np.zeros((len(query_spectra), config.hash_len),
+                                     np.float32)
+            for i, query_spectrum in enumerate(query_spectra):
+                spectrum_to_vector(
+                    query_spectrum, config.min_mz, config.max_mz,
+                    config.bin_size, config.hash_len, True, query_vectors[i])
+            mask = np.zeros_like(candidate_filters)
+            for mask_i, ann_filter in zip(mask, ann_index.search(
+                    query_vectors, config.num_candidates)[1]):
+                mask_i[ann_filter[ann_filter != -1]] = True
+            candidate_filters = np.logical_and(candidate_filters, mask)
 
-    def _filter_library_candidates(self, queries, charge, tol_mass, tol_mode):
-        """
-        Find all candidate matches for the given query in the spectral library.
-
-        Candidate matches are solely filtered on their precursor mass: they are
-        included if their precursor mass falls within the specified window
-        around the precursor mass from the query.
-
-        Args:
-            queries: The query spectra for which candidate spectra are
-                retrieved from the spectral library.
-            charge: The query spectra's precursor charge.
-            tol_mass: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified
-                ('Da' or 'ppm').
-
-        Returns:
-            An iterator over the library candidate spectra for each query
-            spectrum.
-        """
-        precursor_mzs = (np.asarray([query.precursor_mz for query in queries])
-                         .reshape((-1, 1)))
-        # Filter the candidates for all queries on the precursor mass window.
-        for candidate_idx in self._get_mass_filter_idx(
-                precursor_mzs, charge, tol_mass, tol_mode):
-            # Yield all candidates for each query.
-            candidates = []
-            for idx in candidate_idx:
+        # Get the library candidates that pass the filter.
+        for candidate_filter in candidate_filters:
+            query_candidates = []
+            for idx in library_candidates['id'][candidate_filter]:
                 candidate = self._library_reader.get_spectrum(idx, True)
                 if candidate.is_valid():
-                    candidates.append(candidate)
+                    query_candidates.append(candidate)
+            yield query_candidates
 
-            yield candidates
-
-
-class SpectralLibraryAnn(SpectralLibrary):
-    """
-    Approximate nearest neighbors spectral library search engine.
-
-    The spectral library uses an approximate nearest neighbor (ANN) technique
-    to retrieve only the most similar library spectra to a query spectrum as
-    potential matches during identification.
-    """
-
-    _ann_filenames = {}
-
-    _ann_index_lock = multiprocessing.Lock()
-
-    def _filter_library_candidates(self, query, tol_mass, tol_mode,
-                                   num_candidates=None, ann_cutoff=None):
-        """
-        Find all candidate matches for the given query in the spectral library.
-
-        First, the most similar candidates are retrieved from the ANN index to
-        restrict the search space to only the most relevant candidates. Next,
-        these candidates are further filtered on their precursor mass similar
-        to the brute-force approach.
-
-        Args:
-            query: The query Spectrum for which candidate Spectra are retrieved
-                from the spectral library.
-            tol_mass: The size of the precursor mass window.
-            tol_mode: The unit in which the precursor mass window is specified
-                ('Da' or 'ppm').
-            num_candidates: The number of candidates to retrieve from the ANN
-                index.
-            ann_cutoff: The minimum number of candidates for the query to use
-                the ANN index to reduce the search space.
-
-        Returns:
-            The candidate Spectra in the spectral library that need to be
-                compared to the given query Spectrum.
-        """
-        if num_candidates is None:
-            num_candidates = config.num_candidates
-        if ann_cutoff is None:
-            ann_cutoff = config.ann_cutoff
-
-        charge = query.precursor_charge
-
-        # filter the candidates on the precursor mass window
-        mass_filter = self._get_mass_filter_idx(
-            query.precursor_mz, charge, tol_mass, tol_mode)
-
-        # if there are too many candidates, refine using the ANN index
-        if len(mass_filter) > ann_cutoff and charge in self._ann_filenames:
-            # retrieve the most similar candidates from the ANN index
-            ann_filter = self._query_ann(query, num_candidates)
-
-            # select the candidates passing both the ANN filter
-            # and precursor mass filter
-            candidate_idx = np.intersect1d(ann_filter, mass_filter, True)
-        else:
-            candidate_idx = mass_filter
-
-        # read the candidates
-        candidates = []
-        for idx in candidate_idx:
-            candidate = self._library_reader.get_spectrum(idx, True)
-            if candidate.is_valid():
-                candidates.append(candidate)
-
-        return candidates
-
-    @abc.abstractmethod
-    def _get_ann_index(self, charge):
+    def _get_ann_index(self, charge: int) -> faiss.IndexIVF:
         """
         Get the ANN index for the specified charge.
 
         This allows on-demand loading of the ANN indices and prevents having to
-        keep a large amount of data for the index into memory (depending on
-        the ANN method).
+        keep a large amount of data for the index into memory.
         The previously used index is cached to avoid reloading the same index
         (only a single index is cached to prevent using an excessive amount of
         memory). If no index for the specified charge is cached yet, this index
         is loaded from the disk.
 
         To prevent loading the same index multiple times (incurring a
-        significant performance quality) it is CRUCIAL that query spectra are
-        sorted by precursor charge so the previous index can be reused.
+        significant performance quality) it is CRUCIAL that query spectrum
+        processing is partitioned by charge so the previous index can be
+        reused.
 
-        Args:
-            charge: The precursor charge for which the ANN index is retrieved.
+        Parameters
+        ----------
+        charge : int
+            The charge for which the ANN index is retrieved.
 
-        Returns:
-            The ANN index for the specified precursor charge.
-        """
-        pass
-
-    @abc.abstractmethod
-    def _query_ann(self, query, num_candidates):
-        """
-        Retrieve the nearest neighbors for the given query vector from its
-        corresponding ANN index.
-
-        Args:
-            query: The query spectrum.
-            num_candidates: The number of candidate neighbors to retrieve.
-
-        Returns:
-            A NumPy array containing the identifiers of the candidate neighbors
-            retrieved from the ANN index.
-        """
-        pass
-
-
-class SpectralLibraryFaiss(SpectralLibraryAnn):
-
-    """
-    Approximate nearest neighbors (ANN) spectral library search engine using
-    the FAISS library for ANN retrieval.
-    """
-
-    _config_match_keys = ['min_mz', 'max_mz', 'bin_size', 'hash_len',
-                          'num_list']
-
-    def __init__(self, lib_filename, lib_spectra=None):
-        """
-        Initialize the spectral library from the given spectral library file.
-
-        Further, the ANN indices are loaded from the associated index files. If
-        these are missing, new index files are built and stored for all charge
-        states separately.
-
-        Args:
-            lib_filename: The spectral library file name.
-            lib_spectra: All valid spectra from the spectral library. Avoids
-                re-reading a large spectral library if not `None`. This needs
-                to be an iterable giving tuples of which the first element is a
-                Spectrum and the second element is ignored.
-
-        Raises:
-            FileNotFoundError: The given spectral library file wasn't found or
-                isn't supported.
-        """
-        # Get the spectral library reader in the super-class initialization.
-        super().__init__(lib_filename)
-
-        self._current_index = None, None
-
-        verify_file_existence = True
-        if self._library_reader.is_recreated:
-            logging.warning(
-                'ANN indices were created using non-compatible settings')
-            verify_file_existence = False
-        # Check if an ANN index exists for each charge.
-        base_filename, _ = os.path.splitext(lib_filename)
-        base_filename = '{}_{}'.format(
-            base_filename, self._get_config_hash()[:7])
-        # No need to build an ANN index for infrequent precursor charges.
-        min_num_items = max(config.ann_cutoff, config.num_list)
-        ann_charges = [charge for charge, charge_info in
-                       self._library_reader.spec_info['charge'].items()
-                       if len(charge_info['id']) > min_num_items]
-        create_ann_charges = []
-        for charge in sorted(ann_charges):
-            self._ann_filenames[charge] = '{}_{}.idxann'.format(
-                base_filename, charge)
-            if not verify_file_existence or \
-                    not os.path.isfile(self._ann_filenames[charge]):
-                create_ann_charges.append(charge)
-                logging.warning(
-                    'Missing ANN index file for charge {}'.format(charge))
-
-        # Create the missing FAISS indices.
-        if create_ann_charges:
-            logging.debug(
-                'Adding the spectra to the spectral library ANN indices')
-            # Collect vectors for all spectra per precursor charge.
-            charge_vectors = {charge: {'x': [], 'ids': []}
-                              for charge in create_ann_charges}
-            lib_spectra_it = (lib_spectra if lib_spectra is not None
-                              else self._library_reader._get_all_spectra())
-            for lib_spectrum, _ in tqdm.tqdm(
-                    lib_spectra_it,
-                    desc='Library spectra added', unit='spectra'):
-                charge = lib_spectrum.precursor_charge
-                if charge in charge_vectors.keys() and \
-                        lib_spectrum.process_peaks().is_valid():
-                    charge_vectors[charge]['x'].append(
-                        lib_spectrum.get_hashed_vector())
-                    charge_vectors[charge]['ids'].append(
-                        lib_spectrum.identifier)
-            # Build an individual FAISS index per precursor charge.
-            logging.debug('Building the spectral library ANN indices')
-            for charge, vector_ids in charge_vectors.items():
-                logging.debug(
-                    'Creating new ANN index for charge {}'.format(charge))
-                # TODO: GPU
-                quantizer = faiss.IndexFlatIP(config.hash_len)
-                ann_index = faiss.IndexIVFFlat(quantizer, config.hash_len,
-                                               config.num_list,
-                                               faiss.METRIC_INNER_PRODUCT)
-                vectors = np.asarray(vector_ids['x'])
-                ids = np.asarray(vector_ids['ids'], np.int64)
-                ann_index.train(vectors)
-                ann_index.add_with_ids(vectors, ids)
-                logging.debug(
-                    'Saving the ANN index for charge {}'.format(charge))
-                faiss.write_index(ann_index, self._ann_filenames[charge])
-
-            logging.info('Finished creating the spectral library ANN indices')
-
-    def _get_ann_index(self, charge):
-        """
-        Get the ANN index for the specified charge.
-
-        This allows on-demand loading of the ANN indices and prevents having to
-        keep a large amount of data for the index into memory (depending on the
-        ANN method).
-        The previously used index is cached to avoid reloading the same index
-        (only a single index is cached to prevent using an excessive amount of
-        memory). If no index for the specified charge is cached yet, this index
-        is loaded from the disk.
-
-        To prevent loading the same index multiple times (incurring a
-        significant performance quality) it is CRUCIAL that query spectra are
-        sorted by precursor charge so the previous index can be reused.
-
-        Args:
-            charge: The precursor charge for which the ANN index is retrieved.
-
-        Returns:
-            The ANN index for the specified precursor charge.
+        Returns
+        -------
+        faiss.IndexIVF
+            The ANN index for the specified charge.
         """
         with self._ann_index_lock:
             if self._current_index[0] != charge:
-                logging.debug(
-                    'Loading the ANN index for charge {}'.format(charge))
+                logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
                 index.nprobe = config.num_probe
                 self._current_index = charge, index
 
             return self._current_index[1]
-
-    def _query_ann(self, query, num_candidates):
-        """
-        Retrieve the nearest neighbors for the given query vector from its
-        corresponding ANN index.
-
-        Args:
-            query: The query spectrum.
-            num_candidates: The number of candidate neighbors to retrieve.
-
-        Returns:
-            A NumPy array containing the identifiers of the candidate neighbors
-            retrieved from the ANN index.
-        """
-        ann_index = self._get_ann_index(query.precursor_charge)
-        _, candidate_idx = ann_index.search(
-            np.expand_dims(query.get_hashed_vector(), axis=0), num_candidates)
-        return candidate_idx[candidate_idx != -1]

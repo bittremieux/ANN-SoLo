@@ -14,13 +14,8 @@ def main():
     config.parse()
 
     # Perform the search.
-    if config.mode == 'bf':
-        spec_lib = spectral_library.SpectralLibraryBf(
-            config.spectral_library_filename)
-    elif config.mode == 'ann':
-        spec_lib = spectral_library.SpectralLibraryFaiss(
-            config.spectral_library_filename)
-
+    spec_lib = spectral_library.SpectralLibrary(
+        config.spectral_library_filename)
     identifications = spec_lib.search(config.query_filename)
     writer.write_mztab(identifications, config.out_filename,
                        spec_lib._library_reader)

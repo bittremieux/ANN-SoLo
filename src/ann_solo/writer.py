@@ -52,7 +52,7 @@ def write_mztab(identifications, filename, lib_reader):
         'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr', 'mode']
     if config.mode == 'ann':
         config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
-                            'ann_cutoff', 'num_list', 'num_probe'])
+                            'num_list', 'num_probe'])
     for i, key in enumerate(config_keys):
         metadata.append(('software[1]-setting[{}]'.format(i),
                          '{} = {}'.format(key, config[key])))
@@ -78,32 +78,29 @@ def write_mztab(identifications, filename, lib_reader):
             'opt_ms_run[1]_num_candidates', 'opt_ms_run[1]_time_total',
             'opt_ms_run[1]_time_candidates', 'opt_ms_run[1]_time_match'])
                     + '\n')
-        # PSMs sorted by their query id
-        for identification in sorted(
-                identifications, key=lambda i: natural_sort_key(i.query_id)):
+        # SSMs sorted by their query identifier.
+        for ssm in sorted(identifications,
+                          key=lambda ssm: natural_sort_key(ssm.identifier)):
             f_out.write('\t'.join([
                 'PSM',
-                identification.sequence,
-                str(identification.query_id),
-                str(identification.library_id),
+                ssm.sequence,
+                str(ssm.identifier),
+                str(ssm.accession),
                 'null',
                 pathlib.Path(os.path.abspath(
                     config.spectral_library_filename)).as_uri(),
                 database_version,
                 '[MS, MS:1001456, ANN SoLo,]',
-                str(identification.search_engine_score),
-                str(identification.q),
+                str(ssm.search_engine_score),
+                str(ssm.q),
                 'null',
-                str(identification.retention_time),
-                str(identification.charge),
-                str(identification.exp_mass_to_charge),
-                str(identification.calc_mass_to_charge),
-                'ms_run[1]:spectrum={}'.format(identification.query_id),
+                str(ssm.retention_time),
+                str(ssm.charge),
+                str(ssm.exp_mass_to_charge),
+                str(ssm.calc_mass_to_charge),
+                f'ms_run[1]:spectrum={ssm.identifier}',
                 'null', 'null', 'null', 'null',
-                str(1 if identification.is_decoy else 0),
-                str(identification.num_candidates),
-                str(identification.time_total),
-                str(identification.time_candidates),
-                str(identification.time_match)]) + '\n')
+                f'{ssm.is_decoy:d}',
+                str(ssm.num_candidates)]) + '\n')
 
     logging.info('Identifications saved to file %s', filename)

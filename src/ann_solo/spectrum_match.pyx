@@ -8,8 +8,6 @@ from libcpp cimport bool as bool_t
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 
-from ann_solo.config import config
-
 
 cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
     cdef cppclass Spectrum:
@@ -30,8 +28,7 @@ cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def get_best_match(query, candidates,
-                   fragment_mz_tolerance=None, allow_shift=None):
+def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
     """
     Find the best matching candidate spectrum compared to the given query
     spectrum.
@@ -64,14 +61,8 @@ def get_best_match(query, candidates,
     """
     cdef double fragment_mz_tolerance_c
     cdef bool_t allow_shift_c
-    if fragment_mz_tolerance is not None:
-        fragment_mz_tolerance_c = fragment_mz_tolerance
-    else:
-        fragment_mz_tolerance_c = config.fragment_mz_tolerance
-    if allow_shift is not None:
-        allow_shift_c = allow_shift
-    else:
-        allow_shift_c = config.allow_peak_shifts
+    fragment_mz_tolerance_c = fragment_mz_tolerance
+    allow_shift_c = allow_shift
 
     cdef vector[Spectrum*] candidates_vec
     cdef np.float32_t[:] masses, intensities
@@ -80,7 +71,7 @@ def get_best_match(query, candidates,
     cdef double score
     cdef vector[pair[uint, uint]] peak_matches
     try:
-        # convert the candidates
+        # Convert the candidates.
         for candidate in candidates:
             if not hasattr(candidate, 'charges'):
                 candidate.charges = np.zeros(

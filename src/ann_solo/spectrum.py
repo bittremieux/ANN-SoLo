@@ -1,3 +1,4 @@
+import functools
 import math
 
 import mmh3
@@ -6,6 +7,7 @@ import numpy as np
 from ann_solo.config import config
 
 
+@functools.lru_cache(maxsize=None)
 def get_dim(min_mz, max_mz, bin_size):
     """
     Compute the number of bins over the given mass range for the given bin
@@ -146,6 +148,8 @@ class Spectrum:
         if self._is_processed:
             return self
 
+        low_quality = False
+
         masses = self.masses
         intensities = self.intensities
         annotations = self.annotations
@@ -200,6 +204,9 @@ class Spectrum:
 
         # check if sufficient peaks remain
         if len(filter_peaks) < min_peaks:
+            # return self
+            low_quality = True
+        if len(filter_peaks) == 0:
             return self
 
         # apply mass range filter
@@ -222,7 +229,8 @@ class Spectrum:
 
         # check if the peaks cover a sufficient m/z range
         if filtered_masses[-1] - filtered_masses[0] < min_mz_range:
-            return self
+            # return self
+            low_quality = True
 
         # scale the intensities by their root
         # to reduce the effect of extremely high intensity peaks
@@ -240,93 +248,131 @@ class Spectrum:
         self.masses = filtered_masses
         self.intensities = norm_intensities
         self.annotations = filtered_annotations
-        self._is_processed = True
+        self._is_processed = True and not low_quality
 
         return self
 
-    def get_vector(self, min_mz=None, max_mz=None, bin_size=None):
-        """
-        Convert the Spectrum to a vector by binning the peaks.
 
-        Args:
-            min_mz: The minimum mass.
-            max_mz: The maximum mass.
-            bin_size: The size (in Da) of the mass bins.
+@functools.lru_cache(maxsize=None)
+def hash_idx(bin_idx: int, hash_len: int) -> int:
+    """
+    Hash an integer index to fall between 0 and the given maximum hash index.
 
-        Returns:
-            None if the Spectrum doesn't have any peaks; otherwise a vector
-            with each peak of the Spectrum assigned to its mass bin. For
-            multiple peaks assigned to the same mass bin the intensities are
-            summed. The final vector is normalized to have unit length.
-        """
-        if min_mz is None:
-            min_mz = config.min_mz
-        if max_mz is None:
-            max_mz = config.max_mz
-        if bin_size is None:
-            bin_size = config.bin_size
+    Parameters
+    ----------
+    bin_idx : int
+        The (unbounded) index to be hashed.
+    hash_len : int
+        The maximum index after hashing.
 
-        if self.is_valid():
-            vec_length, min_bound, max_bound = get_dim(
-                min_mz, max_mz, bin_size)
-            peaks = np.zeros((vec_length,), dtype=np.float32)
-            # add each mass and intensity to their low-dimensionality bin
-            for mass, intensity in zip(self.masses, self.intensities):
-                mass_bin = math.floor((mass - min_bound) // bin_size)
-                peaks[mass_bin] += intensity
-
-            # normalize
-            return peaks / np.linalg.norm(peaks)
-        else:
-            return None
-
-    def get_hashed_vector(self, min_mz=None, max_mz=None, bin_size=None,
-                          hash_len=None):
-        if min_mz is None:
-            min_mz = config.min_mz
-        if max_mz is None:
-            max_mz = config.max_mz
-        if bin_size is None:
-            bin_size = config.bin_size
-        if hash_len is None:
-            hash_len = config.hash_len
-
-        if self.is_valid():
-            peaks = np.zeros((hash_len,), dtype=np.float32)
-            vec_length, min_bound, max_bound = get_dim(
-                min_mz, max_mz, bin_size)
-            for mass, intensity in zip(self.masses, self.intensities):
-                mass_bin = math.floor((mass - min_bound) // bin_size)
-                mass_bin_hash = (mmh3.hash(str(mass_bin), 42, signed=False)
-                                 % hash_len)
-                peaks[mass_bin_hash] += intensity
-
-            return peaks / np.linalg.norm(peaks)
-        else:
-            return None
+    Returns
+    -------
+    int
+        The hashed index between 0 and `hash_len`.
+    """
+    return mmh3.hash(str(bin_idx), 42, signed=False) % hash_len
 
 
-class SpectrumMatch:
+def spectrum_to_vector(spectrum: Spectrum, min_mz: float, max_mz: float,
+                       bin_size: float, hash_len: int, norm: bool = True,
+                       vector: np.ndarray = None) -> np.ndarray:
+    """
+    Convert a `Spectrum` to a dense NumPy vector.
 
-    def __init__(self, query_spectrum,
-                 library_spectrum=None, search_engine_score=0.0, q=math.nan):
-        # query information
-        self.query_id = query_spectrum.identifier
-        self.retention_time = query_spectrum.retention_time
-        self.charge = query_spectrum.precursor_charge
-        self.exp_mass_to_charge = query_spectrum.precursor_mz
+    Peaks are first discretized in to mass bins of width `bin_size` between
+    `min_mz` and `max_mz`, after which they are hashed to random hash bins
+    in the final vector.
 
-        # identification information
-        if library_spectrum is not None:
-            self.library_id = library_spectrum.identifier
-            self.sequence = library_spectrum.peptide
-            self.calc_mass_to_charge = library_spectrum.precursor_mz
-            self.is_decoy = library_spectrum.is_decoy
-        else:
-            self.library_id = self.sequence = self.calc_mass_to_charge = self.is_decoy = None
+    Parameters
+    ----------
+    spectrum : Spectrum
+        The `Spectrum` to be converted to a vector.
+    min_mz : float
+        The minimum m/z to include in the vector.
+    max_mz : float
+        The maximum m/z to include in the vector.
+    bin_size : float
+        The bin size in m/z used to divide the m/z range.
+    hash_len : int
+        The length of the hashed vector.
+    norm : bool
+        Normalize the vector to unit length or not.
+    vector : np.ndarray, optional
+        A pre-allocated vector.
 
+    Returns
+    -------
+    np.ndarray
+        The hashed spectrum vector with unit length.
+    """
+    if vector is None:
+        vector = np.zeros((hash_len,), np.float32)
+    if hash_len != vector.shape[0]:
+        raise ValueError('Incorrect vector dimensionality')
+
+    _, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
+    for mz, intensity in zip(spectrum.masses, spectrum.intensities):
+        bin_idx = hash_idx(math.floor((mz - min_bound) // bin_size), hash_len)
+        vector[bin_idx] += intensity
+
+    if norm:
+        vector /= np.linalg.norm(vector)
+    return vector
+
+
+class SpectrumSpectrumMatch:
+
+    def __init__(self, query_spectrum: Spectrum,
+                 library_spectrum: Spectrum = None,
+                 search_engine_score: float = math.nan,
+                 q: float = math.nan,
+                 num_candidates: int = 0):
+        self.query_spectrum = query_spectrum
+        self.library_spectrum = library_spectrum
         self.search_engine_score = search_engine_score
         self.q = q
+        self.num_candidates = num_candidates
 
-        # performance information
-        self.num_candidates = self.time_candidates = self.time_match = self.time_total = 0
+    @property
+    def sequence(self):
+        if self.library_spectrum is not None:
+            return self.library_spectrum.peptide
+        else:
+            return None
+
+    @property
+    def identifier(self):
+        return self.query_spectrum.identifier
+
+    @property
+    def accession(self):
+        if self.library_spectrum is not None:
+            return self.library_spectrum.identifier
+        else:
+            return None
+
+    @property
+    def retention_time(self):
+        return self.query_spectrum.retention_time
+
+    @property
+    def charge(self):
+        return self.query_spectrum.precursor_charge
+
+    @property
+    def exp_mass_to_charge(self):
+        return self.query_spectrum.precursor_mz
+
+    @property
+    def calc_mass_to_charge(self):
+        if self.library_spectrum is not None:
+            return self.library_spectrum.precursor_mz
+        else:
+            return None
+
+    @property
+    def is_decoy(self):
+        if self.library_spectrum is not None:
+            return self.library_spectrum.is_decoy
+        else:
+            return None
