@@ -69,7 +69,7 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         ('description', f'Identification results of file '
                         f'"{config.query_filename}" against spectral library '
                         f'file "{config.spectral_library_filename}"'),
-        ('software[1]', '[MS, MS:1001456, ANN-SoLo, {__version__}]'),
+        ('software[1]', f'[MS, MS:1001456, ANN-SoLo, {__version__}]'),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
         ('psm_search_engine_score[2]', '[MS, MS:1002354, PSM-level q-value,]'),
@@ -95,10 +95,7 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         metadata.append((f'software[1]-setting[{i}]',
                          f'{key} = {config[key]}'))
 
-    version = lib_reader.get_version()
-    database_version = (f'{datetime.datetime.strftime(version[0], "%Y-%m-%d")}'
-                        f' ({version[1]} entries)'
-                        if version is not None else 'null')
+    database_version = lib_reader.get_version()
 
     with open(filename, 'w') as f_out:
         # Metadata section.

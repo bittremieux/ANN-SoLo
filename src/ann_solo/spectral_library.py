@@ -127,7 +127,7 @@ class SpectralLibrary:
             for charge in charges}
         i = {charge: 0 for charge in charge_vectors.keys()}
         for lib_spectrum, _ in tqdm.tqdm(
-                self._library_reader._get_all_spectra(),
+                self._library_reader.get_all_spectra(),
                 desc='Library spectra added', leave=False, unit='spectra',
                 smoothing=0.1):
             charge = lib_spectrum.precursor_charge
@@ -252,12 +252,12 @@ class SpectralLibrary:
             threshold (specified in the config).
         """
         if mode == 'std':
-            logging.debug('Identify the query spectra using a standard search'
+            logging.debug('Identify the query spectra using a standard search '
                           '(Δm = %s %s)',
                           config.precursor_tolerance_mass,
                           config.precursor_tolerance_mode)
         elif mode == 'open':
-            logging.debug('Identify the query spectra using an open search'
+            logging.debug('Identify the query spectra using an open search '
                           '(Δm = %s %s)',
                           config.precursor_tolerance_mass_open,
                           config.precursor_tolerance_mode_open)

@@ -55,7 +55,7 @@ def main():
                 metadata[line_split[1]] = line_split[2]
             else:
                 break   # metadata lines should be on top
-    psms = reader.read_mztab_psms(args.mztab_filename)
+    psms = reader.read_mztab_ssms(args.mztab_filename)
     # make sure the PSM id's are strings
     psms.index = psms.index.map(str)
 
