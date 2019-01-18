@@ -377,7 +377,7 @@ class SpectralLibrary:
         query_mzs = np.empty((len(query_spectra), 1), float)
         for i, query_spectrum in enumerate(query_spectra):
             query_mzs[i] = query_spectrum.precursor_mz
-        library_mzs = library_candidates['precursor_mass'].reshape((1, -1))
+        library_mzs = library_candidates['precursor_mz'].reshape((1, -1))
         if tol_mode == 'Da':
             candidate_filters = ne.evaluate(
                 'abs(query_mzs - library_mzs) * charge <= tol_val')

@@ -1,5 +1,6 @@
-# distutils: language = c++
-# distutils: sources = SpectrumMatch.cpp
+# distutils: language=c++
+# distutils: sources=SpectrumMatch.cpp
+# cython: language_level=3
 
 import cython
 import numpy as np
@@ -9,7 +10,7 @@ from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 
 
-cdef extern from 'SpectrumMatch.h' namespace 'ann_solo':
+cdef extern from 'SpectrumMatch.h' namespace 'ann_solo' nogil:
     cdef cppclass Spectrum:
         Spectrum(double, unsigned int, unsigned int,
                  np.float32_t*, np.float32_t*, np.uint8_t*) except +

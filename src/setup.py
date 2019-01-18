@@ -24,13 +24,18 @@ URL = 'https://github.com/bittremieux/ANN-SoLo'
 LICENSE = 'Apache 2.0'
 
 
-compile_args = ['-O3', '-march=native', '-ffast-math',
-                '-fno-associative-math', '-std=c++14']
-ext_module = setuptools.Extension(
+c_args = ['-O3', '-march=native', '-ffast-math', '-fno-associative-math']
+cpp_args = ['-O3', '-march=native', '-ffast-math', '-fno-associative-math',
+            '-std=c++14']
+ext_spectrum_match = setuptools.Extension(
     'ann_solo.spectrum_match',
     ['ann_solo/spectrum_match.pyx', 'ann_solo/SpectrumMatch.cpp'],
-    language='c++', extra_compile_args=compile_args,
-    extra_link_args=compile_args, include_dirs=[np.get_include()])
+    language='c++', extra_compile_args=cpp_args,
+    extra_link_args=cpp_args, include_dirs=[np.get_include()])
+ext_parsers = setuptools.Extension(
+    'ann_solo.parsers', ['ann_solo/parsers.pyx'], extra_compile_args=c_args,
+    extra_link_args=c_args, include_dirs=[np.get_include()]
+)
 
 cmdclass = {}
 if use_cython:
@@ -85,5 +90,5 @@ setuptools.setup(
     setup_requires=[
         'Cython',
         'numpy'],
-    ext_modules=[ext_module],
+    ext_modules=[ext_spectrum_match, ext_parsers],
 )

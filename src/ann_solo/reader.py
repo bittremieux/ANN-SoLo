@@ -4,7 +4,6 @@ import logging
 import mmap
 import os
 import pickle
-import struct
 from functools import lru_cache
 from typing import Iterator
 from typing import List
@@ -17,6 +16,7 @@ import pandas as pd
 import tqdm
 from pyteomics import mgf
 
+from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import Spectrum
 
 
@@ -24,8 +24,6 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
     """
     Read spectra from a spectral library file.
     """
-
-    _max_cache_size = None
 
     _supported_extensions = []
 
@@ -112,7 +110,6 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         else:
             return f'{os.path.splitext(self._filename)[0]}.spcfg'
 
-    @abc.abstractmethod
     def _create_config(self) -> None:
         """
         Create a new configuration file for the spectral library.
@@ -123,7 +120,41 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         contains the settings used to construct this spectral library to make
         sure these match the runtime settings.
         """
+        logging.info('Create the spectral library configuration for file %s',
+                     self._filename)
+
         self.is_recreated = True
+
+        # Read all the spectra in the spectral library.
+        temp_info = collections.defaultdict(
+            lambda: {'id': [], 'precursor_mz': []})
+        offsets = {}
+        with self as lib_reader:
+            for spectrum, offset in tqdm.tqdm(lib_reader.get_all_spectra(),
+                                              desc='Library spectra read',
+                                              unit='spectra'):
+                # Store the spectrum information for easy retrieval.
+                info_charge = temp_info[spectrum.precursor_charge]
+                info_charge['id'].append(spectrum.identifier)
+                info_charge['precursor_mz'].append(spectrum.precursor_mz)
+                offsets[spectrum.identifier] = offset
+        self.spec_info = {
+            'charge': {
+                charge: {
+                    'id': np.asarray(charge_info['id'], np.uint32),
+                    'precursor_mz': np.asarray(charge_info['precursor_mz'],
+                                               np.float32)
+                } for charge, charge_info in temp_info.items()},
+            'offset': offsets}
+
+        # Store the configuration.
+        config_filename = self._get_config_filename()
+        logging.debug('Save the spectral library configuration to file %s',
+                      config_filename)
+        joblib.dump(
+            (os.path.basename(self._filename), self.spec_info,
+             self._config_hash),
+            config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
     @abc.abstractmethod
     def open(self) -> None:
@@ -193,14 +224,12 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         return 'null'
 
 
-class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
+class SptxtReader(SpectralLibraryReader):
     """
-    Read spectra from a SpectraST spectral library file.
+    Read spectra from a SpectraST spectral library .sptxt file.
     """
 
-    _max_cache_size = None
-
-    _supported_extensions = []
+    _supported_extensions = ['.sptxt']
 
     def __init__(self, filename: str, config_hash: str = None) -> None:
         super().__init__(filename, config_hash)
@@ -225,53 +254,7 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()
 
-    def _create_config(self) -> None:
-        """
-        Create a new configuration file for the spectral library.
-
-        The configuration file contains for each spectrum in the spectral
-        library its offset for quick random-access reading, and its precursor
-        m/z for filtering using a precursor mass window. Finally, it also
-        contains the settings used to construct this spectral library to make
-        sure these match the runtime settings.
-        """
-        super()._create_config()
-
-        logging.info('Create the spectral library configuration for file %s',
-                     self._filename)
-
-        # Read all the spectra in the spectral library.
-        temp_info = collections.defaultdict(
-            lambda: {'id': [], 'precursor_mz': []})
-        offsets = {}
-        with self as lib_reader:
-            for spectrum, offset in tqdm.tqdm(lib_reader.get_all_spectra(),
-                                              desc='Library spectra read',
-                                              unit='spectra'):
-                # Store the spectrum information for easy retrieval.
-                info_charge = temp_info[spectrum.precursor_charge]
-                info_charge['id'].append(spectrum.identifier)
-                info_charge['precursor_mz'].append(spectrum.precursor_mz)
-                offsets[spectrum.identifier] = offset
-        self.spec_info = {
-            'charge': {
-                charge: {
-                    'id': np.asarray(charge_info['id'], np.uint32),
-                    'precursor_mz': np.asarray(charge_info['precursor_mz'],
-                                               np.float32)
-                } for charge, charge_info in temp_info.items()},
-            'offset': offsets}
-
-        # Store the configuration.
-        config_filename = self._get_config_filename()
-        logging.debug('Save the spectral library configuration to file %s',
-                      config_filename)
-        joblib.dump(
-            (os.path.basename(self._filename), self.spec_info,
-             self._config_hash),
-            config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
-
-    @lru_cache(maxsize=_max_cache_size)
+    @lru_cache(maxsize=None)
     def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
             -> Spectrum:
         """
@@ -299,18 +282,6 @@ class SpectraSTReader(SpectralLibraryReader, metaclass=abc.ABCMeta):
             spectrum.process_peaks()
 
         return spectrum
-
-    @abc.abstractmethod
-    def _read_spectrum(self) -> Tuple[Spectrum, int]:
-        pass
-
-
-class SptxtReader(SpectraSTReader):
-    """
-    Read spectra from a SpectraST spectral library .sptxt file.
-    """
-
-    _supported_extensions = ['.sptxt']
 
     def get_all_spectra(self) -> Iterator[Tuple[Spectrum, int]]:
         """
@@ -400,12 +371,58 @@ class SptxtReader(SpectraSTReader):
         self._mm.readline()
 
 
-class SplibReader(SpectraSTReader):
+class SplibReader(SpectralLibraryReader):
     """
     Read spectra from a SpectraST spectral library .splib file.
     """
 
     _supported_extensions = ['.splib']
+
+    def __init__(self, filename: str, config_hash: str = None) -> None:
+        super().__init__(filename, config_hash)
+        self._parser = None
+
+    def open(self) -> None:
+        self._parser = SplibParser(self._filename.encode())
+
+    def close(self) -> None:
+        if self._parser is not None:
+            del self._parser
+
+    def __enter__(self) -> SpectralLibraryReader:
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    @lru_cache(maxsize=None)
+    def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
+            -> Spectrum:
+        """
+        Read the spectrum with the specified identifier from the spectral
+        library file.
+
+        Parameters
+        ----------
+        spec_id : int
+            The identifier of the spectrum in the spectral library file.
+        process_peaks : bool, optional
+            Flag whether to process the spectrum's peaks or not
+            (the default is false to not process the spectrum's peaks).
+
+        Returns
+        -------
+        Spectrum
+            The spectrum from the spectral library file with the specified
+            identifier.
+        """
+        spectrum = self._parser.read_spectrum(
+            self.spec_info['offset'][spec_id])[0]
+        if process_peaks:
+            spectrum.process_peaks()
+
+        return spectrum
 
     def get_all_spectra(self) -> Iterator[Tuple[Spectrum, int]]:
         """
@@ -421,68 +438,12 @@ class SplibReader(SpectraSTReader):
             An iterator of all spectra along with their offset in the spectral
             library file.
         """
-        self._mm.seek(0)
+        self._parser.seek_first_spectrum()
         try:
-            # Read splib preamble.
-            # SpectraST version used to create the splib file.
-            version = struct.unpack('i', self._mm.read(4))[0]
-            sub_version = struct.unpack('i', self._mm.read(4))[0]
-            # splib information.
-            filename = self._mm.readline()
-            num_lines = struct.unpack('i', self._mm.read(4))[0]
-            for _ in range(num_lines):
-                self._mm.readline()
-
-            # Read all spectra.
             while True:
-                yield self._read_spectrum()
+                yield self._parser.read_spectrum()
         except StopIteration:
             return
-
-    def _read_spectrum(self) -> Tuple[Spectrum, int]:
-        file_offset = self._mm.tell()
-
-        # libId (int): 4 bytes
-        read_bytes = self._mm.read(4)
-        if not read_bytes:  # EOF: no more spectra to be read
-            raise StopIteration
-        identifier = struct.unpack('i', read_bytes)[0]
-        # fullName: \n terminated string
-        name = self._mm.readline().strip()
-        peptide = name[name.find(b'.') + 1: name.rfind(b'.')].decode(
-            encoding='UTF-8')
-        precursor_charge =\
-            int(name[name.rfind(b'/') + 1: name.rfind(b'/') + 2])
-        # precursor m/z (double): 8 bytes
-        precursor_mz = struct.unpack('d', self._mm.read(8))[0]
-        # status: \n terminated string
-        status = self._mm.readline().strip()
-        # numPeaks (int): 4 bytes
-        num_peaks = struct.unpack('i', self._mm.read(4))[0]
-        # Read all peaks.
-        mz = np.empty((num_peaks,), np.float32)
-        intensity = np.empty((num_peaks,), np.float32)
-        annotation = np.empty((num_peaks,), object)
-        for i in range(num_peaks):
-            # m/z (double): 8 bytes
-            mz[i] = np.float32(struct.unpack('d', self._mm.read(8))[0])
-            # intensity (double): 8 bytes
-            intensity[i] = np.float32(struct.unpack('d', self._mm.read(8))[0])
-            # annotation: \n terminated string
-            annotation_str = self._mm.readline().strip()
-            if not _ignore_annotations:
-                annotation[i] = _parse_annotation(annotation_str)
-            # info: \n terminated string
-            info = self._mm.readline()
-        # comment: \n terminated string
-        comment = self._mm.readline()
-        is_decoy = b' Remark=DECOY_' in comment
-
-        spectrum = Spectrum(identifier, precursor_mz, precursor_charge, None,
-                            peptide, is_decoy)
-        spectrum.set_peaks(mz, intensity, annotation)
-
-        return spectrum, file_offset
 
 
 def get_spectral_library_reader(filename: str, config_hash: str = None)\
