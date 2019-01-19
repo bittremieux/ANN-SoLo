@@ -3,12 +3,13 @@
 
 import numpy as np
 cimport numpy as np
-from libc.stdlib cimport atoi, free, malloc
+from libc.stdlib cimport malloc
 from libc.stdint cimport uint32_t
-from libc.string cimport memcpy, strstr, strtok
+from libc.string cimport memcpy
 from libcpp.string cimport string
 from libcpp.vector cimport vector
-from posix.fcntl cimport open, O_RDONLY
+from posix.fcntl cimport open
+from posix.fcntl cimport O_RDONLY
 from posix.unistd cimport off_t
 
 from ann_solo.spectrum import Spectrum
@@ -48,7 +49,8 @@ cdef class SplibParser:
         fstat(fd, &statbuf)
         self._size = statbuf.st_size
         # Memory map the spectral library file.
-        self._mmap = <char*>mmap(NULL, self._size, PROT_READ, MAP_SHARED, fd, 0)
+        self._mmap = <char*>mmap(NULL, self._size, PROT_READ, MAP_SHARED, fd,
+                                 0)
         self._pos = 0
 
     def __dealloc__(self):
@@ -66,16 +68,14 @@ cdef class SplibParser:
         self._pos += 8
         return result
 
-    cdef char* _read_line(self) nogil:
+    cdef string _read_line(self) nogil:
         cdef size_t offset = 0
         while self._pos + offset < self._size:
             if self._mmap[self._pos + offset] == b'\n':
                 offset += 1
                 break
             offset += 1
-        cdef char *result = <char*>malloc((offset + 1) * sizeof(char))
-        memcpy(result, self._mmap + self._pos, offset)
-        result[offset] = b'\0'
+        cdef string result = string(self._mmap + self._pos, offset)
         self._pos += offset
         return result
 
@@ -102,6 +102,7 @@ cdef class SplibParser:
         cdef float *intensity
         cdef vector[(string, int)] annotation
         cdef bint is_decoy
+        cdef size_t peptide_pos, peptide_len, charge_pos, charge_len
 
         if offset is not None and offset >= 0:
             self._pos = offset
@@ -115,10 +116,13 @@ cdef class SplibParser:
             identifier = self._read_int()
             # Peptide sequence.
             name = self._read_line()
-            strtok(name, '.')
-            peptide = strtok(NULL, '.')
-            strtok(NULL, '/')
-            precursor_charge = atoi(strtok(NULL, ' '))
+            peptide_pos = name.find(b'.') + 1
+            peptide_len = name.find(b'.', peptide_pos) - peptide_pos
+            peptide = name.substr(peptide_pos, peptide_len)
+            charge_pos = name.find(b'/', peptide_pos + peptide_len) + 1
+            charge_len = name.find(b' ', charge_pos)
+            precursor_charge = stoi(name.substr(charge_pos, charge_len), NULL,
+                                    10)
             # Precursor m/z.
             precursor_mz = self._read_double()
             # Status.
@@ -131,13 +135,9 @@ cdef class SplibParser:
             for i in range(num_peaks):
                 mz[i] = <float>self._read_double()
                 intensity[i] = <float>self._read_double()
-                line = self._read_line()
-                annotation.push_back(parse_annotation(line))
-                free(line)
+                annotation.push_back(parse_annotation(self._read_line()))
                 self._skip_line()
-            line = self._read_line()
-            is_decoy = strstr(line, ' Remark=DECOY_') != NULL
-            free(line)
+            is_decoy = self._read_line().find(b' Remark=DECOY_') != <size_t>-1
 
         annotation_p = np.full((num_peaks,), None, object)
         for i in range(num_peaks):
@@ -156,15 +156,15 @@ cdef class SplibParser:
 
 cdef (string, int) parse_annotation(string raw) nogil:
     cdef size_t ion_index_end
-    cdef char ion_type
+
+    cdef char ion_type = raw.at(0)
     cdef int ion_index = -1
     cdef int charge = -1
     # Discard peaks that don't correspond to typical ion types.
-    ion_type = raw.at(0)
     if ion_type == b'a' or ion_type == b'b' or ion_type == b'y':
         # The ion index is the subsequent numeric part.
         # `find_first_not_of` returns the position of the first character that
-        # does not match or the end of the string.
+        # does not match or `npos` (-1).
         ion_index_end = raw.find_first_not_of(b'1234567890', 1)
         ion_index = stoi(raw.substr(1, ion_index_end), NULL, 10)
         # The ion is unmodified if the next character indicates the end of the
