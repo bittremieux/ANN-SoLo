@@ -1,10 +1,13 @@
+# distutils: language=c++
 # cython: language_level=3
 
 import numpy as np
 cimport numpy as np
 from libc.stdlib cimport atoi, free, malloc
-from libc.stdint cimport uint8_t, uint32_t
+from libc.stdint cimport uint32_t
 from libc.string cimport memcpy, strstr, strtok
+from libcpp.string cimport string
+from libcpp.vector cimport vector
 from posix.fcntl cimport open, O_RDONLY
 from posix.unistd cimport off_t
 
@@ -27,15 +30,14 @@ cdef extern from 'sys/stat.h' nogil:
 cdef extern from 'string.h' nogil:
     void *memchr(const void *s, int c, size_t n)
 
-
-cdef struct PeakAnnotation:
-    char ion_type
-    uint8_t ion_index
+cdef extern from '<string>' namespace 'std' nogil:
+    int stoi(const string &stri, size_t *idx, int base)
+    string to_string(int val)
 
 
 cdef class SplibParser:
 
-    cdef void *_mmap
+    cdef char *_mmap
     cdef size_t _size
     cdef size_t _pos
 
@@ -46,7 +48,7 @@ cdef class SplibParser:
         fstat(fd, &statbuf)
         self._size = statbuf.st_size
         # Memory map the spectral library file.
-        self._mmap = mmap(NULL, self._size, PROT_READ, MAP_SHARED, fd, 0)
+        self._mmap = <char*>mmap(NULL, self._size, PROT_READ, MAP_SHARED, fd, 0)
         self._pos = 0
 
     def __dealloc__(self):
@@ -67,7 +69,7 @@ cdef class SplibParser:
     cdef char* _read_line(self) nogil:
         cdef size_t offset = 0
         while self._pos + offset < self._size:
-            if (<char*>self._mmap)[self._pos + offset] == b'\n':
+            if self._mmap[self._pos + offset] == b'\n':
                 offset += 1
                 break
             offset += 1
@@ -80,7 +82,7 @@ cdef class SplibParser:
     cdef void _skip_line(self) nogil:
         cdef size_t offset = 0
         while self._pos + offset < self._size:
-            if (<char*>self._mmap)[self._pos + offset] == b'\n':
+            if self._mmap[self._pos + offset] == b'\n':
                 offset += 1
                 break
             offset += 1
@@ -96,10 +98,10 @@ cdef class SplibParser:
 
     def read_spectrum(self, offset: int = None):
         cdef uint32_t num_peaks
-        cdef double *mz
-        cdef double *intensity
-        cdef PeakAnnotation *annotation
-        cdef uint8_t is_decoy
+        cdef float *mz
+        cdef float *intensity
+        cdef vector[(string, int)] annotation
+        cdef bint is_decoy
 
         if offset is not None and offset >= 0:
             self._pos = offset
@@ -124,37 +126,52 @@ cdef class SplibParser:
             # Number of peaks.
             num_peaks = self._read_int()
             # Read all peaks.
-            # TODO: Is it possible to directly create NumPy arrays without
-            #       Python interaction?
-            mz = <double*>malloc(num_peaks * sizeof(double))
-            intensity = <double*>malloc(num_peaks * sizeof(double))
-            annotation = <PeakAnnotation*>malloc(
-                num_peaks * sizeof(PeakAnnotation))
+            mz = <float*>malloc(num_peaks * sizeof(float))
+            intensity = <float*>malloc(num_peaks * sizeof(float))
             for i in range(num_peaks):
-                mz[i] = self._read_double()
-                intensity[i] = self._read_double()
-                # TODO: Parse peak annotations.
-                self._skip_line()
-                # annotation_str = self._mm.readline().strip()
-                # if not _ignore_annotations:
-                #     annotation[i] = _parse_annotation(annotation_str)
+                mz[i] = <float>self._read_double()
+                intensity[i] = <float>self._read_double()
+                line = self._read_line()
+                annotation.push_back(parse_annotation(line))
+                free(line)
                 self._skip_line()
             line = self._read_line()
             is_decoy = strstr(line, ' Remark=DECOY_') != NULL
             free(line)
 
-        mz_p = np.empty((num_peaks,), np.float32)
-        intensity_p = np.empty((num_peaks,), np.float32)
+        annotation_p = np.full((num_peaks,), None, object)
         for i in range(num_peaks):
-            mz_p[i] = mz[i]
-            intensity_p[i] = intensity[i]
-
-        free(mz)
-        free(intensity)
-        free(annotation)
+            if annotation[i][1] != -1:
+                annotation_p[i] = (annotation[i][0].decode(), annotation[i][1])
+        annotation.clear()
 
         spectrum = Spectrum(identifier, precursor_mz, precursor_charge, None,
                             peptide.decode(), is_decoy)
-        spectrum.set_peaks(mz_p, intensity_p, None)
+        spectrum.set_peaks(np.asarray(<np.float32_t[:num_peaks]> mz),
+                           np.asarray(<np.float32_t[:num_peaks]> intensity),
+                           annotation_p)
 
         return spectrum, spectrum_offset
+
+
+cdef (string, int) parse_annotation(string raw) nogil:
+    cdef size_t ion_index_end
+    cdef char ion_type
+    cdef int ion_index = -1
+    cdef int charge = -1
+    # Discard peaks that don't correspond to typical ion types.
+    ion_type = raw.at(0)
+    if ion_type == b'a' or ion_type == b'b' or ion_type == b'y':
+        # The ion index is the subsequent numeric part.
+        # `find_first_not_of` returns the position of the first character that
+        # does not match or the end of the string.
+        ion_index_end = raw.find_first_not_of(b'1234567890', 1)
+        ion_index = stoi(raw.substr(1, ion_index_end), NULL, 10)
+        # The ion is unmodified if the next character indicates the end of the
+        # peak annotation or a specified charge.
+        if raw.at(ion_index_end + 1) == b'/':
+            charge = 1
+        elif raw.at(ion_index_end + 1) == b'^':
+            charge = stoi(raw.substr(ion_index_end + 1, ion_index_end + 2),
+                          NULL, 10)
+    return (string(1, ion_type) + to_string(ion_index), charge)

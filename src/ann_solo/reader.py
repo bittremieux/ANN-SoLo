@@ -511,41 +511,6 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
                                 f'formats: {", ".join(supported_extensions)})')
 
 
-# Possible peak annotations that will be parsed.
-_annotation_ion_types = frozenset(b'abcxyz')
-# Whether or not to parse the peak annotations.
-_ignore_annotations = False
-
-
-# TODO: Make a PeakParser class out of this?
-def _parse_annotation(raw: bytes) -> Union[Tuple[str, int], None]:
-    # Discard peaks that don't correspond to a supported ion type.
-    if raw[0] in _annotation_ion_types:
-        # Take the first possible annotation.
-        first_annotation = raw.split(b',', 1)[0]
-        # Discard isotope peaks.
-        if b'i' not in first_annotation:
-            ion_sep = first_annotation.find(b'/')
-            if ion_sep == -1:
-                ion_sep = len(first_annotation)
-            first_annotation_substring = first_annotation[:ion_sep]
-            has_mod = (b'-' in first_annotation_substring or
-                       b'+' in first_annotation_substring)
-            # Discard modified peaks.
-            if not has_mod:
-                charge_sep = first_annotation.find(b'^')
-                if charge_sep != -1:
-                    ion_type = first_annotation[:charge_sep].decode('UTF-8')
-                    charge = int(first_annotation[charge_sep + 1: ion_sep])
-                else:
-                    ion_type = first_annotation[:ion_sep].decode('UTF-8')
-                    charge = 1
-
-                return ion_type, charge
-
-    return None
-
-
 def read_mgf(filename: str) -> Iterator[Spectrum]:
     """
     Read all spectra from the given mgf file.
