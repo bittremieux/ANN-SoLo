@@ -60,7 +60,7 @@ class SpectralLibrary:
             isn't supported.
         """
         try:
-            self._library_reader = reader.get_spectral_library_reader(
+            self._library_reader = reader.SpectralLibraryReader(
                 filename, self._get_hyperparameter_hash())
             self._library_reader.open()
         except FileNotFoundError as e:

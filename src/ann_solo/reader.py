@@ -1,14 +1,11 @@
-import abc
 import collections
 import logging
-import mmap
 import os
 import pickle
 from functools import lru_cache
 from typing import Iterator
 from typing import List
 from typing import Tuple
-from typing import Union
 
 import joblib
 import numpy as np
@@ -20,12 +17,12 @@ from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import Spectrum
 
 
-class SpectralLibraryReader(metaclass=abc.ABCMeta):
+class SpectralLibraryReader:
     """
-    Read spectra from a spectral library file.
+    Read spectra from a SpectraST spectral library .splib file.
     """
 
-    _supported_extensions = []
+    _supported_extensions = ['.splib']
 
     is_recreated = False
 
@@ -58,6 +55,7 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
         """
         self._filename = filename
         self._config_hash = config_hash
+        self._parser = None
         do_create = False
 
         # Test if the given spectral library file is in a supported format.
@@ -156,232 +154,6 @@ class SpectralLibraryReader(metaclass=abc.ABCMeta):
              self._config_hash),
             config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
-    @abc.abstractmethod
-    def open(self) -> None:
-        pass
-
-    @abc.abstractmethod
-    def close(self) -> None:
-        pass
-
-    @abc.abstractmethod
-    def __enter__(self) -> 'SpectralLibraryReader':
-        return self
-
-    @abc.abstractmethod
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        pass
-
-    @abc.abstractmethod
-    def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
-            -> Spectrum:
-        """
-        Read the spectrum with the specified identifier from the spectral
-        library file.
-
-        Parameters
-        ----------
-        spec_id : int
-            The identifier of the spectrum in the spectral library file.
-        process_peaks : bool, optional
-            Flag whether to process the spectrum's peaks or not
-            (the default is false to not process the spectrum's peaks).
-
-        Returns
-        -------
-        Spectrum
-            The spectrum from the spectral library file with the specified
-            identifier.
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_all_spectra(self) -> Iterator[Tuple[Spectrum, int]]:
-        """
-        Generates all spectra from the spectral library file.
-
-        For each individual spectrum a tuple consisting of the spectrum and
-        some additional information as a nested tuple (containing on the type
-        of spectral library file) are returned.
-
-        Returns
-        -------
-        Iterator[Tuple[Spectrum, int]]
-            An iterator of all spectra along with their offset in the spectral
-            library file.
-        """
-        pass
-
-    def get_version(self) -> str:
-        """
-        Gives the spectral library version.
-
-        Returns
-        -------
-        str
-            A string representation of the spectral library version.
-        """
-        return 'null'
-
-
-class SptxtReader(SpectralLibraryReader):
-    """
-    Read spectra from a SpectraST spectral library .sptxt file.
-    """
-
-    _supported_extensions = ['.sptxt']
-
-    def __init__(self, filename: str, config_hash: str = None) -> None:
-        super().__init__(filename, config_hash)
-
-        self._file = None
-        self._mm = None
-
-    def open(self) -> None:
-        self._file = open(self._filename, 'rb')
-        self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-
-    def close(self) -> None:
-        if self._mm is not None:
-            self._mm.close()
-        if self._file is not None:
-            self._file.close()
-
-    def __enter__(self) -> SpectralLibraryReader:
-        self.open()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self.close()
-
-    @lru_cache(maxsize=None)
-    def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
-            -> Spectrum:
-        """
-        Read the spectrum with the specified identifier from the spectral
-        library file.
-
-        Parameters
-        ----------
-        spec_id : int
-            The identifier of the spectrum in the spectral library file.
-        process_peaks : bool, optional
-            Flag whether to process the spectrum's peaks or not
-            (the default is false to not process the spectrum's peaks).
-
-        Returns
-        -------
-        Spectrum
-            The spectrum from the spectral library file with the specified
-            identifier.
-        """
-        self._mm.seek(self.spec_info['offset'][spec_id])
-
-        spectrum = self._read_spectrum()[0]
-        if process_peaks:
-            spectrum.process_peaks()
-
-        return spectrum
-
-    def get_all_spectra(self) -> Iterator[Tuple[Spectrum, int]]:
-        """
-        Generates all spectra from the spectral library file.
-
-        For each individual spectrum a tuple consisting of the spectrum and
-        some additional information as a nested tuple (containing on the type
-        of spectral library file) are returned.
-
-        Returns
-        -------
-        Iterator[Tuple[Spectrum, int]]
-            An iterator of all spectra along with their offset in the spectral
-            library file.
-        """
-        self._mm.seek(0)
-        try:
-            while True:
-                yield self._read_spectrum()
-        except StopIteration:
-            return
-
-    def _read_spectrum(self) -> Tuple[Spectrum, int]:
-        # Find the next spectrum in the file.
-        file_offset = self._mm.tell()
-        line = self._read_line()
-        while b'Name: ' not in line:
-            file_offset = self._mm.tell()
-            line = self._read_line()
-
-        # Read the spectrum.
-        # Identification information.
-        name = line.strip()[6:]
-        sep_idx = name.find(b'/')
-        peptide = name[:sep_idx].decode(encoding='UTF-8')
-        precursor_charge = int(name[sep_idx + 1:])
-        identifier = int(self._read_line().strip()[7:])
-        self._skip_line()   # mw = float(self._read_line().strip()[4:])
-        precursor_mz = float(self._read_line().strip()[13:])
-        self._skip_line()  # status = self._read_line().strip()
-        self._skip_line()  # full_name = self._read_line().strip()
-        comment = self._read_line().strip()
-        is_decoy = b' Remark=DECOY_' in comment
-
-        spectrum = Spectrum(identifier, precursor_mz, precursor_charge,
-                            None, peptide, is_decoy)
-
-        # Read the peaks of the spectrum.
-        num_peaks = int(self._read_line().strip()[10:])
-        mz = np.empty((num_peaks,), np.float32)
-        intensity = np.empty((num_peaks,), np.float32)
-        annotation = np.empty((num_peaks,), object)
-        for i in range(num_peaks):
-            peak = self._read_line().strip().split(b'\t')
-            mz[i] = np.float32(peak[0])
-            intensity[i] = np.float32(peak[1])
-            if not _ignore_annotations:
-                annotation[i] = _parse_annotation(peak[2])
-        spectrum.set_peaks(mz, intensity, annotation)
-
-        return spectrum, file_offset
-
-    def _read_line(self) -> bytes:
-        """
-        Read the next line from the spectral library file.
-
-        Returns
-        -------
-        bytes
-            The next line in the spectral library file.
-
-        Raises
-        ------
-        StopIteration
-            If we are at the end of the file.
-        """
-        line = self._mm.readline()
-        if line is not None:
-            return line
-        else:
-            raise StopIteration
-
-    def _skip_line(self) -> None:
-        """
-        Skip the next line in the spectral library file.
-        """
-        self._mm.readline()
-
-
-class SplibReader(SpectralLibraryReader):
-    """
-    Read spectra from a SpectraST spectral library .splib file.
-    """
-
-    _supported_extensions = ['.splib']
-
-    def __init__(self, filename: str, config_hash: str = None) -> None:
-        super().__init__(filename, config_hash)
-        self._parser = None
-
     def open(self) -> None:
         self._parser = SplibParser(self._filename.encode())
 
@@ -389,7 +161,7 @@ class SplibReader(SpectralLibraryReader):
         if self._parser is not None:
             del self._parser
 
-    def __enter__(self) -> SpectralLibraryReader:
+    def __enter__(self) -> 'SpectralLibraryReader':
         self.open()
         return self
 
@@ -445,47 +217,16 @@ class SplibReader(SpectralLibraryReader):
         except StopIteration:
             return
 
+    def get_version(self) -> str:
+        """
+        Gives the spectral library version.
 
-def get_spectral_library_reader(filename: str, config_hash: str = None)\
-        -> SpectralLibraryReader:
-    """
-    Get a spectral library reader instance based on the given spectral library
-    file and ANN configuration code.
-
-    If both an sptxt and splib SpectraST spectral library are available the
-    splib file is preferred.
-
-    Parameters
-    ----------
-    filename : str
-        The spectral library file name.
-    config_hash : str, optional
-        The ANN configuration code pertaining to specific ANN hyperparameters.
-
-    Returns
-    -------
-    SpectralLibraryReader
-        A reader suitable for the given spectral library.
-
-    Raises
-    ------
-    FileNotFoundError
-        - If the file name does not exist.
-        - If the file name does not have one of the supported extensions.
-    """
-    if not os.path.isfile(filename):
-        raise FileNotFoundError(f'Spectral library file {filename} not found')
-    verify_extension(['.splib', '.sptxt'], filename)
-
-    base_filename, ext = os.path.splitext(filename)
-    splib_exists = os.path.isfile(base_filename + '.splib')
-    sptxt_exists = os.path.isfile(base_filename + '.sptxt')
-    if splib_exists:
-        # Prefer an splib file because it is faster to read.
-        return SplibReader(base_filename + '.splib', config_hash)
-    elif sptxt_exists:
-        # Fall back to an sptxt file.
-        return SptxtReader(base_filename + '.sptxt', config_hash)
+        Returns
+        -------
+        str
+            A string representation of the spectral library version.
+        """
+        return 'null'
 
 
 def verify_extension(supported_extensions: List[str], filename: str) -> None:

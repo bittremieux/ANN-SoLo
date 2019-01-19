@@ -90,7 +90,7 @@ def main():
     score = psm['search_engine_score[1]']
 
     # read library and query spectrum
-    with reader.get_spectral_library_reader(library_filename) as lib_reader:
+    with reader.SpectralLibraryReader(library_filename) as lib_reader:
         library_spectrum = lib_reader.get_spectrum(library_id, True)
     query_spectrum = None
     for spec in reader.read_mgf(query_filename):
