@@ -174,9 +174,10 @@ class Config:
 
         # Number of candidates to retrieve from the ANN index for each query.
         self._parser.add_argument(
-            '--num_candidates', default=5000, type=int,
+            '--num_candidates', default=1024, type=int,
             help='number of candidates to retrieve from the ANN index for each'
-                 ' query (default: %(default)s)')
+                 ' query (default: %(default)s), maximum 1024 when using GPU '
+                 'indexing')
 
         # Custom FAISS parameters.
         # Number of lists in the IVF.
@@ -188,7 +189,13 @@ class Config:
         self._parser.add_argument(
             '--num_probe', default=10, type=int,
             help='number of partitions in the ANN index to inspect during '
-                 'querying (default: %(default)s)')
+                 'querying (default: %(default)s), maximum 1024 when using '
+                 'GPU indexing')
+        # Don't try to use the GPU.
+        self._parser.add_argument(
+            '--no_gpu', action='store_true',
+            help="don't use the GPU for ANN searching (default: GPU is used "
+                 "if available)")
 
         # Filled in 'parse', contains the specified settings.
         self._namespace = None

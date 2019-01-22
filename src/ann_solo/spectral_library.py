@@ -67,6 +67,22 @@ class SpectralLibrary:
             logging.error(e)
             raise
 
+        self._use_gpu = not config.no_gpu and faiss.get_num_gpus()
+        if self._use_gpu:
+            self._res = faiss.StandardGpuResources()
+            # GPU indexes can only handle maximum 1024 probes and neighbors.
+            # https://github.com/facebookresearch/faiss/wiki/Faiss-on-the-GPU#limitations
+            if config.num_probe > 1024:
+                logging.warning('Using num_probe=1024 (maximum supported '
+                                'value on the GPU), %d was supplied',
+                                config.num_probe)
+                self._num_probe = 1024
+            if config.num_candidates > 1024:
+                logging.warning('Using num_candidates=1024 (maximum supported '
+                                'value on the GPU), %d was supplied',
+                                config.num_candidates)
+                self._num_candidates = 1024
+
         self._current_index = None, None
 
         verify_file_existence = True
@@ -400,7 +416,7 @@ class SpectralLibrary:
                     config.bin_size, config.hash_len, True, query_vectors[i])
             mask = np.zeros_like(candidate_filters)
             for mask_i, ann_filter in zip(mask, ann_index.search(
-                    query_vectors, config.num_candidates)[1]):
+                    query_vectors, self._num_candidates)[1]):
                 mask_i[ann_filter[ann_filter != -1]] = True
             candidate_filters = np.logical_and(candidate_filters, mask)
 
@@ -443,7 +459,13 @@ class SpectralLibrary:
             if self._current_index[0] != charge:
                 logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
-                index.nprobe = config.num_probe
+                if self._use_gpu:
+                    # TODO: Test if we can get an extra speedup using float16.
+                    # co = faiss.GpuClonerOptions()
+                    # co.useFloat16 = True
+                    # index = faiss.index_cpu_to_gpu(self._res, 0, index, co)
+                    index = faiss.index_cpu_to_gpu(self._res, 0, index)
+                index.nprobe = self._num_probe
                 self._current_index = charge, index
 
             return self._current_index[1]
