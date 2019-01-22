@@ -155,7 +155,7 @@ cdef class SplibParser:
 
 
 cdef (string, int) parse_annotation(string raw) nogil:
-    cdef size_t ion_index_end
+    cdef size_t ion_index_end, ion_charge_end
 
     cdef char ion_type = raw.at(0)
     cdef int ion_index = -1
@@ -169,9 +169,11 @@ cdef (string, int) parse_annotation(string raw) nogil:
         ion_index = stoi(raw.substr(1, ion_index_end), NULL, 10)
         # The ion is unmodified if the next character indicates the end of the
         # peak annotation or a specified charge.
-        if raw.at(ion_index_end + 1) == b'/':
+        ion_charge_end = raw.find(b'/', ion_index_end)
+        if ion_charge_end == ion_index_end:
             charge = 1
-        elif raw.at(ion_index_end + 1) == b'^':
-            charge = stoi(raw.substr(ion_index_end + 1, ion_index_end + 2),
+        elif raw.at(ion_index_end) == b'^':
+            charge = stoi(raw.substr(ion_index_end + 1,
+                                     ion_charge_end - ion_index_end - 1),
                           NULL, 10)
     return (string(1, ion_type) + to_string(ion_index), charge)
