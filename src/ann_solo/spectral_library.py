@@ -67,20 +67,22 @@ class SpectralLibrary:
             logging.error(e)
             raise
 
+        self._num_probe = config.num_probe
+        self._num_candidates = config.num_candidates
         self._use_gpu = not config.no_gpu and faiss.get_num_gpus()
         if self._use_gpu:
             self._res = faiss.StandardGpuResources()
             # GPU indexes can only handle maximum 1024 probes and neighbors.
             # https://github.com/facebookresearch/faiss/wiki/Faiss-on-the-GPU#limitations
-            if config.num_probe > 1024:
+            if self._num_probe > 1024:
                 logging.warning('Using num_probe=1024 (maximum supported '
                                 'value on the GPU), %d was supplied',
-                                config.num_probe)
+                                self._num_probe)
                 self._num_probe = 1024
-            if config.num_candidates > 1024:
+            if self._num_candidates > 1024:
                 logging.warning('Using num_candidates=1024 (maximum supported '
                                 'value on the GPU), %d was supplied',
-                                config.num_candidates)
+                                self._num_candidates)
                 self._num_candidates = 1024
 
         self._current_index = None, None
