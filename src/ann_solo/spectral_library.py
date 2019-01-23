@@ -459,6 +459,10 @@ class SpectralLibrary:
         """
         with self._ann_index_lock:
             if self._current_index[0] != charge:
+                # Release memory reserved by the previous index.
+                if self._current_index[1] is not None:
+                    self._current_index[1].reset()
+                # Load the new index.
                 logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
                 if self._use_gpu:
