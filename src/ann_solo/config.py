@@ -179,6 +179,12 @@ class Config:
                  ' query (default: %(default)s), maximum 1024 when using GPU '
                  'indexing')
 
+        # Number of query spectra to process simultaneously.
+        self._parser.add_argument(
+            '--batch_size', default=16384, type=int,
+            help='number of query spectra to process simultaneously '
+                 '(default: %(default)s)')
+
         # Custom FAISS parameters.
         # Number of lists in the IVF.
         self._parser.add_argument(

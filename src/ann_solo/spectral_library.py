@@ -281,21 +281,27 @@ class SpectralLibrary:
                           config.precursor_tolerance_mode_open)
 
         ssms = {}
+        batch_size = config.batch_size
         num_spectra = sum([len(q) for q in query_spectra.values()])
         with tqdm.tqdm(desc='Query spectra processed', total=num_spectra,
                        leave=False, unit='spectra', smoothing=0.1) as pbar:
             for charge, query_spectra_charge in query_spectra.items():
-                for ssm in self._search_batch(query_spectra_charge, charge,
-                                              mode):
-                    # Make sure we only retain the best identification
-                    # (i.e. in case of duplicated spectra
-                    # if the precursor charge was unknown).
-                    if (ssm is not None and
-                            (ssm.identifier not in ssms or
-                             (ssm.search_engine_score >
-                              ssms[ssm.identifier].search_engine_score))):
-                        ssms[ssm.identifier] = ssm
-                    pbar.update(1)
+                for batch_i in range(0, len(query_spectra_charge), batch_size):
+                    query_spectra_batch =\
+                        query_spectra_charge[batch_i:
+                                             min(batch_i + batch_size,
+                                                 len(query_spectra_charge))]
+                    for ssm in self._search_batch(query_spectra_batch, charge,
+                                                  mode):
+                        # Make sure we only retain the best identification
+                        # (i.e. in case of duplicated spectra
+                        # if the precursor charge was unknown).
+                        if (ssm is not None and
+                                (ssm.identifier not in ssms or
+                                 (ssm.search_engine_score >
+                                  ssms[ssm.identifier].search_engine_score))):
+                            ssms[ssm.identifier] = ssm
+                        pbar.update(1)
         # Store the SSMs below the FDR threshold.
         logging.debug('Filter the spectrum—spectrum matches on FDR '
                       '(threshold = %s)', config.fdr)
