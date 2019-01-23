@@ -467,7 +467,9 @@ class SpectralLibrary:
                     # co.useFloat16 = True
                     # index = faiss.index_cpu_to_gpu(self._res, 0, index, co)
                     index = faiss.index_cpu_to_gpu(self._res, 0, index)
-                index.nprobe = self._num_probe
+                    index.setNumProbes(self._num_probe)
+                else:
+                    index.nprobe = self._num_probe
                 self._current_index = charge, index
 
             return self._current_index[1]
