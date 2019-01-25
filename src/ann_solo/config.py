@@ -87,7 +87,7 @@ class Config:
             '--min_peaks', default=10, type=int,
             help='discard spectra with less peaks (default: %(default)s)')
         self._parser.add_argument(
-            '--min_mz_range', default=250, type=int,
+            '--min_mz_range', default=250, type=float,
             help='discard spectra with a smaller mass range '
                  '(default: %(default)s m/z)')
 

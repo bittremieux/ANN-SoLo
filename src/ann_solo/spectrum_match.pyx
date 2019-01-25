@@ -66,35 +66,35 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
     allow_shift_c = allow_shift
 
     cdef vector[Spectrum*] candidates_vec
-    cdef np.float32_t[:] masses, intensities
-    cdef np.uint8_t[:] charges
+    cdef np.float32_t[:] mz, intensity
+    cdef np.uint8_t[:] charge
     cdef unsigned int candidate_index
     cdef double score
     cdef vector[pair[uint, uint]] peak_matches
+
     try:
         # Convert the candidates.
         for candidate in candidates:
-            if not hasattr(candidate, 'charges'):
-                candidate.charges = np.zeros(
-                    len(candidate.annotations), dtype=np.uint8)
-                for index, annotation in enumerate(candidate.annotations):
+            if not hasattr(candidate, 'charge'):
+                candidate.charge = np.zeros(
+                    len(candidate.annotation), dtype=np.uint8)
+                for index, annotation in enumerate(candidate.annotation):
                     if annotation is not None:
-                        candidate.charges[index] = annotation[1]
-            masses = candidate.masses
-            intensities = candidate.intensities
-            charges = candidate.charges
+                        candidate.charge[index] = annotation[1]
+            mz = candidate.mz
+            intensity = candidate.intensity
+            charge = candidate.charge
             candidates_vec.push_back(new Spectrum(
                 candidate.precursor_mz, candidate.precursor_charge,
-                len(candidate.masses),
-                &masses[0], &intensities[0], &charges[0]))
+                len(candidate.mz), &mz[0], &intensity[0], &charge[0]))
 
-        masses = query.masses
-        intensities = query.intensities
-        query.charges = np.zeros(len(query.annotations), dtype=np.uint8)
-        charges = query.charges
+        mz = query.mz
+        intensity = query.intensity
+        query.charge = np.zeros(len(query.annotation), dtype=np.uint8)
+        charge = query.charge
         query_spec = new Spectrum(
-            query.precursor_mz, query.precursor_charge, len(query.masses),
-            &masses[0], &intensities[0], &charges[0])
+            query.precursor_mz, query.precursor_charge, len(query.mz),
+            &mz[0], &intensity[0], &charge[0])
 
         with nogil:
             query_matcher = new SpectrumMatcher()

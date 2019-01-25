@@ -9,8 +9,10 @@ import matplotlib.ticker as mticker
 import numpy as np
 import seaborn as sns
 
-from ann_solo import reader, spectrum_match
+from ann_solo import reader
+from ann_solo import spectrum_match
 from ann_solo.config import config
+from ann_solo.spectrum import process_spectrum
 
 
 sns.set_context('notebook')
@@ -95,8 +97,7 @@ def main():
     query_spectrum = None
     for spec in reader.read_mgf(query_filename):
         if spec.identifier == query_id:
-            query_spectrum = spec
-            query_spectrum.process_peaks()
+            query_spectrum = process_spectrum(spec)
             # make sure that the precursor charge is set for query spectra
             # with a undefined precursor charge
             if query_spectrum.precursor_charge is None:

@@ -11,8 +11,7 @@ from libcpp.vector cimport vector
 from posix.fcntl cimport open
 from posix.fcntl cimport O_RDONLY
 from posix.unistd cimport off_t
-
-from ann_solo.spectrum import Spectrum
+from spectrum_utils.spectrum import MsmsSpectrum
 
 
 cdef extern from 'sys/mman.h' nogil:
@@ -145,11 +144,11 @@ cdef class SplibParser:
                 annotation_p[i] = (annotation[i][0].decode(), annotation[i][1])
         annotation.clear()
 
-        spectrum = Spectrum(identifier, precursor_mz, precursor_charge, None,
-                            peptide.decode(), is_decoy)
-        spectrum.set_peaks(np.asarray(<np.float32_t[:num_peaks]> mz),
-                           np.asarray(<np.float32_t[:num_peaks]> intensity),
-                           annotation_p)
+        spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                                np.asarray(<np.float32_t[:num_peaks]> mz),
+                                np.asarray(<np.float32_t[:num_peaks]>
+                                           intensity), annotation_p,
+                                peptide=peptide.decode(), is_decoy=is_decoy)
 
         return spectrum, spectrum_offset
 

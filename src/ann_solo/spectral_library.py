@@ -13,13 +13,14 @@ import faiss
 import numexpr as ne
 import numpy as np
 import tqdm
+from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo import reader
 from ann_solo import spectrum_match
 from ann_solo import utils
 from ann_solo.config import config
+from ann_solo.spectrum import process_spectrum
 from ann_solo.spectrum import spectrum_to_vector
-from ann_solo.spectrum import Spectrum
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
@@ -150,7 +151,7 @@ class SpectralLibrary:
                 smoothing=0.1):
             charge = lib_spectrum.precursor_charge
             if charge in charge_vectors.keys():
-                spectrum_to_vector(lib_spectrum.process_peaks(),
+                spectrum_to_vector(process_spectrum(lib_spectrum),
                                    config.min_mz, config.max_mz,
                                    config.bin_size, config.hash_len, True,
                                    charge_vectors[charge][i[charge]])
@@ -209,7 +210,7 @@ class SpectralLibrary:
         # TODO: Parallelize query spectrum peak processing?
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
-                leave=False, unit='spectra', smoothing=0.1):
+                leave=False, unit='spectra', smoothing=0.7):
             # For queries with an unknown charge, try all possible charges.
             if query_spectrum.precursor_charge is not None:
                 query_spectra_charge = [query_spectrum]
@@ -220,7 +221,7 @@ class SpectralLibrary:
                     query_spectra_charge[-1].precursor_charge = charge
             for query_spectrum_charge in query_spectra_charge:
                 # Discard low-quality spectra.
-                if query_spectrum_charge.process_peaks().is_valid():
+                if process_spectrum(query_spectrum_charge).is_valid:
                     (query_spectra[query_spectrum_charge.precursor_charge]
                      .append(query_spectrum_charge))
 
@@ -247,7 +248,7 @@ class SpectralLibrary:
 
         return list(identifications.values())
 
-    def _search_cascade(self, query_spectra: Dict[int, List[Spectrum]],
+    def _search_cascade(self, query_spectra: Dict[int, List[MsmsSpectrum]],
                         mode: str) -> Iterator[SpectrumSpectrumMatch]:
         """
         Perform a single level of the cascade search.
@@ -313,7 +314,7 @@ class SpectralLibrary:
                                           config.fdr_tolerance_mode,
                                           config.fdr_min_group_size)
 
-    def _search_batch(self, query_spectra: List[Spectrum],
+    def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\
             -> Iterator[SpectrumSpectrumMatch]:
         """
@@ -353,9 +354,9 @@ class SpectralLibrary:
                     query_spectrum, library_match, score,
                     num_candidates=len(library_candidates))
 
-    def _get_library_candidates(self, query_spectra: List[Spectrum],
+    def _get_library_candidates(self, query_spectra: List[MsmsSpectrum],
                                 charge: int, mode: str)\
-            -> Iterator[List[Spectrum]]:
+            -> Iterator[List[MsmsSpectrum]]:
         """
         Get the library spectra to be matched against the query spectra.
 
@@ -433,7 +434,7 @@ class SpectralLibrary:
             query_candidates = []
             for idx in library_candidates['id'][candidate_filter]:
                 candidate = self._library_reader.get_spectrum(idx, True)
-                if candidate.is_valid():
+                if candidate.is_valid:
                     query_candidates.append(candidate)
             yield query_candidates
 

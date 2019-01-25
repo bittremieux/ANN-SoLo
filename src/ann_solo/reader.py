@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 import tqdm
 from pyteomics import mgf
+from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo.parsers import SplibParser
-from ann_solo.spectrum import Spectrum
+from ann_solo.spectrum import process_spectrum
 
 
 class SpectralLibraryReader:
@@ -170,7 +171,7 @@ class SpectralLibraryReader:
 
     @lru_cache(maxsize=None)
     def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
-            -> Spectrum:
+            -> MsmsSpectrum:
         """
         Read the spectrum with the specified identifier from the spectral
         library file.
@@ -191,12 +192,13 @@ class SpectralLibraryReader:
         """
         spectrum = self._parser.read_spectrum(
             self.spec_info['offset'][spec_id])[0]
+        spectrum.is_processed = False
         if process_peaks:
-            spectrum.process_peaks()
+            process_spectrum(spectrum)
 
         return spectrum
 
-    def get_all_spectra(self) -> Iterator[Tuple[Spectrum, int]]:
+    def get_all_spectra(self) -> Iterator[Tuple[MsmsSpectrum, int]]:
         """
         Generates all spectra from the spectral library file.
 
@@ -252,7 +254,7 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
                                 f'formats: {", ".join(supported_extensions)})')
 
 
-def read_mgf(filename: str) -> Iterator[Spectrum]:
+def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     """
     Read all spectra from the given mgf file.
 
@@ -280,10 +282,11 @@ def read_mgf(filename: str) -> Iterator[Spectrum]:
         else:
             precursor_charge = None
 
-        spectrum = Spectrum(identifier, precursor_mz, precursor_charge,
-                            retention_time)
-        spectrum.set_peaks(mgf_spectrum['m/z array'],
-                           mgf_spectrum['intensity array'])
+        spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                                mgf_spectrum['m/z array'],
+                                mgf_spectrum['intensity array'],
+                                retention_time=retention_time)
+        spectrum.is_processed = False
 
         yield spectrum
 
