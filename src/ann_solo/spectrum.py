@@ -8,49 +8,75 @@ from spectrum_utils.spectrum import MsmsSpectrum
 from ann_solo.config import config
 
 
-def process_spectrum(spectrum: MsmsSpectrum):
+def _check_spectrum_valid(spectrum: MsmsSpectrum) -> bool:
     """
+    Check whether a spectrum is of high enough quality to be used for matching.
 
     Parameters
     ----------
-    spectrum :
+    spectrum : MsmsSpectrum
+        The spectrum whose quality is checked.
 
     Returns
     -------
+    bool
+        True if the spectrum has enough peaks covering a wide enough mass
+        range, False otherwise.
+    """
+    spectrum.is_valid = (
+            len(spectrum.mz) >= config.min_peaks and
+            spectrum.mz[-1] - spectrum.mz[0] >= config.min_mz_range)
+    if not spectrum.is_valid:
+        spectrum.is_processed = True
+        return False
+    else:
+        return True
 
+
+def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
+    """
+    Process the peaks of the MS/MS spectrum according to the config.
+
+    Parameters
+    ----------
+    spectrum : MsmsSpectrum
+        The spectrum that will be processed.
+
+    Returns
+    -------
+    MsmsSpectrum
+        The processed spectrum. The spectrum is also changed in-place.
     """
     if spectrum.is_processed:
         return spectrum
 
-    print('start', spectrum.mz, spectrum.intensity)
-
     spectrum = spectrum.set_mz_range(config.min_mz, config.max_mz)
+    if not _check_spectrum_valid(spectrum):
+        return spectrum
     if config.resolution is not None:
         spectrum = spectrum.round(config.resolution, 'sum')
+        if not _check_spectrum_valid(spectrum):
+            return spectrum
+
     if config.remove_precursor:
         spectrum = spectrum.remove_precursor_peak(
-            config.remove_precursor_tolerance, 'Da')
+            config.remove_precursor_tolerance, 'Da', 3)
+        if not _check_spectrum_valid(spectrum):
+            return spectrum
+
     spectrum = spectrum.filter_intensity(config.min_intensity,
                                          config.max_peaks_used)
+    if not _check_spectrum_valid(spectrum):
+        return spectrum
 
-    print('after filter', spectrum.mz, spectrum.intensity)
+    scaling = config.scaling
+    if scaling == 'sqrt':
+        scaling = 'root'
+    if scaling is not None:
+        spectrum = spectrum.scale_intensity(scaling, 1.0)
 
-    # Set a flag to denote whether the spectrum is of high enough quality.
-    spectrum.is_valid = (
-            len(spectrum.mz) >= config.min_peaks and
-            spectrum.mz[-1] - spectrum.mz[0] >= config.min_mz_range)
-
-    if spectrum.is_valid:
-        scaling = config.scaling
-        if scaling == 'sqrt':
-            scaling = 'root'
-        if scaling is not None:
-            spectrum = spectrum.scale_intensity(scaling, 1.0)
-
-        # Normalize the peak intensities.
-        spectrum.intensity /= np.linalg.norm(spectrum.intensity)
-
-    print('after scaling', spectrum.mz, spectrum.intensity)
+    # Normalize the peak intensities.
+    spectrum.intensity /= np.linalg.norm(spectrum.intensity)
 
     # Set a flag to indicate that the spectrum has been processed to avoid
     # reprocessing of library spectra for multiple queries.
