@@ -473,11 +473,9 @@ class SpectralLibrary:
                 logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
                 if self._use_gpu:
-                    # TODO: Test if we can get an extra speedup using float16.
-                    # co = faiss.GpuClonerOptions()
-                    # co.useFloat16 = True
-                    # index = faiss.index_cpu_to_gpu(self._res, 0, index, co)
-                    index = faiss.index_cpu_to_gpu(self._res, 0, index)
+                    co = faiss.GpuClonerOptions()
+                    co.useFloat16 = True
+                    index = faiss.index_cpu_to_gpu(self._res, 0, index, co)
                     index.setNumProbes(self._num_probe)
                 else:
                     index.nprobe = self._num_probe
