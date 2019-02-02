@@ -73,7 +73,8 @@ def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     if scaling == 'sqrt':
         scaling = 'root'
     if scaling is not None:
-        spectrum = spectrum.scale_intensity(scaling, 1.0)
+        spectrum = spectrum.scale_intensity(scaling,
+                                            max_rank=config.max_peaks_used)
 
     # Normalize the peak intensities.
     spectrum.intensity /= np.linalg.norm(spectrum.intensity)
