@@ -60,7 +60,7 @@ def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
 
     if config.remove_precursor:
         spectrum = spectrum.remove_precursor_peak(
-            config.remove_precursor_tolerance, 'Da', 3)
+            config.remove_precursor_tolerance, 'Da', 2)
         if not _check_spectrum_valid(spectrum):
             return spectrum
 
