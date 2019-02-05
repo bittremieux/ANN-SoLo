@@ -3,9 +3,10 @@
 
 import numpy as np
 cimport numpy as np
+from cython.operator cimport dereference as deref
+from libc.stdlib cimport free
 from libc.stdlib cimport malloc
 from libc.stdint cimport uint32_t
-from libc.string cimport memcpy
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from posix.fcntl cimport open
@@ -56,16 +57,12 @@ cdef class SplibParser:
         munmap(self._mmap, self._size)
 
     cdef uint32_t _read_int(self) nogil:
-        cdef uint32_t result = 0
-        memcpy(&result, self._mmap + self._pos, 4)
         self._pos += 4
-        return result
+        return deref(<uint32_t*>(self._mmap + self._pos - 4))
 
     cdef double _read_double(self) nogil:
-        cdef double result = 0.0
-        memcpy(&result, self._mmap + self._pos, 8)
         self._pos += 8
-        return result
+        return deref(<double*>(self._mmap + self._pos - 8))
 
     cdef string _read_line(self) nogil:
         cdef size_t offset = 0
@@ -149,6 +146,9 @@ cdef class SplibParser:
                                 np.asarray(<np.float32_t[:num_peaks]>
                                            intensity), annotation_p,
                                 peptide=peptide.decode(), is_decoy=is_decoy)
+
+        free(mz)
+        free(intensity)
 
         return spectrum, spectrum_offset
 
