@@ -76,8 +76,8 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
         # Convert the candidates.
         for candidate in candidates:
             if not hasattr(candidate, 'charge'):
-                candidate.charge = np.zeros(
-                    len(candidate.annotation), dtype=np.uint8)
+                candidate.charge = np.zeros_like(
+                    candidate.annotation, dtype=np.uint8)
                 for index, annotation in enumerate(candidate.annotation):
                     if annotation is not None:
                         candidate.charge[index] = annotation[1]
@@ -90,7 +90,7 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
 
         mz = query.mz
         intensity = query.intensity
-        query.charge = np.zeros(len(query.annotation), dtype=np.uint8)
+        query.charge = np.zeros_like(query.mz, dtype=np.uint8)
         charge = query.charge
         query_spec = new Spectrum(
             query.precursor_mz, query.precursor_charge, len(query.mz),

@@ -30,7 +30,7 @@ def _check_spectrum_valid(spectrum_mz: np.ndarray, min_peaks: int,
             spectrum_mz[-1] - spectrum_mz[0] >= min_mz_range)
 
 
-@numba.njit
+@nb.njit
 def _norm_intensity(spectrum_intensity: np.ndarray) -> np.ndarray:
     """
     Normalize spectrum peak intensities.
