@@ -91,11 +91,17 @@ class Config:
             help='discard spectra with a smaller mass range '
                  '(default: %(default)s m/z)')
 
-        # Maximum number of fragment peaks to use for each spectrum.
+        # Maximum number of fragment peaks to use for each query spectrum.
         self._parser.add_argument(
             '--max_peaks_used', default=50, type=int,
-            help='only use the specified most intense peaks '
-                 '(default: %(default)s)')
+            help='only use the specified most intense peaks for the query '
+                 'spectra (default: %(default)s)')
+
+        # Maximum number of fragment peaks to use for each library spectrum.
+        self._parser.add_argument(
+            '--max_peaks_used_library', default=50, type=int,
+            help='only use the specified most intense peaks for the library '
+                 'spectra (default: %(default)s)')
 
         # Manner in which to scale the peak intensities.
         self._parser.add_argument(

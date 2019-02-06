@@ -48,7 +48,7 @@ def _norm_intensity(spectrum_intensity: np.ndarray) -> np.ndarray:
     return spectrum_intensity / np.linalg.norm(spectrum_intensity)
 
 
-def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
+def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
     """
     Process the peaks of the MS/MS spectrum according to the config.
 
@@ -56,6 +56,9 @@ def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     ----------
     spectrum : MsmsSpectrum
         The spectrum that will be processed.
+    is_library : bool
+        Flag specifying whether the spectrum is a query spectrum or a library
+        spectrum.
 
     Returns
     -------
@@ -88,8 +91,9 @@ def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
             spectrum.is_processed = True
             return spectrum
 
-    spectrum = spectrum.filter_intensity(config.min_intensity,
-                                         config.max_peaks_used)
+    spectrum = spectrum.filter_intensity(
+        config.min_intensity, (config.max_peaks_used_library if is_library else
+                               config.max_peaks_used))
     if not _check_spectrum_valid(spectrum.mz, min_peaks, min_mz_range):
         spectrum.is_valid = False
         spectrum.is_processed = True
@@ -99,8 +103,9 @@ def process_spectrum(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     if scaling == 'sqrt':
         scaling = 'root'
     if scaling is not None:
-        spectrum = spectrum.scale_intensity(scaling,
-                                            max_rank=config.max_peaks_used)
+        spectrum = spectrum.scale_intensity(
+            scaling, max_rank=(config.max_peaks_used_library if is_library else
+                               config.max_peaks_used))
 
     spectrum.intensity = _norm_intensity(spectrum.intensity)
 

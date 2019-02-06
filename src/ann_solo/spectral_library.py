@@ -151,7 +151,7 @@ class SpectralLibrary:
                 smoothing=0.1):
             charge = lib_spectrum.precursor_charge
             if charge in charge_vectors.keys():
-                spectrum_to_vector(process_spectrum(lib_spectrum),
+                spectrum_to_vector(process_spectrum(lib_spectrum, True),
                                    config.min_mz, config.max_mz,
                                    config.bin_size, config.hash_len, True,
                                    charge_vectors[charge][i[charge]])
@@ -221,7 +221,7 @@ class SpectralLibrary:
                     query_spectra_charge[-1].precursor_charge = charge
             for query_spectrum_charge in query_spectra_charge:
                 # Discard low-quality spectra.
-                if process_spectrum(query_spectrum_charge).is_valid:
+                if process_spectrum(query_spectrum_charge, False).is_valid:
                     (query_spectra[query_spectrum_charge.precursor_charge]
                      .append(query_spectrum_charge))
 

@@ -194,7 +194,7 @@ class SpectralLibraryReader:
             self.spec_info['offset'][spec_id])[0]
         spectrum.is_processed = False
         if process_peaks:
-            process_spectrum(spectrum)
+            process_spectrum(spectrum, True)
 
         return spectrum
 
@@ -215,7 +215,9 @@ class SpectralLibraryReader:
         self._parser.seek_first_spectrum()
         try:
             while True:
-                yield self._parser.read_spectrum()
+                spectrum, offset = self._parser.read_spectrum()
+                spectrum.is_processed = False
+                yield spectrum, offset
         except StopIteration:
             return
 

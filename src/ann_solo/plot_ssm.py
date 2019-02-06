@@ -97,7 +97,7 @@ def main():
     query_spectrum = None
     for spec in reader.read_mgf(query_filename):
         if spec.identifier == query_id:
-            query_spectrum = process_spectrum(spec)
+            query_spectrum = process_spectrum(spec, False)
             # make sure that the precursor charge is set for query spectra
             # with a undefined precursor charge
             if query_spectrum.precursor_charge is None:
