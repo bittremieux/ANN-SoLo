@@ -184,6 +184,8 @@ class SpectralLibrary:
         Release any resources to gracefully shut down.
         """
         self._library_reader.close()
+        if self._current_index[1] is not None:
+            self._current_index[1].reset()
 
     def search(self, query_filename: str) -> List[SpectrumSpectrumMatch]:
         """
