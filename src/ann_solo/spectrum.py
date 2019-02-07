@@ -182,7 +182,7 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
     bin_size : float
         The bin size in m/z used to divide the m/z range.
     hash_len : int
-        The length of the hashed vector.
+        The length of the hashed vector, None if no hashing is to be done.
     norm : bool
         Normalize the vector to unit length or not.
     vector : np.ndarray, optional
@@ -193,14 +193,18 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
     np.ndarray
         The hashed spectrum vector with unit length.
     """
+    vec_len, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
     if vector is None:
-        vector = np.zeros((hash_len,), np.float32)
-    if hash_len != vector.shape[0]:
-        raise ValueError('Incorrect vector dimensionality')
+        if hash_len is not None:
+            vec_len = hash_len
+        vector = np.zeros((vec_len,), np.float32)
+        if vec_len != vector.shape[0]:
+            raise ValueError('Incorrect vector dimensionality')
 
-    _, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
     for mz, intensity in zip(spectrum.mz, spectrum.intensity):
-        bin_idx = hash_idx(math.floor((mz - min_bound) // bin_size), hash_len)
+        bin_idx = math.floor((mz - min_bound) // bin_size)
+        if hash_len is not None:
+            bin_idx = hash_idx(bin_idx, hash_len)
         vector[bin_idx] += intensity
 
     if norm:
