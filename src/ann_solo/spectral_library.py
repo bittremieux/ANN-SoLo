@@ -160,9 +160,6 @@ class SpectralLibrary:
         logging.info('Build the spectral library ANN indexes')
         for charge, vectors in charge_vectors.items():
             logging.debug('Create a new ANN index for charge %d', charge)
-            # TODO: Use a GPU if available.
-            #       https://github.com/erikbern/ann-benchmarks/blob/master/ann_benchmarks/algorithms/faiss_gpu.py
-            #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_gpu_1bn.py
             quantizer = faiss.IndexFlatIP(config.hash_len)
             # TODO: Use HNSW as quantizer?
             #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_hnsw.py#L136
@@ -209,7 +206,6 @@ class SpectralLibrary:
         # split based on their precursor charge.
         logging.debug('Read all query spectra')
         query_spectra = collections.defaultdict(list)
-        # TODO: Parallelize query spectrum peak processing?
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
                 leave=False, unit='spectra', smoothing=0.7):
