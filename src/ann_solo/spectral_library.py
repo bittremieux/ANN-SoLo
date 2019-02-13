@@ -100,7 +100,7 @@ class SpectralLibrary:
         # No need to build an ANN index for infrequent precursor charges.
         ann_charges = [charge for charge, charge_info in
                        self._library_reader.spec_info['charge'].items()
-                       if len(charge_info['id']) >= config.num_list * 39]
+                       if len(charge_info['id']) >= config.num_list]
         for charge in sorted(ann_charges):
             self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
             if (not verify_file_existence or
