@@ -7,10 +7,10 @@ from typing import List
 from typing import Pattern
 from typing import Union
 
-from . import __version__
 from ann_solo.config import config
 from ann_solo.reader import SpectralLibraryReader
 from ann_solo.spectrum import SpectrumSpectrumMatch
+from . import __version__
 
 
 def natural_sort_key(s: str, _nsre: Pattern[AnyStr] = re.compile('([0-9]+)'))\

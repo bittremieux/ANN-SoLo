@@ -193,7 +193,7 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
     np.ndarray
         The hashed spectrum vector with unit length.
     """
-    vec_len, min_bound, max_bound = get_dim(min_mz, max_mz, bin_size)
+    vec_len, min_bound, _ = get_dim(min_mz, max_mz, bin_size)
     if vector is None:
         if hash_len is not None:
             vec_len = hash_len
@@ -227,10 +227,8 @@ class SpectrumSpectrumMatch:
 
     @property
     def sequence(self):
-        if self.library_spectrum is not None:
-            return self.library_spectrum.peptide
-        else:
-            return None
+        return (self.library_spectrum.peptide
+                if self.library_spectrum is not None else None)
 
     @property
     def identifier(self):
@@ -238,10 +236,8 @@ class SpectrumSpectrumMatch:
 
     @property
     def accession(self):
-        if self.library_spectrum is not None:
-            return self.library_spectrum.identifier
-        else:
-            return None
+        return (self.library_spectrum.identifier
+                if self.library_spectrum is not None else None)
 
     @property
     def retention_time(self):
@@ -257,14 +253,10 @@ class SpectrumSpectrumMatch:
 
     @property
     def calc_mass_to_charge(self):
-        if self.library_spectrum is not None:
-            return self.library_spectrum.precursor_mz
-        else:
-            return None
+        return (self.library_spectrum.precursor_mz
+                if self.library_spectrum is not None else None)
 
     @property
     def is_decoy(self):
-        if self.library_spectrum is not None:
-            return self.library_spectrum.is_decoy
-        else:
-            return None
+        return (self.library_spectrum.is_decoy
+                if self.library_spectrum is not None else None)

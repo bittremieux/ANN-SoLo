@@ -77,7 +77,7 @@ def filter_group_fdr(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01,
 
     # Start with the highest ranked SSM.
     groups_common, groups_uncommon = [], []
-    while len(ssms_remaining) > 0:
+    while ssms_remaining.size > 0:
         # Find all remaining PSMs within the mass difference window.
         if (tol_mass is None or tol_mode not in ('Da', 'ppm') or
                 min_group_size is None):

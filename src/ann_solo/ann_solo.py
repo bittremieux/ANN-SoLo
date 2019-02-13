@@ -17,7 +17,7 @@ def main():
     # Perform the search.
     spec_lib = spectral_library.SpectralLibrary(
         config.spectral_library_filename)
-    identifications = spec_lib.search(config.query_filename )
+    identifications = spec_lib.search(config.query_filename)
     writer.write_mztab(identifications, config.out_filename,
                        spec_lib._library_reader)
     spec_lib.shutdown()

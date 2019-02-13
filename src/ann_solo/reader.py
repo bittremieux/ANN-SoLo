@@ -249,7 +249,7 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
     FileNotFoundError
         If the file name does not have one of the supported extensions.
     """
-    base_name, ext = os.path.splitext(os.path.basename(filename))
+    _, ext = os.path.splitext(os.path.basename(filename))
     if ext.lower() not in supported_extensions:
         logging.error('Unrecognized file format: %s', filename)
         raise FileNotFoundError(f'Unrecognized file format (supported file '
