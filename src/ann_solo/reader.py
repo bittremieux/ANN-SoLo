@@ -254,6 +254,9 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
         logging.error('Unrecognized file format: %s', filename)
         raise FileNotFoundError(f'Unrecognized file format (supported file '
                                 f'formats: {", ".join(supported_extensions)})')
+    elif not os.path.isfile(filename):
+        logging.error('File not found: %s', filename)
+        raise FileNotFoundError(f'File {filename} does not exist')
 
 
 def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
