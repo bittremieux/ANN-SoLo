@@ -230,6 +230,8 @@ class SpectralLibrary:
         # Cascade level 1: standard search.
         for ssm in self._search_cascade(query_spectra, 'std'):
             identifications[ssm.identifier] = ssm
+        logging.info('%d spectra identified after the standard search',
+                     len(identifications))
         if (config.precursor_tolerance_mass_open is not None and
                 config.precursor_tolerance_mode_open is not None):
             # Collect the remaining query spectra for the second cascade level.
@@ -237,8 +239,6 @@ class SpectralLibrary:
                 query_spectra[charge] = [
                     spectrum for spectrum in query_spectra_charge
                     if spectrum.identifier not in identifications]
-            logging.info('%d spectra identified after the standard search',
-                         len(identifications))
             # Cascade level 2: open search.
             for ssm in self._search_cascade(query_spectra, 'open'):
                 identifications[ssm.identifier] = ssm
