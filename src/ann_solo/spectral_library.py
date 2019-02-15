@@ -88,29 +88,30 @@ class SpectralLibrary:
 
         self._current_index = None, None
 
-        verify_file_existence = True
-        if self._library_reader.is_recreated:
-            logging.warning('ANN indexes were created using '
-                            'non-compatible settings')
-            verify_file_existence = False
-        # Check if an ANN index exists for each charge.
-        base_filename = f'{os.path.splitext(filename)[0]}_' \
-                        f'{self._get_hyperparameter_hash()[:7]}'
-        create_ann_charges = []
-        # No need to build an ANN index for infrequent precursor charges.
-        ann_charges = [charge for charge, charge_info in
-                       self._library_reader.spec_info['charge'].items()
-                       if len(charge_info['id']) >= config.num_list]
-        for charge in sorted(ann_charges):
-            self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
-            if (not verify_file_existence or
-                    not os.path.isfile(self._ann_filenames[charge])):
-                create_ann_charges.append(charge)
-                logging.warning('Missing ANN index for charge %d', charge)
+        if config.mode == 'ann':
+            verify_file_existence = True
+            if self._library_reader.is_recreated:
+                logging.warning('ANN indexes were created using '
+                                'non-compatible settings')
+                verify_file_existence = False
+            # Check if an ANN index exists for each charge.
+            base_filename = f'{os.path.splitext(filename)[0]}_' \
+                            f'{self._get_hyperparameter_hash()[:7]}'
+            create_ann_charges = []
+            # No need to build an ANN index for infrequent precursor charges.
+            ann_charges = [charge for charge, charge_info in
+                           self._library_reader.spec_info['charge'].items()
+                           if len(charge_info['id']) >= config.num_list]
+            for charge in sorted(ann_charges):
+                self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
+                if (not verify_file_existence or
+                        not os.path.isfile(self._ann_filenames[charge])):
+                    create_ann_charges.append(charge)
+                    logging.warning('Missing ANN index for charge %d', charge)
 
-        # Create the missing FAISS indices.
-        if create_ann_charges:
-            self._create_ann_indexes(create_ann_charges)
+            # Create the missing FAISS indices.
+            if create_ann_charges:
+                self._create_ann_indexes(create_ann_charges)
 
     def _get_hyperparameter_hash(self) -> str:
         """
