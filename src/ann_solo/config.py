@@ -44,9 +44,10 @@ class Config:
 
         # IO
         self._parser.add_argument(
-            'spectral_library_filename', help='spectral library file')
+            'spectral_library_filename', help='spectral library file '
+                                              '(supported formats: splib)')
         self._parser.add_argument(
-            'query_filename', help='query file')
+            'query_filename', help='query file (supported formats: mgf)')
         self._parser.add_argument(
             'out_filename',
             help='name of the mzTab output file containing the search results')
@@ -175,7 +176,7 @@ class Config:
             help='ANN vector bin width (default: %(default)s Da)')
         # ANN vector length after hashing.
         self._parser.add_argument(
-            '--hash_len', default=200, type=int,
+            '--hash_len', default=800, type=int,
             help='ANN vector length (default: %(default)s)')
 
         # Number of candidates to retrieve from the ANN index for each query.
@@ -194,12 +195,12 @@ class Config:
         # Custom FAISS parameters.
         # Number of lists in the IVF.
         self._parser.add_argument(
-            '--num_list', default=1024, type=int,
+            '--num_list', default=256, type=int,
             help='number of partitions in the ANN index '
                  '(default: %(default)s)')
         # Number of lists to inspect during querying.
         self._parser.add_argument(
-            '--num_probe', default=10, type=int,
+            '--num_probe', default=128, type=int,
             help='number of partitions in the ANN index to inspect during '
                  'querying (default: %(default)s), maximum 1024 when using '
                  'GPU indexing')
