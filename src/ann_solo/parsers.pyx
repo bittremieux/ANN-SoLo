@@ -13,6 +13,7 @@ from posix.fcntl cimport open
 from posix.fcntl cimport O_RDONLY
 from posix.unistd cimport off_t
 from spectrum_utils.spectrum import MsmsSpectrum
+from spectrum_utils.spectrum import FragmentAnnotation
 
 
 cdef extern from 'sys/mman.h' nogil:
@@ -96,7 +97,7 @@ cdef class SplibParser:
         cdef uint32_t num_peaks
         cdef float *mz
         cdef float *intensity
-        cdef vector[(string, int)] annotation
+        cdef vector[(string, int, int)] annotation
         cdef bint is_decoy
         cdef size_t peptide_pos, peptide_len, charge_pos, charge_len
 
@@ -137,15 +138,18 @@ cdef class SplibParser:
 
         annotation_p = np.full((num_peaks,), None, object)
         for i in range(num_peaks):
-            if annotation[i][1] != -1:
-                annotation_p[i] = (annotation[i][0].decode(), annotation[i][1])
+            ion_type, ion_index, charge = annotation[i]
+            if charge != -1:
+                annotation_p[i] = FragmentAnnotation(
+                    ion_type.decode(), ion_index, charge, mz[i])
         annotation.clear()
 
         spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
                                 np.asarray(<np.float32_t[:num_peaks]> mz),
                                 np.asarray(<np.float32_t[:num_peaks]>
                                            intensity), annotation_p,
-                                peptide=peptide.decode(), is_decoy=is_decoy)
+                                is_decoy=is_decoy)
+        spectrum.peptide = peptide.decode()
 
         free(mz)
         free(intensity)
@@ -153,7 +157,7 @@ cdef class SplibParser:
         return spectrum, spectrum_offset
 
 
-cdef (string, int) parse_annotation(string raw) nogil:
+cdef (string, int, int) parse_annotation(string raw) nogil:
     cdef size_t ion_index_end, ion_charge_end
 
     cdef char ion_type = raw.at(0)
@@ -175,4 +179,4 @@ cdef (string, int) parse_annotation(string raw) nogil:
             charge = stoi(raw.substr(ion_index_end + 1,
                                      ion_charge_end - ion_index_end - 1),
                           NULL, 10)
-    return (string(1, ion_type) + to_string(ion_index), charge)
+    return (string(1, ion_type), ion_index, charge)

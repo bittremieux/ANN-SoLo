@@ -80,7 +80,7 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
                     candidate.annotation, dtype=np.uint8)
                 for index, annotation in enumerate(candidate.annotation):
                     if annotation is not None:
-                        candidate.charge[index] = annotation[1]
+                        candidate.charge[index] = annotation.charge
             mz = candidate.mz
             intensity = candidate.intensity
             charge = candidate.charge
