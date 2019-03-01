@@ -85,7 +85,6 @@ setuptools.setup(
         'numpy',
         'pandas',
         'pyteomics',
-        'seaborn',
         'scipy',
         'spectrum_utils',
         'tqdm'],
