@@ -18,15 +18,39 @@ If you use ANN-SoLo in your work, please cite the following publication:
 Running ANN-SoLo
 ----------------
 
-ANN-SoLo requires Python 3.5 or higher.
+ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS support.
 
-The ANN-SoLo installation depends on NumPy. When NumPy is available ANN-SoLo can easily be installed using pip (pip3):
+The recommended way to install ANN-SoLo is using pip:
 
     pip install ann_solo
 
-For detailed instructions on how to run ANN-SoLo see the `src` folder or run `ann_solo -h` to pull up instructions on the ANN-SoLo command-line interface.
+For detailed instructions on how to run ANN-SoLo see the `src` folder or run `ann_solo -h` to get detailed information about the ANN-SoLo command-line interface.
+
+### Dependencies
+
+ANN-SoLo has the following dependencies:
+
+- [ConfigArgParse](https://github.com/bw2/ConfigArgParse)
+- [Cython](https://cython.org/)
+- [Faiss](https://github.com/facebookresearch/faiss)
+- [Joblib](https://joblib.readthedocs.io/)
+- [Matplotlib](http://matplotlib.org/)
+- [mmh3](https://pypi.org/project/mmh3/)
+- [Numba](http://numba.pydata.org/)
+- [NumExpr](https://github.com/pydata/numexpr)
+- [NumPy](https://www.numpy.org/)
+- [Pandas](https://pandas.pydata.org/)
+- [Pyteomics](http://pyteomics.readthedocs.io/)
+- [SciPy](https://www.scipy.org/)
+- [spectrum_utils](https://github.com/bittremieux/spectrum_utils)
+- [tqdm](https://tqdm.github.io/)
+
+We recommend installing these dependencies using conda. Any missing dependencies will be automatically installed when you install ANN-SoLo. There are two exceptions:
+
+- **NumPy** needs to be available prior to the installation of ANN-SoLo.
+- The **Faiss** installation depends on a specific GPU version. Please refer to the [Faiss installation instructions](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) for more information.
 
 Contact
 -------
 
-For more information you can visit the [official code website](https://github.com/bittremieux/ANN-SoLo) or send a mail to <wout.bittremieux@uantwerpen.be>.
+For more information you can visit the [official code website](https://github.com/bittremieux/ANN-SoLo) or send an email to <wout.bittremieux@uantwerpen.be>.
