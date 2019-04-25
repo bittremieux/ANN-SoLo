@@ -179,20 +179,20 @@ optional arguments:
                         used if available)
 ```
 
-Spectrum-spectrum match viewer
+Spectrum–spectrum match viewer
 ------------------------------
 
-Use the ANN-SoLo plotter to visualize spectrum-spectrum matches from your search results. The plotter can be run directly on the command line using `ann_solo_plot` or as a named Python module (if you do not have sufficient rights to install command-line scripts) using `python -m ann_solo.plot_ssm`.
+Use the ANN-SoLo plotter to visualize spectrum–spectrum matches from your search results. The plotter can be run directly on the command line using `ann_solo_plot` or as a named Python module (if you do not have sufficient rights to install command-line scripts) using `python -m ann_solo.plot_ssm`.
 
 The plotter requires as command-line arguments an mzTab identification file produced by ANN-SoLo and the identifier of the query to visualize.
 Please note that the spectral library used to perform the search needs to be present in the exact location as specified in the mzTab file.
 
-The plotter will create a PNG file with a mirror plot to visualize the specified spectrum-spectrum match.
+The plotter will create a PNG file with a mirror plot to visualize the specified spectrum–spectrum match.
 
 ```
 usage: ann_solo_plot [-h] mztab_filename query_id
 
-Visualize spectrum-spectrum matches from your ANN-SoLo identification results
+Visualize spectrum–spectrum matches from your ANN-SoLo identification results
 
 positional arguments:
   mztab_filename  Identifications in mzTab format

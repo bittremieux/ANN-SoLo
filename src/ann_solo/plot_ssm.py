@@ -35,7 +35,7 @@ def set_matching_peaks(library_spectrum, query_spectrum):
 def main():
     # Load the cmd arguments.
     parser = argparse.ArgumentParser(
-        description='Visualize spectrum-spectrum matches from your '
+        description='Visualize spectrum–spectrum matches from your '
                     'ANN-SoLo identification results')
     parser.add_argument(
         'mztab_filename', help='Identifications in mzTab format')
