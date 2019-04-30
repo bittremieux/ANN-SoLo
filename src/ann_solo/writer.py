@@ -80,16 +80,20 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         ('fixed_mod[1]', '[MS, MS:1002453, No fixed modifications searched,]'),
         ('variable_mod[1]', '[MS, MS:1002454, No variable modifications '
                             'searched,]'),
+        ('false_discovery_rate', f'[MS, MS:1002350, PSM-level global FDR, '
+                                 f'{config.fdr}]'),
     ]
 
     # Add relevant configuration settings.
     config_keys = [
         'resolution', 'min_mz', 'max_mz', 'remove_precursor',
         'remove_precursor_tolerance', 'min_intensity', 'min_peaks',
-        'min_mz_range', 'max_peaks_used', 'scaling',
+        'min_mz_range', 'max_peaks_used', 'max_peaks_used_library', 'scaling',
         'precursor_tolerance_mass', 'precursor_tolerance_mode',
         'precursor_tolerance_mass_open', 'precursor_tolerance_mode_open',
-        'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr', 'mode']
+        'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr',
+        'fdr_tolerance_mass', 'fdr_tolerance_mode', 'fdr_min_group_size',
+        'mode']
     if config.mode == 'ann':
         config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
                             'num_list', 'num_probe'])
