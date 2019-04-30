@@ -72,8 +72,11 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
         ('psm_search_engine_score[2]', '[MS, MS:1002354, PSM-level q-value,]'),
+        ('ms_run[1]-format', '[MS, MS:1001062, Mascot MGF file,]'),
         ('ms_run[1]-location', pathlib.Path(
             os.path.abspath(config.query_filename)).as_uri()),
+        ('ms_run[1]-id_format', '[MS, MS:1000774, multiple peak list nativeID '
+                                'format,]'),
         ('fixed_mod[1]', '[MS, MS:1002453, No fixed modifications searched,]'),
         ('variable_mod[1]', '[MS, MS:1002454, No variable modifications '
                             'searched,]'),
@@ -130,7 +133,7 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
                 str(ssm.charge),
                 str(ssm.exp_mass_to_charge),
                 str(ssm.calc_mass_to_charge),
-                f'ms_run[1]:spectrum={ssm.identifier}',
+                f'ms_run[1]:index={ssm.index}',
                 'null', 'null', 'null', 'null',
                 f'{ssm.is_decoy:d}',
                 str(ssm.num_candidates)]) + '\n')

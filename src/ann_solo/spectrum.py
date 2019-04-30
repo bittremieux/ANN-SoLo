@@ -235,6 +235,10 @@ class SpectrumSpectrumMatch:
         return self.query_spectrum.identifier
 
     @property
+    def index(self):
+        return self.query_spectrum.index
+
+    @property
     def accession(self):
         return (self.library_spectrum.identifier
                 if self.library_spectrum is not None else None)

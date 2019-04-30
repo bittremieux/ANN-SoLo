@@ -277,7 +277,7 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     verify_extension(['.mgf'], filename)
 
     # Get all query spectra.
-    for mgf_spectrum in mgf.read(filename):
+    for i, mgf_spectrum in enumerate(mgf.read(filename)):
         # Create spectrum.
         identifier = mgf_spectrum['params']['title']
         precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
@@ -291,6 +291,7 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
                                 mgf_spectrum['m/z array'],
                                 mgf_spectrum['intensity array'],
                                 retention_time=retention_time)
+        spectrum.index = i
         spectrum.is_processed = False
 
         yield spectrum
