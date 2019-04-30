@@ -66,8 +66,9 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         ('mzTab-ID', f'ANN-SoLo_{filename}'),
         ('title', f'ANN-SoLo identification file "{filename}"'),
         ('description', f'Identification results of file '
-                        f'"{config.query_filename}" against spectral library '
-                        f'file "{config.spectral_library_filename}"'),
+                        f'"{os.path.split(config.query_filename)[1]}" against '
+                        f'spectral library file '
+                        f'"{os.path.split(config.spectral_library_filename)[1]}"'),
         ('software[1]', f'[MS, MS:1001456, ANN-SoLo, {__version__}]'),
         ('psm_search_engine_score[1]', '[MS, MS:1001143, search engine '
                                        'specific score for PSMs,]'),
