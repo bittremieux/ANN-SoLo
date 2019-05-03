@@ -19,7 +19,7 @@ These notebooks allow you to easily recreate all figures and tables in the ANN-S
 
 ## Data
 
-The necessary data to execute the notebooks is available on the PRIDE repository at identifier [PXD009861](https://www.ebi.ac.uk/pride/archive/projects/PXD009861) (v0.1) and [PDX00TODO](https://to.do/).
+The necessary data to execute the notebooks is available on the PRIDE repository at identifier [PXD009861](https://www.ebi.ac.uk/pride/archive/projects/PXD009861) (v0.1) and [PXD013641](https://www.ebi.ac.uk/pride/archive/projects/PXD013641) (v0.2), and on the MassIVE repository at identifier [RMSV000000091.4](https://massive.ucsd.edu/ProteoSAFe/reanalysis.jsp?task=b25b8c664eb8477a9991c477a40af8c2) (v0.2).
 
 The directory structure is based on the [Cookiecutter Data Science](https://drivendata.github.io/cookiecutter-data-science/) project. A `data` directory is expected at the same level of the `notebooks` directory. Additionally, ANN-SoLo should be installed as a Python package or the ANN-SoLo source code should be present in the `src` directory. The full directory and file structure is as follows:
 
