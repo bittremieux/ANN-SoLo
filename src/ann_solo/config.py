@@ -35,7 +35,11 @@ class Config:
                         'Bittremieux et al. Fast open modification spectral '
                         'library searching through approximate nearest '
                         'neighbor indexing. Journal of Proteome Research 17, '
-                        '3464-3474 (2018).\n\n'
+                        '3464-3474 (2018).\n\nBittremieux et al. Extremely '
+                        'fast and accurate open modification spectral library '
+                        'searching of high-resolution mass spectra using '
+                        'feature hashing and graphics processing units. '
+                        'bioRxiv (2019).\n\n'
                         'Official code website: '
                         'https://github.com/bittremieux/ANN-SoLo\n\n',
             default_config_files=['config.ini'],

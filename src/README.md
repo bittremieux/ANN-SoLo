@@ -56,27 +56,26 @@ Most options have sensible default values. Some positional arguments specifying 
 Please note that to run ANN-SoLo in cascade search mode two different precursor mass tolerances need to be specified for both levels of the cascade search (`precursor_tolerance_(mass|mode)` and `precursor_tolerance_(mass|mode)_open`).
 
 ```
-usage: ann_solo.py [-h] [-c CONFIG_FILE] [--resolution RESOLUTION]
-                   [--min_mz MIN_MZ] [--max_mz MAX_MZ] [--remove_precursor]
-                   [--remove_precursor_tolerance REMOVE_PRECURSOR_TOLERANCE]
-                   [--min_intensity MIN_INTENSITY] [--min_peaks MIN_PEAKS]
-                   [--min_mz_range MIN_MZ_RANGE]
-                   [--max_peaks_used MAX_PEAKS_USED]
-                   [--max_peaks_used_library MAX_PEAKS_USED_LIBRARY]
-                   [--scaling {sqrt,rank}] --precursor_tolerance_mass
-                   PRECURSOR_TOLERANCE_MASS --precursor_tolerance_mode
-                   {Da,ppm}
-                   [--precursor_tolerance_mass_open PRECURSOR_TOLERANCE_MASS_OPEN]
-                   [--precursor_tolerance_mode_open {Da,ppm}]
-                   --fragment_mz_tolerance FRAGMENT_MZ_TOLERANCE
-                   [--allow_peak_shifts] [--fdr FDR]
-                   [--fdr_tolerance_mass FDR_TOLERANCE_MASS]
-                   [--fdr_tolerance_mode {Da,ppm}]
-                   [--fdr_min_group_size FDR_MIN_GROUP_SIZE] [--mode {ann,bf}]
-                   [--bin_size BIN_SIZE] [--hash_len HASH_LEN]
-                   [--num_candidates NUM_CANDIDATES] [--batch_size BATCH_SIZE]
-                   [--num_list NUM_LIST] [--num_probe NUM_PROBE] [--no_gpu]
-                   spectral_library_filename query_filename out_filename
+usage: ann_solo [-h] [-c CONFIG_FILE] [--resolution RESOLUTION]
+                [--min_mz MIN_MZ] [--max_mz MAX_MZ] [--remove_precursor]
+                [--remove_precursor_tolerance REMOVE_PRECURSOR_TOLERANCE]
+                [--min_intensity MIN_INTENSITY] [--min_peaks MIN_PEAKS]
+                [--min_mz_range MIN_MZ_RANGE]
+                [--max_peaks_used MAX_PEAKS_USED]
+                [--max_peaks_used_library MAX_PEAKS_USED_LIBRARY]
+                [--scaling {sqrt,rank}] --precursor_tolerance_mass
+                PRECURSOR_TOLERANCE_MASS --precursor_tolerance_mode {Da,ppm}
+                [--precursor_tolerance_mass_open PRECURSOR_TOLERANCE_MASS_OPEN]
+                [--precursor_tolerance_mode_open {Da,ppm}]
+                --fragment_mz_tolerance FRAGMENT_MZ_TOLERANCE
+                [--allow_peak_shifts] [--fdr FDR]
+                [--fdr_tolerance_mass FDR_TOLERANCE_MASS]
+                [--fdr_tolerance_mode {Da,ppm}]
+                [--fdr_min_group_size FDR_MIN_GROUP_SIZE] [--mode {ann,bf}]
+                [--bin_size BIN_SIZE] [--hash_len HASH_LEN]
+                [--num_candidates NUM_CANDIDATES] [--batch_size BATCH_SIZE]
+                [--num_list NUM_LIST] [--num_probe NUM_PROBE] [--no_gpu]
+                spectral_library_filename query_filename out_filename
 
 ANN-SoLo: Approximate nearest neighbor spectral library searching
 =================================================================
@@ -84,6 +83,10 @@ ANN-SoLo: Approximate nearest neighbor spectral library searching
 Bittremieux et al. Fast open modification spectral library searching through
 approximate nearest neighbor indexing. Journal of Proteome Research 17,
 3464-3474 (2018).
+
+Bittremieux et al. Extremely fast and accurate open modification spectral
+library searching of high-resolution mass spectra using feature hashing and
+graphics processing units. bioRxiv (2019).
 
 Official code website: https://github.com/bittremieux/ANN-SoLo
 
