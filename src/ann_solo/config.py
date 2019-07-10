@@ -1,4 +1,5 @@
 import argparse
+import textwrap
 
 import configargparse
 
@@ -7,9 +8,9 @@ class NewlineTextHelpFormatter(argparse.HelpFormatter):
 
     def _fill_text(self, text, width, indent):
         return '\n'.join(
-            argparse._textwrap.fill(line, width, initial_indent=indent,
-                                    subsequent_indent=indent,
-                                    replace_whitespace=False).strip()
+            textwrap.fill(line, width, initial_indent=indent,
+                          subsequent_indent=indent,
+                          replace_whitespace=False).strip()
             for line in text.splitlines(keepends=True))
 
 
