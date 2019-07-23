@@ -20,7 +20,10 @@ If you use ANN-SoLo in your work, please cite the following publications:
 Running ANN-SoLo
 ----------------
 
-ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS support.
+ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems, while the CPU-only version supports both the Linux and OSX platforms. An Nvidia CUDA-enabled GPU is required to use the GPU-powered version of ANN-SoLo. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
+
+- **NumPy** needs to be available prior to the installation of ANN-SoLo.
+- The **Faiss** installation depends on a specific GPU version. Please refer to the [Faiss installation instructions](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) for more information.
 
 The recommended way to install ANN-SoLo is using pip:
 
@@ -47,10 +50,7 @@ ANN-SoLo has the following dependencies:
 - [spectrum_utils](https://github.com/bittremieux/spectrum_utils)
 - [tqdm](https://tqdm.github.io/)
 
-We recommend installing these dependencies using conda. Any missing dependencies will be automatically installed when you install ANN-SoLo. There are two exceptions:
-
-- **NumPy** needs to be available prior to the installation of ANN-SoLo.
-- The **Faiss** installation depends on a specific GPU version. Please refer to the [Faiss installation instructions](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) for more information.
+We recommend installing these dependencies using conda. Any missing dependencies will be automatically installed when you install ANN-SoLo.
 
 Contact
 -------
