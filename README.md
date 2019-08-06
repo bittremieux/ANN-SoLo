@@ -20,7 +20,9 @@ If you use ANN-SoLo in your work, please cite the following publications:
 Running ANN-SoLo
 ----------------
 
-ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems with an Nvidia CUDA-enabled GPU device, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
+See the [wiki](https://github.com/bittremieux/ANN-SoLo/wiki) for detailed instructions on how to install and run ANN-SoLo.
+
+ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems with an NVIDIA CUDA-enabled GPU device, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
 
 ### Installation requirements
 
@@ -32,29 +34,6 @@ ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can 
 The recommended way to install ANN-SoLo is using pip:
 
     pip install ann_solo
-
-For detailed instructions on how to run ANN-SoLo see the `src` folder or run `ann_solo -h` to get detailed information about the ANN-SoLo command-line interface.
-
-### Dependencies
-
-ANN-SoLo has the following dependencies:
-
-- [ConfigArgParse](https://github.com/bw2/ConfigArgParse)
-- [Cython](https://cython.org/)
-- [Faiss](https://github.com/facebookresearch/faiss)
-- [Joblib](https://joblib.readthedocs.io/)
-- [Matplotlib](http://matplotlib.org/)
-- [mmh3](https://pypi.org/project/mmh3/)
-- [Numba](http://numba.pydata.org/)
-- [NumExpr](https://github.com/pydata/numexpr)
-- [NumPy](https://www.numpy.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Pyteomics](http://pyteomics.readthedocs.io/)
-- [SciPy](https://www.scipy.org/)
-- [spectrum_utils](https://github.com/bittremieux/spectrum_utils)
-- [tqdm](https://tqdm.github.io/)
-
-We recommend installing these dependencies using conda. Any missing dependencies will be automatically installed when you install ANN-SoLo.
 
 Contact
 -------

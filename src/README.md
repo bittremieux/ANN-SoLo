@@ -12,35 +12,20 @@ The software is available as open-source under the Apache 2.0 license.
 Install
 -------
 
-ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS support.
+See the [wiki](https://github.com/bittremieux/ANN-SoLo/wiki) for detailed instructions on how to install and run ANN-SoLo.
+
+ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems with an NVIDIA CUDA-enabled GPU device, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
+
+### Installation requirements
+
+- **NumPy** needs to be available prior to the installation of ANN-SoLo.
+- The **Faiss** installation depends on a specific GPU version. Please refer to the [Faiss installation instructions](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) for more information.
+
+### Install ANN-SoLo
 
 The recommended way to install ANN-SoLo is using pip:
 
     pip install ann_solo
-
-### Dependencies
-
-ANN-SoLo has the following dependencies:
-
-- [ConfigArgParse](https://github.com/bw2/ConfigArgParse)
-- [Cython](https://cython.org/)
-- [Faiss](https://github.com/facebookresearch/faiss)
-- [Joblib](https://joblib.readthedocs.io/)
-- [Matplotlib](http://matplotlib.org/)
-- [mmh3](https://pypi.org/project/mmh3/)
-- [Numba](http://numba.pydata.org/)
-- [NumExpr](https://github.com/pydata/numexpr)
-- [NumPy](https://www.numpy.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Pyteomics](http://pyteomics.readthedocs.io/)
-- [SciPy](https://www.scipy.org/)
-- [spectrum_utils](https://github.com/bittremieux/spectrum_utils)
-- [tqdm](https://tqdm.github.io/)
-
-We recommend installing these dependencies using conda. Any missing dependencies will be automatically installed when you install ANN-SoLo. There are two exceptions:
-
-- **NumPy** needs to be available prior to the installation of ANN-SoLo.
-- The **Faiss** installation depends on a specific GPU version. Please refer to the [Faiss installation instructions](https://github.com/facebookresearch/faiss/blob/master/INSTALL.md) for more information.
 
 ANN-SoLo search
 ---------------
