@@ -15,7 +15,7 @@ If you use ANN-SoLo in your work, please cite the following publications:
 
 - Wout Bittremieux, Pieter Meysman, William Stafford Noble, Kris Laukens. **Fast Open Modification Spectral Library Searching through Approximate Nearest Neighbor Indexing.** _Journal of Proteome Research_ (2018). [doi:10.1021/acs.jproteome.8b00359](https://doi.org/10.1021/acs.jproteome.8b00359)
 
-- Wout Bittremieux, Kris Laukens, William Stafford Noble. **Extremely fast and accurate open modification spectral library searching of high-resolution mass spectra using feature hashing and graphics processing units.** _bioRxiv_ (2019). [doi:10.1101/627497](https://doi.org/10.1101/627497)
+- Wout Bittremieux, Kris Laukens, William Stafford Noble. **Extremely Fast and Accurate Open Modification Spectral Library Searching of High-Resolution Mass Spectra Using Feature Hashing and Graphics Processing Units.** _Journal of Proteome Research_ (2019). [doi:10.1021/acs.jproteome.9b00291](https://doi.org/10.1021/acs.jproteome.9b00291)
 
 Running ANN-SoLo
 ----------------

@@ -71,7 +71,7 @@ approximate nearest neighbor indexing. Journal of Proteome Research 17,
 
 Bittremieux et al. Extremely fast and accurate open modification spectral
 library searching of high-resolution mass spectra using feature hashing and
-graphics processing units. bioRxiv (2019).
+graphics processing units. Journal of Proteome Research 18, 3792-3799 (2019).
 
 Official code website: https://github.com/bittremieux/ANN-SoLo
 

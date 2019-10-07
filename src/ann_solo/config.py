@@ -40,8 +40,8 @@ class Config:
                         'fast and accurate open modification spectral library '
                         'searching of high-resolution mass spectra using '
                         'feature hashing and graphics processing units. '
-                        'bioRxiv (2019).\n\n'
-                        'Official code website: '
+                        'Journal of Proteome Research 18, 3792-3799 (2019).'
+                        '\n\nOfficial code website: '
                         'https://github.com/bittremieux/ANN-SoLo\n\n',
             default_config_files=['config.ini'],
             args_for_setting_config_path=['-c', '--config'],
