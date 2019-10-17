@@ -12,7 +12,7 @@ from posix.fcntl cimport open
 from posix.fcntl cimport O_RDONLY
 from posix.unistd cimport off_t
 from spectrum_utils.spectrum import MsmsSpectrum
-from spectrum_utils.spectrum import FragmentAnnotation
+from spectrum_utils.spectrum import PeptideFragmentAnnotation
 
 
 cdef extern from 'sys/mman.h' nogil:
@@ -139,8 +139,8 @@ cdef class SplibParser:
         for i in range(num_peaks):
             ion_type, ion_index, charge = annotation[i]
             if charge != -1:
-                annotation_p[i] = FragmentAnnotation(
-                    ion_type.decode(), ion_index, charge, mz[i])
+                annotation_p[i] = PeptideFragmentAnnotation(
+                    charge, mz[i], ion_type.decode(), ion_index)
         annotation.clear()
 
         spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
