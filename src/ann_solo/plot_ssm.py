@@ -7,7 +7,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from spectrum_utils import plot
-from spectrum_utils.spectrum import FragmentAnnotation
+from spectrum_utils.spectrum import PeptideFragmentAnnotation
 
 from ann_solo import reader
 from ann_solo import spectrum_match
@@ -25,7 +25,7 @@ def set_matching_peaks(library_spectrum, query_spectrum):
         if library_annotation is not None:
             query_spectrum.annotation[peak_match[0]] = library_annotation
         else:
-            fragment_annotation = FragmentAnnotation('z', 1, 1, 0)
+            fragment_annotation = PeptideFragmentAnnotation(1, 1, 'z', 0)
             fragment_annotation.ion_type = 'unknown'
             query_spectrum.annotation[peak_match[0]] =\
                 library_spectrum.annotation[peak_match[1]] =\
@@ -111,7 +111,8 @@ def main():
     fig, ax = plt.subplots(figsize=(20, 10))
 
     # Plot without annotations.
-    plot.mirror(query_spectrum, library_spectrum, True, False, ax)
+    plot.mirror(query_spectrum, library_spectrum,
+                {'color_ions': True, 'annotate_ions': False}, ax)
     # Add annotations to the library spectrum.
     max_intensity = library_spectrum.intensity.max()
     for i, annotation in enumerate(library_spectrum.annotation):
