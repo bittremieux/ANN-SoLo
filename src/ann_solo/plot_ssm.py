@@ -91,7 +91,7 @@ def main():
     with reader.SpectralLibraryReader(library_filename) as lib_reader:
         library_spectrum = lib_reader.get_spectrum(library_id, True)
     query_spectrum = None
-    for spec in reader.read_mgf(query_filename):
+    for spec in reader.read_spectra(query_filename):
         if spec.identifier == query_id:
             query_spectrum = process_spectrum(spec, False)
             # Make sure that the precursor charge is set for query spectra

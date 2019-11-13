@@ -208,7 +208,7 @@ class SpectralLibrary:
         logging.debug('Read all query spectra')
         query_spectra = collections.defaultdict(list)
         for query_spectrum in tqdm.tqdm(
-                reader.read_mgf(query_filename), desc='Query spectra read',
+                reader.read_spectra(query_filename), desc='Query spectra read',
                 leave=False, unit='spectra', smoothing=0.7):
             # For queries with an unknown charge, try all possible charges.
             if query_spectrum.precursor_charge is not None:

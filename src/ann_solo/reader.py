@@ -11,7 +11,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import tqdm
-from pyteomics import mgf
+from pyteomics import mgf, mzml, mzxml
 from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo.parsers import SplibParser
@@ -259,42 +259,155 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
         raise FileNotFoundError(f'File {filename} does not exist')
 
 
-def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
+def read_spectra(filename: str) -> Iterator[MsmsSpectrum]:
     """
-    Read all spectra from the given mgf file.
+    Read all MS/MS spectra from the given file.
+
+    Supported file types are MGF, mzML, and mzXML.
 
     Parameters
     ----------
-    filename: str
-        The mgf file name from which to read the spectra.
+    filename : str
+        The file name from which to read the spectra.
 
     Returns
     -------
     Iterator[Spectrum]
-        An iterator of spectra in the given mgf file.
+        An iterator of MS/MS spectra in the given file.
     """
-    # Test if the given file is an mzML file.
+    verify_extension(['.mgf', '.mzml', 'mzxml'], filename)
+    _, ext = os.path.splitext(os.path.basename(filename.lower()))
+    if ext == '.mgf':
+        read_func = read_mgf
+    elif ext == '.mzml':
+        read_func = read_mzml
+    elif ext == '.mzxml':
+        read_func = read_mzxml
+    else:
+        raise ValueError(f'Unrecognized file format')
+    yield from read_func(filename)
+
+
+def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Read all spectra from the given MGF file.
+
+    Parameters
+    ----------
+    filename: str
+        The MGF file name from which to read the spectra.
+
+    Returns
+    -------
+    Iterator[Spectrum]
+        An iterator of spectra in the given MGF file.
+    """
+    # Test if the given file is an MGF file.
     verify_extension(['.mgf'], filename)
 
     # Get all query spectra.
-    for i, mgf_spectrum in enumerate(mgf.read(filename)):
+    for i, spectrum_dict in enumerate(mgf.read(filename)):
         # Create spectrum.
-        identifier = mgf_spectrum['params']['title']
-        precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
-        retention_time = float(mgf_spectrum['params']['rtinseconds'])
-        if 'charge' in mgf_spectrum['params']:
-            precursor_charge = int(mgf_spectrum['params']['charge'][0])
+        identifier = spectrum_dict['params']['title']
+        precursor_mz = float(spectrum_dict['params']['pepmass'][0])
+        retention_time = float(spectrum_dict['params']['rtinseconds'])
+        if 'charge' in spectrum_dict['params']:
+            precursor_charge = int(spectrum_dict['params']['charge'][0])
         else:
             precursor_charge = None
 
         spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
-                                mgf_spectrum['m/z array'],
-                                mgf_spectrum['intensity array'],
+                                spectrum_dict['m/z array'],
+                                spectrum_dict['intensity array'],
                                 retention_time=retention_time)
         spectrum.index = i
         spectrum.is_processed = False
 
         yield spectrum
+
+
+def read_mzml(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Read all MS/MS spectra from the given mzML file.
+
+    Parameters
+    ----------
+    filename: str
+        The mzML file name from which to read the spectra.
+
+    Returns
+    -------
+    Iterator[Spectrum]
+        An iterator of MS/MS spectra in the given mzML file.
+    """
+    # Test if the given file is an mzML file.
+    verify_extension(['.mzml'], filename)
+
+    # Get all query spectra.
+    for i, spectrum_dict in enumerate(mzml.read(filename)):
+        if int(spectrum_dict.get('ms level', -1)) == 2:
+            # Create spectrum.
+            identifier = spectrum_dict['id']
+            precursor = spectrum_dict['precursorList']['precursor'][0]
+            precursor_ion = precursor['selectedIonList']['selectedIon'][0]
+            precursor_mz = precursor_ion['selected ion m/z']
+            retention_time = (spectrum_dict['scanList']['scan'][0]
+                              ['scan start time'])
+            if 'charge state' in precursor_ion:
+                precursor_charge = int(precursor_ion['charge state'])
+            elif 'possible charge state' in precursor_ion:
+                precursor_charge = int(precursor_ion['possible charge state'])
+            else:
+                precursor_charge = None
+
+            spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                                    spectrum_dict['m/z array'],
+                                    spectrum_dict['intensity array'],
+                                    retention_time=retention_time)
+            spectrum.index = i
+            spectrum.is_processed = False
+
+            yield spectrum
+
+
+def read_mzxml(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Read all MS/MS spectra from the given mzXML file.
+
+    Parameters
+    ----------
+    filename: str
+        The mzXML file name from which to read the spectra.
+
+    Returns
+    -------
+    Iterator[Spectrum]
+        An iterator of MS/MS spectra in the given mzXML file.
+    """
+    # Test if the given file is an mzXML file.
+    verify_extension(['.mzxml'], filename)
+
+    # Get all query spectra.
+    for i, spectrum_dict in enumerate(mzxml.read(filename)):
+        if int(spectrum_dict.get('msLevel', -1)) == 2:
+            # Create spectrum.
+            identifier = spectrum_dict['id']
+            precursor_mz = spectrum_dict['precursorMz'][0]['precursorMz']
+            retention_time = spectrum_dict['retentionTime']
+            if 'precursorCharge' in spectrum_dict['precursorMz'][0]:
+                precursor_charge = (spectrum_dict['precursorMz'][0]
+                                    ['precursorCharge'])
+            else:
+                precursor_charge = None
+
+            spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                                    spectrum_dict['m/z array'],
+                                    spectrum_dict['intensity array'],
+                                    retention_time=retention_time)
+            spectrum.index = i
+            spectrum.is_processed = False
+
+            yield spectrum
 
 
 def read_mztab_ssms(filename: str) -> pd.DataFrame:
