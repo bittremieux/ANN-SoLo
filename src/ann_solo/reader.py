@@ -275,7 +275,7 @@ def read_spectra(filename: str) -> Iterator[MsmsSpectrum]:
     Iterator[Spectrum]
         An iterator of MS/MS spectra in the given file.
     """
-    verify_extension(['.mgf', '.mzml', 'mzxml'], filename)
+    verify_extension(['.mgf', '.mzml', '.mzxml'], filename)
     _, ext = os.path.splitext(os.path.basename(filename.lower()))
     if ext == '.mgf':
         read_func = read_mgf
