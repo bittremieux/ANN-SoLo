@@ -72,7 +72,6 @@ class SpectralLibrary:
         self._num_candidates = config.num_candidates
         self._use_gpu = not config.no_gpu and faiss.get_num_gpus()
         if self._use_gpu:
-            self._res = faiss.StandardGpuResources()
             # GPU indexes can only handle maximum 1024 probes and neighbors.
             # https://github.com/facebookresearch/faiss/wiki/Faiss-on-the-GPU#limitations
             if self._num_probe > 1024:
@@ -467,14 +466,23 @@ class SpectralLibrary:
             if self._current_index[0] != charge:
                 # Release memory reserved by the previous index.
                 if self._current_index[1] is not None:
-                    self._current_index[1].reset()
+                    # Multi-GPU index.
+                    if hasattr(self._current_index[1], 'at'):
+                        for i in range(self._current_index[1].count()):
+                            self._current_index[1].at(i).reset()
+                    else:
+                        self._current_index[1].reset()
                 # Load the new index.
                 logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
                 if self._use_gpu:
-                    co = faiss.GpuClonerOptions()
+                    co = faiss.GpuMultipleClonerOptions()
+                    co.shard = False
                     co.useFloat16 = True
-                    index = faiss.index_cpu_to_gpu(self._res, 0, index, co)
+                    co.useFloat16CoarseQuantizer = False
+                    co.indicesOptions = faiss.INDICES_64_BIT
+                    co.reserveVecs = index.ntotal
+                    index = faiss.index_cpu_to_all_gpus(index, co)
                     index.setNumProbes(self._num_probe)
                 else:
                     index.nprobe = self._num_probe
