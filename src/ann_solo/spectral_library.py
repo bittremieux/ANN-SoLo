@@ -483,7 +483,12 @@ class SpectralLibrary:
                     co.indicesOptions = faiss.INDICES_64_BIT
                     co.reserveVecs = index.ntotal
                     index = faiss.index_cpu_to_all_gpus(index, co)
-                    index.setNumProbes(self._num_probe)
+                    # Multi-GPU index.
+                    if hasattr(index, 'at'):
+                        for i in range(index.count()):
+                            index.at(i).setNumProbes(self._num_probe)
+                    else:
+                        index.setNumProbes(self._num_probe)
                 else:
                     index.nprobe = self._num_probe
                 self._current_index = charge, index
