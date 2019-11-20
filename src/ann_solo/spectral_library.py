@@ -486,9 +486,10 @@ class SpectralLibrary:
                     # Multi-GPU index.
                     if hasattr(index, 'at'):
                         for i in range(index.count()):
-                            index.at(i).nprobe = self._num_probe
+                            faiss.downcast_index(index.at(i)).nprobe =\
+                                self._num_probe
                     else:
-                        index.setNumProbes(self._num_probe)
+                        index.nprobe = self._num_probe
                 else:
                     index.nprobe = self._num_probe
                 self._current_index = charge, index
