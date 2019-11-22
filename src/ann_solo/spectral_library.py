@@ -181,8 +181,18 @@ class SpectralLibrary:
         Release any resources to gracefully shut down.
         """
         self._library_reader.close()
+        self._reset_index()
+
+    def _reset_index(self) -> None:
+        """
+        Release GPU index resources.
+        """
         if self._current_index[1] is not None:
-            self._current_index[1].reset()
+            if hasattr(self._current_index[1], 'at'):    # Multi-GPU index.
+                for i in range(self._current_index[1].count()):
+                    self._current_index[1].at(i).reset()
+            else:       # Standard index.
+                self._current_index[1].reset()
 
     def search(self, query_filename: str) -> List[SpectrumSpectrumMatch]:
         """
@@ -465,13 +475,7 @@ class SpectralLibrary:
         with self._ann_index_lock:
             if self._current_index[0] != charge:
                 # Release memory reserved by the previous index.
-                if self._current_index[1] is not None:
-                    # Multi-GPU index.
-                    if hasattr(self._current_index[1], 'at'):
-                        for i in range(self._current_index[1].count()):
-                            self._current_index[1].at(i).reset()
-                    else:
-                        self._current_index[1].reset()
+                self._reset_index()
                 # Load the new index.
                 logging.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
