@@ -18,6 +18,9 @@ from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
 
 
+logger = logging.getLogger('ann_solo')
+
+
 class SpectralLibraryReader:
     """
     Read spectra from a SpectraST spectral library .splib file.
@@ -62,7 +65,7 @@ class SpectralLibraryReader:
         # Test if the given spectral library file is in a supported format.
         verify_extension(self._supported_extensions, self._filename)
 
-        logging.debug('Load the spectral library configuration')
+        logger.debug('Load the spectral library configuration')
 
         # Verify that the configuration file
         # corresponding to this spectral library is present.
@@ -71,7 +74,7 @@ class SpectralLibraryReader:
             # If not we should recreate this file
             # prior to using the spectral library.
             do_create = True
-            logging.warning('Missing spectral library configuration file')
+            logger.warning('Missing spectral library configuration file')
         else:
             # Load the configuration file.
             config_lib_filename, self.spec_info, load_hash =\
@@ -80,13 +83,13 @@ class SpectralLibraryReader:
             # Check that the same spectral library file format is used.
             if config_lib_filename != os.path.basename(self._filename):
                 do_create = True
-                logging.warning('The configuration corresponds to a different '
-                                'file format of this spectral library')
+                logger.warning('The configuration corresponds to a different '
+                               'file format of this spectral library')
             # Verify that the runtime settings match the loaded settings.
             if self._config_hash != load_hash:
                 do_create = True
-                logging.warning('The spectral library search engine was '
-                                'created using non-compatible settings')
+                logger.warning('The spectral library search engine was '
+                               'created using non-compatible settings')
 
         # (Re)create the spectral library configuration
         # if it is missing or invalid.
@@ -119,8 +122,8 @@ class SpectralLibraryReader:
         contains the settings used to construct this spectral library to make
         sure these match the runtime settings.
         """
-        logging.info('Create the spectral library configuration for file %s',
-                     self._filename)
+        logger.info('Create the spectral library configuration for file %s',
+                    self._filename)
 
         self.is_recreated = True
 
@@ -148,8 +151,8 @@ class SpectralLibraryReader:
 
         # Store the configuration.
         config_filename = self._get_config_filename()
-        logging.debug('Save the spectral library configuration to file %s',
-                      config_filename)
+        logger.debug('Save the spectral library configuration to file %s',
+                     config_filename)
         joblib.dump(
             (os.path.basename(self._filename), self.spec_info,
              self._config_hash),
@@ -251,11 +254,11 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
     """
     _, ext = os.path.splitext(os.path.basename(filename))
     if ext.lower() not in supported_extensions:
-        logging.error('Unrecognized file format: %s', filename)
+        logger.error('Unrecognized file format: %s', filename)
         raise FileNotFoundError(f'Unrecognized file format (supported file '
                                 f'formats: {", ".join(supported_extensions)})')
     elif not os.path.isfile(filename):
-        logging.error('File not found: %s', filename)
+        logger.error('File not found: %s', filename)
         raise FileNotFoundError(f'File {filename} does not exist')
 
 

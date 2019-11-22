@@ -13,6 +13,9 @@ from ann_solo.spectrum import SpectrumSpectrumMatch
 from . import __version__
 
 
+logger = logging.getLogger('ann_solo')
+
+
 def natural_sort_key(s: str, _nsre: Pattern[AnyStr] = re.compile('([0-9]+)'))\
         -> List[Union[str, int]]:
     """
@@ -56,7 +59,7 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
     if os.path.splitext(filename)[1].lower() != '.mztab':
         filename += '.mztab'
 
-    logging.info('Save identifications to file %s', filename)
+    logger.info('Save identifications to file %s', filename)
 
     # Collect the necessary metadata.
     metadata = [

@@ -24,6 +24,9 @@ from ann_solo.spectrum import spectrum_to_vector
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
+logger = logging.getLogger('ann_solo')
+
+
 class SpectralLibrary:
     """
     Spectral library search engine.
@@ -65,7 +68,7 @@ class SpectralLibrary:
                 filename, self._get_hyperparameter_hash())
             self._library_reader.open()
         except FileNotFoundError as e:
-            logging.error(e)
+            logger.error(e)
             raise
 
         self._num_probe = config.num_probe
@@ -75,14 +78,13 @@ class SpectralLibrary:
             # GPU indexes can only handle maximum 1024 probes and neighbors.
             # https://github.com/facebookresearch/faiss/wiki/Faiss-on-the-GPU#limitations
             if self._num_probe > 1024:
-                logging.warning('Using num_probe=1024 (maximum supported '
-                                'value on the GPU), %d was supplied',
-                                self._num_probe)
+                logger.warning('Using num_probe=1024 (maximum supported value '
+                               'on the GPU), %d was supplied', self._num_probe)
                 self._num_probe = 1024
             if self._num_candidates > 1024:
-                logging.warning('Using num_candidates=1024 (maximum supported '
-                                'value on the GPU), %d was supplied',
-                                self._num_candidates)
+                logger.warning('Using num_candidates=1024 (maximum supported '
+                               'value on the GPU), %d was supplied',
+                               self._num_candidates)
                 self._num_candidates = 1024
 
         self._current_index = None, None
@@ -90,8 +92,8 @@ class SpectralLibrary:
         if config.mode == 'ann':
             verify_file_existence = True
             if self._library_reader.is_recreated:
-                logging.warning('ANN indexes were created using '
-                                'non-compatible settings')
+                logger.warning('ANN indexes were created using non-compatible '
+                               'settings')
                 verify_file_existence = False
             # Check if an ANN index exists for each charge.
             base_filename = f'{os.path.splitext(filename)[0]}_' \
@@ -102,11 +104,12 @@ class SpectralLibrary:
                            self._library_reader.spec_info['charge'].items()
                            if len(charge_info['id']) >= config.num_list]
             for charge in sorted(ann_charges):
-                self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
+                self._ann_filenames[charge] =\
+                    f'{base_filename}_{charge}.idxann'
                 if (not verify_file_existence or
                         not os.path.isfile(self._ann_filenames[charge])):
                     create_ann_charges.append(charge)
-                    logging.warning('Missing ANN index for charge %d', charge)
+                    logger.warning('Missing ANN index for charge %d', charge)
 
             # Create the missing FAISS indices.
             if create_ann_charges:
@@ -137,14 +140,14 @@ class SpectralLibrary:
             Charges for which a FAISS index will be created. Sufficient library
             spectra with the corresponding precursor charge should exist.
         """
-        logging.debug('Add the spectra to the spectral library ANN indexes')
+        logger.debug('Add the spectra to the spectral library ANN indexes')
         # Collect vectors for all spectra per charge.
         charge_vectors = {
             charge: np.zeros((len(self._library_reader.spec_info
                                   ['charge'][charge]['id']), config.hash_len),
                              np.float32)
             for charge in charges}
-        i = {charge: 0 for charge in charge_vectors.keys()}
+        i = collections.Counter()
         for lib_spectrum, _ in tqdm.tqdm(
                 self._library_reader.get_all_spectra(),
                 desc='Library spectra added', leave=False, unit='spectra',
@@ -157,10 +160,11 @@ class SpectralLibrary:
                                    charge_vectors[charge][i[charge]])
                 i[charge] += 1
         # Build an individual FAISS index per charge.
-        logging.info('Build the spectral library ANN indexes')
+        logger.info('Build the spectral library ANN indexes')
         for charge, vectors in charge_vectors.items():
-            logging.debug('Create a new ANN index for charge %d', charge)
+            logger.debug('Create a new ANN index for charge %d', charge)
             quantizer = faiss.IndexFlatIP(config.hash_len)
+            # TODO: Use the GPU to build the index. See GLEAMS.
             # TODO: Use HNSW as quantizer?
             #       https://github.com/facebookresearch/faiss/blob/master/benchs/bench_hnsw.py#L136
             # quantizer = faiss.IndexHNSWFlat(config.hash_len, 32)
@@ -174,7 +178,7 @@ class SpectralLibrary:
             ann_index.add(vectors)
             faiss.write_index(ann_index, self._ann_filenames[charge])
 
-        logging.debug('Finished creating the spectral library ANN indexes')
+        logger.debug('Finished creating the spectral library ANN indexes')
 
     def shutdown(self) -> None:
         """
@@ -210,11 +214,11 @@ class SpectralLibrary:
             spectra and library spectra below the given FDR threshold
             (specified in the config).
         """
-        logging.info('Process file %s', query_filename)
+        logger.info('Process file %s', query_filename)
 
         # Read all spectra in the query file and
         # split based on their precursor charge.
-        logging.debug('Read all query spectra')
+        logger.debug('Read all query spectra')
         query_spectra = collections.defaultdict(list)
         for query_spectrum in tqdm.tqdm(
                 reader.read_spectra(query_filename), desc='Query spectra read',
@@ -234,12 +238,12 @@ class SpectralLibrary:
                      .append(query_spectrum_charge))
 
         # Identify all query spectra.
-        logging.debug('Process all query spectra')
+        logger.debug('Process all query spectra')
         identifications = {}
         # Cascade level 1: standard search.
         for ssm in self._search_cascade(query_spectra, 'std'):
             identifications[ssm.identifier] = ssm
-        logging.info('%d spectra identified after the standard search',
+        logger.info('%d spectra identified after the standard search',
                      len(identifications))
         if (config.precursor_tolerance_mass_open is not None and
                 config.precursor_tolerance_mode_open is not None):
@@ -251,8 +255,8 @@ class SpectralLibrary:
             # Cascade level 2: open search.
             for ssm in self._search_cascade(query_spectra, 'open'):
                 identifications[ssm.identifier] = ssm
-            logging.info('%d spectra identified after the open search',
-                         len(identifications))
+            logger.info('%d spectra identified after the open search',
+                        len(identifications))
 
         return list(identifications.values())
 
@@ -279,15 +283,13 @@ class SpectralLibrary:
             threshold (specified in the config).
         """
         if mode == 'std':
-            logging.debug('Identify the query spectra using a standard search '
-                          '(Δm = %s %s)',
-                          config.precursor_tolerance_mass,
-                          config.precursor_tolerance_mode)
+            logger.debug('Identify the query spectra using a standard search '
+                         '(Δm = %s %s)', config.precursor_tolerance_mass,
+                         config.precursor_tolerance_mode)
         elif mode == 'open':
-            logging.debug('Identify the query spectra using an open search '
-                          '(Δm = %s %s)',
-                          config.precursor_tolerance_mass_open,
-                          config.precursor_tolerance_mode_open)
+            logger.debug('Identify the query spectra using an open search '
+                         '(Δm = %s %s)', config.precursor_tolerance_mass_open,
+                         config.precursor_tolerance_mode_open)
 
         ssms = {}
         batch_size = config.batch_size
@@ -312,8 +314,8 @@ class SpectralLibrary:
                             ssms[ssm.identifier] = ssm
                         pbar.update(1)
         # Store the SSMs below the FDR threshold.
-        logging.debug('Filter the spectrum—spectrum matches on FDR '
-                      '(threshold = %s)', config.fdr)
+        logger.debug('Filter the spectrum—spectrum matches on FDR '
+                     '(threshold = %s)', config.fdr)
         if mode == 'std':
             return utils.filter_fdr(ssms.values(), config.fdr)
         elif mode == 'open':
@@ -477,7 +479,7 @@ class SpectralLibrary:
                 # Release memory reserved by the previous index.
                 self._reset_index()
                 # Load the new index.
-                logging.debug('Load the ANN index for charge %d', charge)
+                logger.debug('Load the ANN index for charge %d', charge)
                 index = faiss.read_index(self._ann_filenames[charge])
                 if self._use_gpu:
                     co = faiss.GpuMultipleClonerOptions()
