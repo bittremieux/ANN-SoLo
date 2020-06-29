@@ -31,7 +31,7 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
     main([spectral_library_filename, query_filename, out_filename, *args])
 
 
-def main(args: Union[str, list] = None):
+def main(args: Union[str, List[str]] = None):
     # Initialize logging.
     logging.basicConfig(format='{asctime} [{levelname}/{processName}] '
                                '{module}.{funcName} : {message}',
