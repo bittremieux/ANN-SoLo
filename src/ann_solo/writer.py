@@ -38,7 +38,7 @@ def natural_sort_key(s: str, _nsre: Pattern[AnyStr] = re.compile('([0-9]+)'))\
 
 
 def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
-                lib_reader: SpectralLibraryReader) -> None:
+                lib_reader: SpectralLibraryReader) -> str:
     """
     Write the given SSMs to an mzTab file.
 
@@ -51,6 +51,11 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         '.mztab' extension this will be added.
     lib_reader : SpectralLibraryReader
         The spectral library reader used during identifications.
+
+    Returns
+    -------
+    str
+        The file name of the mzTab output file.
     """
     # Check if the filename contains the mztab extension and add if required.
     if os.path.splitext(filename)[1].lower() != '.mztab':
@@ -142,3 +147,5 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
                 'null', 'null', 'null', 'null',
                 f'{ssm.is_decoy:d}',
                 str(ssm.num_candidates)]) + '\n')
+
+    return filename
