@@ -1,5 +1,5 @@
 import logging
-from typing import List, Union, Dict, Optional
+from typing import List, Union
 
 from ann_solo import spectral_library
 from ann_solo import writer
@@ -7,9 +7,12 @@ from ann_solo.config import config
 
 
 def ann_solo(spectral_library_filename: str, query_filename: str,
-             out_filename: str, **kwargs) -> str:
+             out_filename: str, **kwargs: Union[bool, float, int, str]) -> str:
     """
-    Run ANN-SoLo.
+    Run ANN-SoLo with the specified search settings.
+
+    Values for search settings that are not explicitly specified will be taken
+    from the config file (if present) or take their default values.
 
     The identified PSMs will be stored in the given file.
 
@@ -21,7 +24,7 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
         The query spectra file name.
     out_filename : str
         The mzTab output file name.
-    **kwargs
+    **kwargs : Union[bool, float, int, str]
         Additional search settings. Keys MUST match the command line
         arguments (excluding the '--' prefix;
         https://github.com/bittremieux/ANN-SoLo/wiki/Parameters). Values
