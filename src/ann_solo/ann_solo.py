@@ -1,5 +1,5 @@
 import logging
-from typing import List, Union
+from typing import List, Union, Dict, Optional
 
 from ann_solo import spectral_library
 from ann_solo import writer
@@ -7,7 +7,7 @@ from ann_solo.config import config
 
 
 def ann_solo(spectral_library_filename: str, query_filename: str,
-             out_filename: str, args: List[str]) -> None:
+             out_filename: str, **kwargs) -> str:
     """
     Run ANN-SoLo.
 
@@ -21,14 +21,27 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
         The query spectra file name.
     out_filename : str
         The mzTab output file name.
-    args : List[str]
-        List of additional search settings. List items either MUST match the
-        commandline arguments (including '--' prefix;
-        https://github.com/bittremieux/ANN-SoLo/wiki/Parameters) or MUST be
-        values as strings.
+    **kwargs
+        Additional search settings. Keys MUST match the command line
+        arguments (excluding the '--' prefix;
+        https://github.com/bittremieux/ANN-SoLo/wiki/Parameters). Values
+        MUST be the argument values. Boolean flags can be toggled by
+        specifying True or False (ex: no_gpu=True).
     """
+    # Convert kwargs dictionary to list for main().
+    # 'args' contains arguments with values.
+    # 'flags' contains boolean flags to include
+    args = sum([['--' + k, str(v)] for k, v in kwargs.items()
+                if not isinstance(v, bool)], [])
+
+    flags = ['--' + k for k, v in kwargs.items() if v and isinstance(v, bool)]
+
     # Explicitly set the search parameters when run from Python.
-    main([spectral_library_filename, query_filename, out_filename, *args])
+    main([spectral_library_filename, query_filename, out_filename, *args,
+          *flags])
+
+    # Return the mzTab output file name.
+    return out_filename
 
 
 def main(args: Union[str, List[str]] = None):
