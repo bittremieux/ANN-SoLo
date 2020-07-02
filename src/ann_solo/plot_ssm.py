@@ -81,7 +81,7 @@ def main():
     query_filename = os.path.abspath(os.path.join(
         query_uri.netloc, query_uri.path))
     ssm = ssms.loc[query_id]
-    library_id = ssm['accession']
+    library_id = ssm['opt_ms_run[1]_library_id']
     library_uri = urlparse.urlparse(urlparse.unquote(ssm['database']))
     library_filename = os.path.abspath(os.path.join(
         library_uri.netloc, library_uri.path))

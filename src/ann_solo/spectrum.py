@@ -231,15 +231,15 @@ class SpectrumSpectrumMatch:
                 if self.library_spectrum is not None else None)
 
     @property
-    def identifier(self):
+    def query_identifier(self):
         return self.query_spectrum.identifier
 
     @property
-    def index(self):
+    def query_index(self):
         return self.query_spectrum.index
 
     @property
-    def accession(self):
+    def library_identifier(self):
         return (self.library_spectrum.identifier
                 if self.library_spectrum is not None else None)
 

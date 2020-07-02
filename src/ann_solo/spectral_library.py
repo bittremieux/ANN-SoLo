@@ -229,7 +229,7 @@ class SpectralLibrary:
         identifications = {}
         # Cascade level 1: standard search.
         for ssm in self._search_cascade(query_spectra, 'std'):
-            identifications[ssm.identifier] = ssm
+            identifications[ssm.query_identifier] = ssm
         logging.info('%d spectra identified after the standard search',
                      len(identifications))
         if (config.precursor_tolerance_mass_open is not None and
@@ -238,10 +238,10 @@ class SpectralLibrary:
             for charge, query_spectra_charge in query_spectra.items():
                 query_spectra[charge] = [
                     spectrum for spectrum in query_spectra_charge
-                    if spectrum.identifier not in identifications]
+                    if spectrum.query_identifier not in identifications]
             # Cascade level 2: open search.
             for ssm in self._search_cascade(query_spectra, 'open'):
-                identifications[ssm.identifier] = ssm
+                identifications[ssm.query_identifier] = ssm
             logging.info('%d spectra identified after the open search',
                          len(identifications))
 
@@ -297,10 +297,10 @@ class SpectralLibrary:
                         # (i.e. in case of duplicated spectra
                         # if the precursor charge was unknown).
                         if (ssm is not None and
-                                (ssm.identifier not in ssms or
+                                (ssm.query_identifier not in ssms or
                                  (ssm.search_engine_score >
-                                  ssms[ssm.identifier].search_engine_score))):
-                            ssms[ssm.identifier] = ssm
+                                  ssms[ssm.query_identifier].search_engine_score))):
+                            ssms[ssm.query_identifier] = ssm
                         pbar.update(1)
         # Store the SSMs below the FDR threshold.
         logging.debug('Filter the spectrum—spectrum matches on FDR '

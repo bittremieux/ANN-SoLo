@@ -121,17 +121,17 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
             'search_engine_score[2]', 'modifications', 'retention_time',
             'charge', 'exp_mass_to_charge', 'calc_mass_to_charge',
             'spectra_ref', 'pre', 'post', 'start', 'end',
+            'opt_ms_run[1]_library_id',
             'opt_ms_run[1]_cv_MS:1002217_decoy_peptide',
             'opt_ms_run[1]_num_candidates']) + '\n')
         # SSMs sorted by their query identifier.
         for ssm in sorted(identifications,
-                          key=lambda ssm: natural_sort_key(ssm.identifier)):
+                          key=lambda s: natural_sort_key(s.query_identifier)):
             f_out.write('\t'.join([
                 'PSM',
                 ssm.sequence,
-                str(ssm.identifier),
-                str(ssm.accession),
-                'null',
+                str(ssm.query_identifier),
+                'null', 'null',
                 pathlib.Path(os.path.abspath(
                     config.spectral_library_filename)).as_uri(),
                 database_version,
@@ -143,8 +143,9 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
                 str(ssm.charge),
                 str(ssm.exp_mass_to_charge),
                 str(ssm.calc_mass_to_charge),
-                f'ms_run[1]:index={ssm.index}',
+                f'ms_run[1]:index={ssm.query_index}',
                 'null', 'null', 'null', 'null',
+                str(ssm.library_identifier),
                 f'{ssm.is_decoy:d}',
                 str(ssm.num_candidates)]) + '\n')
 
