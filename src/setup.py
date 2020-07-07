@@ -1,8 +1,8 @@
+import codecs
+import os
 import setuptools
 
 import numpy as np
-
-import ann_solo
 
 try:
     import Cython.Distutils
@@ -12,8 +12,26 @@ else:
     use_cython = True
 
 
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__))
+    # Intentionally *not* adding an encoding option to open, See:
+    #   https://github.com/pypa/virtualenv/issues/201#issuecomment-3145690
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError('Unable to find version string')
+
+
 DISTNAME = 'ann_solo'
-VERSION = ann_solo.__version__
+# https://packaging.python.org/guides/single-sourcing-package-version/
+VERSION = get_version('ann_solo/__init__.py')
 DESCRIPTION = 'Spectral library search engine optimized for fast open ' \
               'modification searching'
 with open('README.md') as f_in:
