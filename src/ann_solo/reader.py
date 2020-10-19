@@ -134,9 +134,9 @@ class SpectralLibraryReader:
                                               unit='spectra'):
                 # Store the spectrum information for easy retrieval.
                 info_charge = temp_info[spectrum.precursor_charge]
-                info_charge['id'].append(spectrum.query_identifier)
+                info_charge['id'].append(spectrum.identifier)
                 info_charge['precursor_mz'].append(spectrum.precursor_mz)
-                offsets[spectrum.query_identifier] = offset
+                offsets[spectrum.identifier] = offset
         self.spec_info = {
             'charge': {
                 charge: {

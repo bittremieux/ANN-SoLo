@@ -238,7 +238,7 @@ class SpectralLibrary:
             for charge, query_spectra_charge in query_spectra.items():
                 query_spectra[charge] = [
                     spectrum for spectrum in query_spectra_charge
-                    if spectrum.query_identifier not in identifications]
+                    if spectrum.identifier not in identifications]
             # Cascade level 2: open search.
             for ssm in self._search_cascade(query_spectra, 'open'):
                 identifications[ssm.query_identifier] = ssm
