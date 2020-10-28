@@ -7,7 +7,7 @@ from ann_solo.config import config
 
 
 def ann_solo(spectral_library_filename: str, query_filename: str,
-             out_filename: str, **kwargs: Union[bool, float, int, str]) -> str:
+             out_filename: str, **kwargs: Union[bool, float, int, str]) -> int:
     """
     Run ANN-SoLo with the specified search settings.
 
@@ -33,8 +33,8 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
 
     Returns
     -------
-    str
-        The file name of the mzTab output file.
+    int
+        The error code from running ANN-SoLo.
     """
     # Convert kwargs dictionary to list for main().
     # 'args' contains arguments with values.
@@ -44,14 +44,13 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
     flags = ['--' + k for k, v in kwargs.items() if v and isinstance(v, bool)]
 
     # Explicitly set the search parameters when run from Python.
-    out_filename = main([spectral_library_filename, query_filename,
-                         out_filename, *args, *flags])
+    error_code = main([spectral_library_filename, query_filename, out_filename,
+                       *args, *flags])
 
-    # Return the mzTab output file name.
-    return out_filename
+    return error_code
 
 
-def main(args: Union[str, List[str]] = None) -> str:
+def main(args: Union[str, List[str]] = None) -> int:
     # Initialize logging.
     logging.basicConfig(format='{asctime} [{levelname}/{processName}] '
                                '{module}.{funcName} : {message}',
@@ -64,13 +63,13 @@ def main(args: Union[str, List[str]] = None) -> str:
     spec_lib = spectral_library.SpectralLibrary(
         config.spectral_library_filename)
     identifications = spec_lib.search(config.query_filename)
-    out_filename = writer.write_mztab(identifications, config.out_filename,
-                                      spec_lib._library_reader)
+    writer.write_mztab(identifications, config.out_filename,
+                       spec_lib._library_reader)
     spec_lib.shutdown()
 
     logging.shutdown()
 
-    return out_filename
+    return 0
 
 
 if __name__ == '__main__':
