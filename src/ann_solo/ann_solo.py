@@ -54,7 +54,7 @@ def main(args: Union[str, List[str]] = None) -> int:
     # Initialize logging.
     logging.basicConfig(format='{asctime} [{levelname}/{processName}] '
                                '{module}.{funcName} : {message}',
-                        style='{', level=logging.DEBUG)
+                        style='{', level=logging.INFO)
 
     # Load the configuration.
     config.parse(args)

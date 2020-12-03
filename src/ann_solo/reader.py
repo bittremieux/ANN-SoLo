@@ -15,6 +15,7 @@ from pyteomics import mgf
 from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo.parsers import SplibParser
+from ann_solo.sqlite_parsers import ElibParser
 from ann_solo.spectrum import process_spectrum
 
 
@@ -23,7 +24,7 @@ class SpectralLibraryReader:
     Read spectra from a SpectraST spectral library .splib file.
     """
 
-    _supported_extensions = ['.splib']
+    _supported_extensions = ['.splib', '.elib', '.dlib']
 
     is_recreated = False
 
@@ -156,7 +157,11 @@ class SpectralLibraryReader:
             config_filename, compress=9, protocol=pickle.DEFAULT_PROTOCOL)
 
     def open(self) -> None:
-        self._parser = SplibParser(self._filename.encode())
+        _, ext = os.path.splitext(self._filename)
+        if ext.lower() == ".splib":
+            self._parser = SplibParser(self._filename.encode())
+        else:
+            self._parser = ElibParser(self._filename.encode())
 
     def close(self) -> None:
         if self._parser is not None:
@@ -213,13 +218,18 @@ class SpectralLibraryReader:
             library file.
         """
         self._parser.seek_first_spectrum()
+
         try:
-            while True:
-                spectrum, offset = self._parser.read_spectrum()
-                spectrum.is_processed = False
-                yield spectrum, offset
-        except StopIteration:
-            return
+            yield from self._parser.get_all_spectra()
+        except AttributeError:
+            try:
+                print("blah")
+                while True:
+                    spectrum, offset = self._parser.read_spectrum()
+                    spectrum.is_processed = False
+                    yield spectrum, offset
+            except StopIteration:
+                return
 
     def get_version(self) -> str:
         """
