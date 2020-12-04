@@ -223,7 +223,6 @@ class SpectralLibraryReader:
             yield from self._parser.get_all_spectra()
         except AttributeError:
             try:
-                print("blah")
                 while True:
                     spectrum, offset = self._parser.read_spectrum()
                     spectrum.is_processed = False

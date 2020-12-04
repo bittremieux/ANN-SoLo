@@ -11,7 +11,7 @@ BLIB should be easy to add.
 import re
 import sqlite3
 import zlib
-from typing import Tuple, Dict, Iterator
+from typing import Tuple, Dict, Iterator, Union, List
 
 import numpy as np
 from spectrum_utils.spectrum import MsmsSpectrum
@@ -35,34 +35,18 @@ class ElibParser:
         """
         self._conn = sqlite3.connect(filename)
         self._cursor = self._conn.cursor()
-        self._size = (self._cursor
-                      .execute('SELECT COUNT(rowid) FROM entries')
-                      .fetchone()[0])
 
+        # Get row IDs for fast look-up:
+        rowids = self._cursor.execute('SELECT rowid FROM entries')
+        self._rowids = {k: v[0] for k, v in enumerate(rowids)}
+        self._size = len(self._rowids)
         self._pos = 0
 
+        # Build an decoy dict for fast look-up:
         decoy_map = self._cursor.execute(
             'SELECT PeptideSeq, isDecoy FROM peptidetoprotein'
         )
-        self._is_decoy = {k: v for k, v in decoy_map}
-
-    def _get_row(self, offset: int) -> Tuple:
-        """
-        Read a row at the offset
-
-        Parameters
-        ----------
-        offset : int
-            The index of the row to read.
-
-        Returns
-        -------
-        A tuple containing the values of each column in the table.
-        """
-        vals = self._cursor.execute(
-            'SELECT * FROM entries LIMIT 1 OFFSET ?', (str(offset),)
-        )
-        return vals.fetchone()
+        self._is_decoy = dict(decoy_map)
 
     def _parse_spectrum(self, row: Tuple, identifier: int) -> MsmsSpectrum:
         """
@@ -94,7 +78,24 @@ class ElibParser:
         spectrum.annotate_peptide_fragments(10, "ppm")
         return spectrum
 
-    def seek_first_spectrum(self):
+    def _get_row(self, offset: int) -> MsmsSpectrum:
+        """
+        Read a row at the offset
+        Parameters
+        ----------
+        offset : int
+            The index of the row to read.
+        Returns
+        -------
+        A parsed Spectrum.
+        """
+        rowid = self._rowids[offset]
+        row = self._cursor.execute(
+            'SELECT * FROM entries WHERE rowid=?', (str(rowid),)
+        )
+        return self._parse_spectrum(row.fetchone(), offset)
+
+    def seek_first_spectrum(self) -> None:
         """Needed for for compatibility"""
         self._pos = 0
 
@@ -102,10 +103,19 @@ class ElibParser:
         """
         Read a spectrum from the library.
 
+        This function is mainly to maintain a consistent API with the
+        splib parser. However, use this function sparingly - it is
+        exceedingly slow due to having lookup each spectrum from the
+        SQLite table individually.
+
         Parameters
         ----------
         offset : int
             The row to start reading from.
+
+        Returns
+        -------
+            An Spectrum object
         """
         if offset is not None and offset >= 0:
             self._pos = offset
@@ -115,8 +125,7 @@ class ElibParser:
             print(self._pos, self._size)
             raise StopIteration
 
-        row = self._get_row(spectrum_offset)
-        spectrum = self._parse_spectrum(row, spectrum_offset)
+        spectrum = self._get_row(spectrum_offset)
         self._pos += 1
         return spectrum, spectrum_offset
 
@@ -138,6 +147,7 @@ class ElibParser:
             spectrum = self._parse_spectrum(row, spectrum_offset)
             spectrum.is_processed = False
             yield spectrum, spectrum_offset
+
 
 def _decode(array: bytes, dtype: str) -> np.ndarray:
     """
@@ -169,7 +179,7 @@ def _parse_mods(peptide: str) -> Dict[int, float]:
     Dict[int, float]
         The modifications for spectrum_utils.
     """
-    mods = re.finditer("\[(.+?)\]", peptide)
+    mods = re.finditer(r"\[(.+?)\]", peptide)
     mod_dict = {}
     offset = 0
     for mod in mods:
