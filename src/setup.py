@@ -57,6 +57,11 @@ ext_parsers = setuptools.Extension(
     language='c++', extra_compile_args=compile_args,
     extra_link_args=compile_args, include_dirs=[np.get_include()])
 ext_parsers.cython_directives = cython_directives
+ext_tools_fast = setuptools.Extension(
+    'ann_solo.spectral_similarity.tools_fast', ['ann_solo/spectral_similarity/tools_fast.pyx'],
+    language='c++', extra_compile_args=compile_args,
+    extra_link_args=compile_args, include_dirs=[np.get_include()])
+ext_tools_fast.cython_directives = cython_directives
 
 cmdclass = {}
 if use_cython:
@@ -107,7 +112,9 @@ setuptools.setup(
         'pyteomics',
         'scipy',
         'spectrum_utils>=0.3.0',
-        'tqdm'],
+        'tqdm',
+        'mokapot',
+        'os'],
     setup_requires=[
         'Cython',
         'numpy'],
