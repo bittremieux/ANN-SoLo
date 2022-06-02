@@ -7,10 +7,7 @@ import numpy as np
 from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo.config import config
-from scipy.special import comb
-from .spectral_similarity import all_similarity
-from sklearn.metrics import mean_squared_error
-import scipy.stats as stats
+
 
 @nb.njit
 def _check_spectrum_valid(spectrum_mz: np.ndarray, min_peaks: int,
@@ -221,29 +218,12 @@ class SpectrumSpectrumMatch:
                  library_spectrum: MsmsSpectrum = None,
                  search_engine_score: float = math.nan,
                  q: float = math.nan,
-                 num_candidates: int = 0,
-                 matched_peaks: []= None,
-                 group: str= None,
-                 mode: str='std'):
+                 num_candidates: int = 0):
         self.query_spectrum = query_spectrum
         self.library_spectrum = library_spectrum
         self.search_engine_score = search_engine_score
         self.q = q
         self.num_candidates = num_candidates
-        self.matched_peaks = matched_peaks
-        self.group = group
-        self.mode = mode
-        self.std_features = {}#pd.DataFrame(columns=column_names)
-        self.open_features = {}#pd.DataFrame(columns=column_names)
-        self.compute_features()
-
-
-    def __str__(self):
-        return " query_spectrum: " + str(self.query_spectrum) + \
-               " library_spectrum: " + str(self.library_spectrum) + \
-               " search_engine_score: " + str(self.search_engine_score) + \
-               " q: " + str(self.q) + \
-               " num_candidates: " + str(self.num_candidates)
 
     @property
     def sequence(self):
@@ -284,108 +264,3 @@ class SpectrumSpectrumMatch:
     def is_decoy(self):
         return (self.library_spectrum.is_decoy
                 if self.library_spectrum is not None else None)
-
-    def get_precursor_mass(self,spectrum):
-        return spectrum.precursor_mz
-
-    def get_precursor_charge(self,spectrum):
-        return spectrum.precursor_charge
-
-    def number_of_matched_spectrum_peaks(self):
-        return len(self.matched_peaks)
-
-    def hypergeometric_peak_match_score(self):
-        k = self.number_of_matched_spectrum_peaks()#len(self.matched_peaks)
-        m = len(self.library_spectrum.mz)
-        N,_,_ = get_dim(config.min_mz,config.max_mz,config.bin_size)
-        hgs = 0
-        for i in range(k+1,m+1):
-            hgs += (comb(m,i,exact=True) * comb(N-m,m-i,exact=True))/comb(N,m,exact=True)
-        return hgs
-
-    def fraction_of_matched_query_spectrum_peaks(self):
-        return self.number_of_matched_spectrum_peaks() / len(self.query_spectrum.mz)
-
-    def fraction_of_matched_library_spectrum_peaks(self):
-        return self.number_of_matched_spectrum_peaks() / len(self.library_spectrum.mz)
-
-    def fraction_of_matched_spectrum_peak_intensities(self):
-        matched_qs_intensity, matched_ls_intensity = 0, 0
-        for qsi, lsi in self.matched_peaks:
-            matched_qs_intensity += self.query_spectrum.intensity[qsi]
-            matched_ls_intensity += self.library_spectrum.intensity[lsi]
-        return matched_qs_intensity / sum(self.query_spectrum.intensity) , \
-               matched_ls_intensity / sum(self.library_spectrum.intensity)
-
-    def bray_curtis_dissimilarity(self):
-        return 1 - (2*self.number_of_matched_spectrum_peaks())/(len(self.library_spectrum.mz)+len(self.query_spectrum.mz))
-
-    def kendalltau(self):
-        qs_intesity_len = len(self.query_spectrum.intensity)
-        ls_intesity_len = len(self.library_spectrum.intensity)
-        max_len = max(qs_intesity_len,ls_intesity_len)
-        tau, _ = stats.kendalltau(np.pad(self.query_spectrum.intensity, (0,max_len-qs_intesity_len), 'constant',constant_values=(0, 0)),
-                                  np.pad(self.library_spectrum.intensity, (0, max_len-ls_intesity_len), 'constant', constant_values=(0, 0)))
-        return tau
-    def mse_matched_spec_peak(self,axis):
-        qs_list = []
-        ls_list = []
-        for qsi,lsi in self.matched_peaks:
-            if axis == 'intensity':
-                qs_list.append(self.query_spectrum.intensity[qsi])
-                ls_list.append(self.library_spectrum.intensity[lsi])
-            else:
-                qs_list.append(self.query_spectrum.mz[qsi])
-                ls_list.append(self.library_spectrum.mz[lsi])
-        return 1 if len(self.matched_peaks) == 0 else mean_squared_error(qs_list,ls_list)
-
-    def get_spec_2d_representation(self,input_spec):
-        for index, mz in enumerate(input_spec.mz):
-            if index:
-                peak = np.array([[mz, input_spec.mz[index]]], dtype=np.float32)
-                spectrum = np.concatenate((spectrum, peak), axis=0)
-            else:
-                spectrum = np.array([[mz, input_spec.mz[index]]], dtype=np.float32)
-        return spectrum
-
-    def compute_all_other_distance_measures(self,ms2_ppm: float = None, ms2_da: float = None):
-        if ms2_ppm is None:
-            return all_similarity(self.get_spec_2d_representation(self.query_spectrum), self.get_spec_2d_representation(self.library_spectrum), ms2_da=ms2_da)#,need_normalize_result=False)
-        else:
-            return all_similarity(self.get_spec_2d_representation(self.query_spectrum), self.get_spec_2d_representation(self.library_spectrum), ms2_ppm=ms2_ppm)#,need_normalize_result=False)
-
-    def compute_features(self):
-        frc_matched_qspec_peak_intsty,frc_matched_lspec_peak_intsty = \
-            self.fraction_of_matched_spectrum_peak_intensities()
-        common_features = {'query_precursor_mass':self.get_precursor_mass(self.query_spectrum),
-                           'library_precursor_mass':self.get_precursor_mass(self.library_spectrum),
-                           'query_precursor_charge':self.get_precursor_charge(self.query_spectrum),
-                           'library_precursor_charge':self.get_precursor_charge(self.library_spectrum),
-                           'shifted_dot_product':self.search_engine_score,
-                           'hypergeometric_score':self.hypergeometric_peak_match_score(),
-                           'frc_matched_qspec_peaks':self.fraction_of_matched_query_spectrum_peaks(),
-                           'frc_matched_lspec_peaks':self.fraction_of_matched_library_spectrum_peaks(),
-                           'mse_matched_spec_peak_intensity':self.mse_matched_spec_peak("intensity"),
-                           'mse_matched_spec_peak_m/z':self.mse_matched_spec_peak("M/Z"),
-                           'frc_matched_qspec_peak_intensities':frc_matched_qspec_peak_intsty,
-                           'frc_matched_lspec_peak_intensities':frc_matched_lspec_peak_intsty,
-                           'bray_curtis_dissimilarity':self.bray_curtis_dissimilarity(),
-                           'kendalltau':self.kendalltau()}
-
-        if config.precursor_tolerance_mass is not None and config.precursor_tolerance_mode is not None and self.mode=='std':
-            distance_measures = self.compute_all_other_distance_measures(
-                ms2_ppm=config.precursor_tolerance_mass if config.precursor_tolerance_mode == 'ppm' else None,
-                ms2_da=config.precursor_tolerance_mass if config.precursor_tolerance_mode == 'Da' else None)
-            distance_measures["cosine_dot_product"] = distance_measures.pop("dot_product")
-            distance_measures["cosine_distance"] = distance_measures.pop("cosine")
-
-            self.std_features = {**common_features, **distance_measures} #self.std_features.append(common_features | distance_measures, ignore_index=True)
-
-        elif config.precursor_tolerance_mass_open is not None and config.precursor_tolerance_mode_open is not None and self.mode=='open':
-            distance_measures = self.compute_all_other_distance_measures(
-                ms2_ppm=config.precursor_tolerance_mass_open if config.precursor_tolerance_mode_open == 'ppm' else None,
-                ms2_da=config.precursor_tolerance_mass_open if config.precursor_tolerance_mode_open == 'Da' else None)
-            distance_measures["cosine_dot_product"] = distance_measures.pop("dot_product")
-            distance_measures["cosine_distance"] = distance_measures.pop("cosine")
-
-            self.open_features = {**common_features, **distance_measures}#pd.DataFrame(common_features | distance_measures, ignore_index=True)

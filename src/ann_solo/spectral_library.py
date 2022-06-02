@@ -346,15 +346,13 @@ class SpectralLibrary:
                     query_spectra, charge, mode)):
             # Find the best match candidate.
             if library_candidates:
-                library_match, score, matched_peaks = spectrum_match.get_best_match(
+                library_match, score, _ = spectrum_match.get_best_match(
                     query_spectrum, library_candidates,
                     config.fragment_mz_tolerance,
                     config.allow_peak_shifts)
                 yield SpectrumSpectrumMatch(
                     query_spectrum, library_match, score,
-                    num_candidates=len(library_candidates),
-                    matched_peaks=matched_peaks,
-                    mode=mode)
+                    num_candidates=len(library_candidates))
 
     def _get_library_candidates(self, query_spectra: List[MsmsSpectrum],
                                 charge: int, mode: str)\
