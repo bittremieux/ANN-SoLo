@@ -23,6 +23,7 @@ from ann_solo.spectrum import process_spectrum
 from ann_solo.spectrum import spectrum_to_vector
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
+
 class SpectralLibrary:
     """
     Spectral library search engine.
@@ -144,7 +145,7 @@ class SpectralLibrary:
                                   ['charge'][charge]['id']), config.hash_len),
                              np.float32)
             for charge in charges}
-     
+
         i = {charge: 0 for charge in charge_vectors.keys()}
         for lib_spectrum, _ in tqdm.tqdm(
                 self._library_reader.get_all_spectra(),
@@ -206,9 +207,7 @@ class SpectralLibrary:
         # Read all spectra in the query file and
         # split based on their precursor charge.
         logging.debug('Read all query spectra')
-
         query_spectra = collections.defaultdict(list)
-        #return utils.rescore_matches1()
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
                 leave=False, unit='spectra', smoothing=0.7):
@@ -234,7 +233,6 @@ class SpectralLibrary:
             identifications[ssm.query_identifier] = ssm
         logging.info('%d spectra identified after the standard search',
                      len(identifications))
-     
         if (config.precursor_tolerance_mass_open is not None and
                 config.precursor_tolerance_mode_open is not None):
             # Collect the remaining query spectra for the second cascade level.
@@ -310,17 +308,11 @@ class SpectralLibrary:
                       '(threshold = %s)', config.fdr)
         if mode == 'std':
             return utils.rescore_matches(ssms.values(), config.fdr)
-            #return utils.filter_fdr(ssms.values(), config.fdr)
         elif mode == 'open':
             return utils.group_rescore(ssms.values(), config.fdr,
-                                          config.fdr_tolerance_mass,
-                                          config.fdr_tolerance_mode,
-                                          config.fdr_min_group_size)
-
-            #return utils.filter_group_fdr(ssms.values(), config.fdr,
-            #                              config.fdr_tolerance_mass,
-            #                              config.fdr_tolerance_mode,
-            #                              config.fdr_min_group_size)
+                                       config.fdr_tolerance_mass,
+                                       config.fdr_tolerance_mode,
+                                       config.fdr_min_group_size)
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\
