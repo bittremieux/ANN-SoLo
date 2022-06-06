@@ -1,13 +1,14 @@
 import numpy as np
 
-try:
-    from .tools import match_peaks_in_spectra, match_peaks_with_mz_info_in_spectra
-    from . import math_distance
-except:
-    pass
+from .tools import match_peaks_in_spectra, match_peaks_with_mz_info_in_spectra
+from . import math_distance
 
 
-def weighted_dot_product_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
+def weighted_dot_product_distance(
+        spec_query,
+        spec_reference,
+        ms2_ppm=None,
+        ms2_da=None):
     r"""
     Weighted Dot-Product distance:
 
@@ -20,7 +21,8 @@ def weighted_dot_product_distance(spec_query, spec_reference, ms2_ppm=None, ms2_
 
     """
 
-    spec_matched = match_peaks_with_mz_info_in_spectra(spec_query, spec_reference, ms2_ppm, ms2_da)
+    spec_matched = match_peaks_with_mz_info_in_spectra(
+        spec_query, spec_reference, ms2_ppm, ms2_da)
     m_q = spec_matched[:, 0]
     i_q = spec_matched[:, 1]
     m_r = spec_matched[:, 2]
@@ -33,7 +35,11 @@ def weighted_dot_product_distance(spec_query, spec_reference, ms2_ppm=None, ms2_
     return math_distance.dot_product_distance(w_q, w_r)
 
 
-def ms_for_id_v1_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
+def ms_for_id_v1_distance(
+        spec_query,
+        spec_reference,
+        ms2_ppm=None,
+        ms2_da=None):
     r"""
     MSforID distance version 1:
 
@@ -47,7 +53,11 @@ def ms_for_id_v1_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None)
     :return: :math:`Distance`
     """
 
-    spec_matched = match_peaks_in_spectra(spec_a=spec_query, spec_b=spec_reference, ms2_ppm=ms2_ppm, ms2_da=ms2_da)
+    spec_matched = match_peaks_in_spectra(
+        spec_a=spec_query,
+        spec_b=spec_reference,
+        ms2_ppm=ms2_ppm,
+        ms2_da=ms2_da)
 
     i_q = spec_matched[:, 1]
     i_r = spec_matched[:, 2]
@@ -94,7 +104,8 @@ def ms_for_id_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
     spec_query = spec_query[spec_query[:, 1] > 0.05]
     spec_reference = spec_reference[spec_reference[:, 1] > 0.05]
 
-    spec_matched = match_peaks_with_mz_info_in_spectra(spec_query, spec_reference, ms2_ppm, ms2_da)
+    spec_matched = match_peaks_with_mz_info_in_spectra(
+        spec_query, spec_reference, ms2_ppm, ms2_da)
 
     b = 4
     c = 1.25
@@ -111,8 +122,8 @@ def ms_for_id_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
 
     s1 = np.power(n_m, b) * np.power(np.sum(i_q) + 2 * np.sum(i_r), c)
     s2 = np.power(n_q + 2 * n_r, d) + \
-         np.sum(np.abs(i_delta)) + \
-         np.sum(np.abs(m_delta))
+        np.sum(np.abs(i_delta)) + \
+        np.sum(np.abs(m_delta))
 
     if s2 == 0:
         similarity = 0.

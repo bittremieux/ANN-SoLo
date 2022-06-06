@@ -1,9 +1,7 @@
 import numpy as np
 
-try:
-    from . import tools_fast
-except Exception as e:
-    print("Compile the cython code is highly recommended!")
+from . import tools_fast
+
 
 
 def check_spectrum(spectrum):

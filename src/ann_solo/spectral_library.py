@@ -208,7 +208,6 @@ class SpectralLibrary:
         logging.debug('Read all query spectra')
 
         query_spectra = collections.defaultdict(list)
-        #return utils.rescore_matches1()
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
                 leave=False, unit='spectra', smoothing=0.7):
@@ -310,17 +309,11 @@ class SpectralLibrary:
                       '(threshold = %s)', config.fdr)
         if mode == 'std':
             return utils.rescore_matches(ssms.values(), config.fdr)
-            #return utils.filter_fdr(ssms.values(), config.fdr)
         elif mode == 'open':
             return utils.group_rescore(ssms.values(), config.fdr,
                                           config.fdr_tolerance_mass,
                                           config.fdr_tolerance_mode,
                                           config.fdr_min_group_size)
-
-            #return utils.filter_group_fdr(ssms.values(), config.fdr,
-            #                              config.fdr_tolerance_mass,
-            #                              config.fdr_tolerance_mode,
-            #                              config.fdr_min_group_size)
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\

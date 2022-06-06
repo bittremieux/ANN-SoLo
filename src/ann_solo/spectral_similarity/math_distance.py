@@ -12,8 +12,8 @@ def unweighted_entropy_distance(p, q):
     """
     merged = p + q
     entropy_increase = 2 * \
-                       scipy.stats.entropy(merged) - scipy.stats.entropy(p) - \
-                       scipy.stats.entropy(q)
+        scipy.stats.entropy(merged) - scipy.stats.entropy(p) - \
+        scipy.stats.entropy(q)
     return entropy_increase
 
 
@@ -32,14 +32,15 @@ def entropy_distance(p, q):
 
 
 def _weight_intensity_by_entropy(x):
-    WEIGHT_START = 0.25
-    ENTROPY_CUTOFF = 3
-    weight_slope = (1 - WEIGHT_START) / ENTROPY_CUTOFF
+    weight_start = 0.25
+    entropy_cutoff = 3
+
+    weight_slope = (1 - weight_start) / entropy_cutoff
 
     if np.sum(x) > 0:
         entropy_x = scipy.stats.entropy(x)
-        if entropy_x < ENTROPY_CUTOFF:
-            weight = WEIGHT_START + weight_slope * entropy_x
+        if entropy_x < entropy_cutoff:
+            weight = weight_start + weight_slope * entropy_x
             x = np.power(x, weight)
             x_sum = np.sum(x)
             x = x / x_sum
@@ -205,7 +206,8 @@ def roberts_distance(p, q):
 
         1-\sum\frac{(P_{i}+Q_{i})\frac{\min{(P_{i},Q_{i})}}{\max{(P_{i},Q_{i})}}}{\sum(P_{i}+Q_{i})}
     """
-    return 1 - np.sum((p + q) / np.sum(p + q) * np.minimum(p, q) / np.maximum(p, q))
+    return 1 - np.sum((p + q) / np.sum(p + q) *
+                      np.minimum(p, q) / np.maximum(p, q))
 
 
 def intersection_distance(p, q):
@@ -253,7 +255,8 @@ def baroni_urbani_buser_distance(p, q):
     if np.max(p) < np.max(q):
         p, q = q, p
     d1 = np.sqrt(np.sum(np.minimum(p, q) * np.sum(max(p) - np.maximum(p, q))))
-    return 1 - (np.sum(np.minimum(p, q)) + d1) / (np.sum(np.maximum(p, q)) + d1)
+    return 1 - (np.sum(np.minimum(p, q)) + d1) / \
+        (np.sum(np.maximum(p, q)) + d1)
 
 
 def penrose_size_distance(p, q):
@@ -313,7 +316,8 @@ def clark_distance(p, q):
         (\frac{1}{N}\sum(\frac{P_i-Q_i}{|P_i|+|Q_i|})^2)^\frac{1}{2}
     """
     n = np.sum(p > 0)
-    return np.sqrt(1 / n * np.sum(np.power((p - q) / (np.abs(p) + np.abs(q)), 2)))
+    return np.sqrt(
+        1 / n * np.sum(np.power((p - q) / (np.abs(p) + np.abs(q)), 2)))
 
 
 def hellinger_distance(p, q):
@@ -326,7 +330,17 @@ def hellinger_distance(p, q):
     """
     p_avg = np.mean(p)
     q_avg = np.mean(q)
-    return np.sqrt(2 * np.sum(np.power(np.sqrt(p / p_avg) - np.sqrt(q / q_avg), 2)))
+    return np.sqrt(
+        2 *
+        np.sum(
+            np.power(
+                np.sqrt(
+                    p /
+                    p_avg) -
+                np.sqrt(
+                    q /
+                    q_avg),
+                2)))
 
 
 def whittaker_index_of_association_distance(p, q):
@@ -370,7 +384,17 @@ def pearson_correlation_distance(p, q):
     q_avg = np.mean(q)
 
     x = np.sum((q - q_avg) * (p - p_avg))
-    y = np.sqrt(np.sum(np.power(q - q_avg, 2)) * np.sum(np.power(p - p_avg, 2)))
+    y = np.sqrt(
+        np.sum(
+            np.power(
+                q -
+                q_avg,
+                2)) *
+        np.sum(
+            np.power(
+                p -
+                p_avg,
+                2)))
 
     if x == 0 and y == 0:
         return 0.
@@ -412,7 +436,7 @@ def dot_product_distance(p, q):
         1 - \sqrt{\frac{(\sum{Q_iP_i})^2}{\sum{Q_i^2\sum P_i^2}}}
     """
     score = np.power(np.sum(q * p), 2) / \
-            (np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
+        (np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
     return 1 - np.sqrt(score)
 
 
@@ -427,32 +451,6 @@ def cosine_distance(p, q):
     return dot_product_distance(p, q)
 
 
-def dot_product_reverse_distance(p, q):
-    r"""
-    Reverse dot product distance, only consider peaks existed in spectrum Q.
-
-    .. math::
-
-        1 - \sqrt{\frac{(\sum{{} {P_i^{'}}})^2}{{\sum{(Q_i^{'})^2}{\sum (P_i^{'})^2}}}}, with:
-
-        P^{'}_{i}=\frac{P^{''}_{i}}{\sum_{i}{P^{''}_{i}}},
-
-        P^{''}_{i}=\begin{cases}
-        0 & \text{ if } Q_{i}=0 \\
-        P_{i} & \text{ if } Q_{i}\neq0
-        \end{cases}
-
-    """
-
-    p, q = _select_common_peaks(p, q)
-    if np.sum(p) == 0:
-        score = 0
-    else:
-        score = np.power(np.sum(q * p), 2) / \
-                (np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
-    return 1 - np.sqrt(score)
-
-
 def spectral_contrast_angle_distance(p, q):
     r"""
     Spectral Contrast Angle distance.
@@ -464,7 +462,7 @@ def spectral_contrast_angle_distance(p, q):
         1 - \frac{\sum{Q_iP_i}}{\sqrt{\sum Q_i^2\sum P_i^2}}
     """
     return 1 - np.sum(q * p) / \
-           np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
+        np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
 
 
 def wave_hedges_distance(p, q):
@@ -487,7 +485,7 @@ def jaccard_distance(p, q):
         \frac{\sum(P_i-Q_i)^2}{\sum P_i^2+\sum{Q_i^2-\sum{P_iQ_i}}}
     """
     return np.sum(np.power(p - q, 2)) / \
-           (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)) - np.sum(p * q))
+        (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)) - np.sum(p * q))
 
 
 def dice_distance(p, q):
@@ -499,7 +497,7 @@ def dice_distance(p, q):
         \frac{\sum(P_i-Q_i)^2}{\sum P_i^2+\sum Q_i^2}
     """
     return np.sum(np.power(p - q, 2)) / \
-           (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)))
+        (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)))
 
 
 def inner_product_distance(p, q):
@@ -522,17 +520,6 @@ def divergence_distance(p, q):
         2\sum\frac{(P_i-Q_i)^2}{(P_i+Q_i)^2}
     """
     return 2 * np.sum((np.power(p - q, 2)) / np.power(p + q, 2))
-
-
-def avg_l_distance(p, q):
-    r"""
-    Avg (L1, L∞) distance:
-
-    .. math::
-
-        \frac{1}{2}(\sum|P_i-Q_i|+\underset{i}{\max}{|P_i-Q_i|})
-    """
-    return (np.sum(np.abs(p - q)) + max(np.abs(p - q)))
 
 
 def vicis_symmetric_chi_squared_3_distance(p, q):

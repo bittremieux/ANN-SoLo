@@ -1,11 +1,10 @@
-import numpy as np
 from typing import Union
 
-try:
-    from . import math_distance, ms_distance
-    from .tools import clean_spectrum, match_peaks_in_spectra, normalize_distance
-except:
-    pass
+import numpy as np
+
+from . import math_distance, ms_distance
+from .tools import clean_spectrum, match_peaks_in_spectra, normalize_distance
+
 
 methods_name = {
     "entropy": "Entropy distance",

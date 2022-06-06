@@ -5,12 +5,13 @@ import mmh3
 import numba as nb
 import numpy as np
 from spectrum_utils.spectrum import MsmsSpectrum
-
-from ann_solo.config import config
-from scipy.special import comb
-from .spectral_similarity import all_similarity
 from sklearn.metrics import mean_squared_error
 import scipy.stats as stats
+from scipy.special import comb
+
+from ann_solo.config import config
+from .spectral_similarity import all_similarity
+
 
 @nb.njit
 def _check_spectrum_valid(spectrum_mz: np.ndarray, min_peaks: int,
@@ -340,6 +341,7 @@ class SpectrumSpectrumMatch:
         return 1 if len(self.matched_peaks) == 0 else mean_squared_error(qs_list,ls_list)
 
     def get_spec_2d_representation(self,input_spec):
+        spectrum = {}
         for index, mz in enumerate(input_spec.mz):
             if index:
                 peak = np.array([[mz, input_spec.mz[index]]], dtype=np.float32)

@@ -113,8 +113,7 @@ setuptools.setup(
         'scipy',
         'spectrum_utils>=0.3.0',
         'tqdm',
-        'mokapot',
-        'os'],
+        'mokapot'],
     setup_requires=[
         'Cython',
         'numpy'],

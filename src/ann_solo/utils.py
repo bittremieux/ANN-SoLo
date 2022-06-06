@@ -1,18 +1,21 @@
 import itertools
 import operator
 from typing import Iterator
+import os
 
 import numpy as np
 import pandas as pd
 import pyteomics.auxiliary
-from ann_solo.spectrum import SpectrumSpectrumMatch
 import tqdm
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
-import os
 import mokapot
 
-def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01, mode: str='std')\
+from ann_solo.spectrum import SpectrumSpectrumMatch
+
+
+def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01,
+                    mode: str='std')\
         -> Iterator[SpectrumSpectrumMatch]:
     """
     Rescore SSMs and fetch best targets meeting the given FDR.
@@ -36,8 +39,9 @@ def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01, mo
     """
     column_names = ['ssm_id','query_precursor_mass', 'library_precursor_mass', 'query_precursor_charge',
                    'library_precursor_charge', 'shifted_dot_product', 'hypergeometric_score',
-                   'frc_matched_qspec_peaks', 'frc_matched_lspec_peaks', 'mse_matched_spec_peak_intensity',
-                   'mse_matched_spec_peak_m/z', 'frc_matched_qspec_peak_intensities', 'frc_matched_lspec_peak_intensities',
+                   'frc_matched_qspec_peaks', 'frc_matched_lspec_peaks',
+                   'mse_matched_spec_peak_intensity','mse_matched_spec_peak_m/z',
+                   'frc_matched_qspec_peak_intensities', 'frc_matched_lspec_peak_intensities',
                    'bray_curtis_dissimilarity', 'kendalltau',
                    'entropy', 'unweighted_entropy',
                    'euclidean', 'manhattan', 'chebyshev',
@@ -52,9 +56,8 @@ def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01, mo
                    'pearson_correlation', 'improved_similarity', 'absolute_value',
                    'cosine_dot_product', 'spectral_contrast_angle',
                    'wave_hedges', 'cosine_distance', 'jaccard',
-                   'dice', 'inner_product', 'divergence',
-                   'avg_L1_Linfinity', 'vicis_symmetric_chi_squared_3', 'ms_for_id_v1',
-                   'ms_for_id', 'weighted_dot_product','label','peptide']
+                   'dice', 'inner_product', 'divergence', 'vicis_symmetric_chi_squared_3',
+                   'ms_for_id_v1', 'ms_for_id', 'weighted_dot_product', 'label','peptide']
     full_dataset = pd.DataFrame(columns=column_names)
     psms_dictionary = {}
     with tqdm.tqdm(desc='Spectra-spectra match devset generated', total=len(ssms),
@@ -144,7 +147,8 @@ def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01, mo
         psms_dictionary[key].q = best_targets.loc[best_targets['ssm_id'] == key, 'q_value'].values[0]
         yield psms_dictionary[key]
 
-def compute_q_value(rankedSSMS: list) -> list:
+def compute_q_value(rankedSSMS: list)\
+        -> list:
     """
     Compute FDR/q-value of a ranked list of SSMs
 
@@ -169,7 +173,8 @@ def compute_q_value(rankedSSMS: list) -> list:
         q_values.append(running_decoy_count/max(1,running_target_count))
     return q_values
 
-def assert_columns_dtypes(df: pd, mode: str='std') -> pd:
+def assert_columns_dtypes(df: pd, mode: str='std')\
+        -> pd:
     """
     Sets the correct datatype of the columns as they are expected in mokapot.
 
