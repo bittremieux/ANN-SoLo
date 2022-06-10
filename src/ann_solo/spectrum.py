@@ -1,5 +1,6 @@
 import functools
 import math
+from typing import List, Optional
 
 import mmh3
 import numba as nb
@@ -218,26 +219,28 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
 
 class SpectrumSpectrumMatch:
 
-    def __init__(self, query_spectrum: MsmsSpectrum,
-                 library_spectrum: MsmsSpectrum = None,
-                 search_engine_score: float = math.nan,
-                 q: float = math.nan,
-                 num_candidates: int = 0,
-                 matched_peaks: []= None,
-                 group: str= None,
-                 mode: str='std'):
+    def __init__(
+            self,
+            query_spectrum: MsmsSpectrum,
+            library_spectrum: MsmsSpectrum = None,
+            search_engine_score: float = math.nan,
+            peak_matches: Optional[List] = None,
+            q: float = math.nan,
+            group: str = None,
+            mode: str = "std",
+            num_candidates: int = 0,
+    ):
         self.query_spectrum = query_spectrum
         self.library_spectrum = library_spectrum
         self.search_engine_score = search_engine_score
         self.q = q
         self.num_candidates = num_candidates
-        self.matched_peaks = matched_peaks
+        self.peak_matches = peak_matches
         self.group = group
         self.mode = mode
-        self.std_features = {}#pd.DataFrame(columns=column_names)
-        self.open_features = {}#pd.DataFrame(columns=column_names)
+        self.std_features = {}
+        self.open_features = {}
         self.compute_features()
-
 
     def __str__(self):
         return " query_spectrum: " + str(self.query_spectrum) + \
@@ -293,7 +296,7 @@ class SpectrumSpectrumMatch:
         return spectrum.precursor_charge
 
     def number_of_matched_spectrum_peaks(self):
-        return len(self.matched_peaks)
+        return len(self.peak_matches)
 
     def hypergeometric_peak_match_score(self):
         k = self.number_of_matched_spectrum_peaks()#len(self.matched_peaks)
@@ -312,7 +315,7 @@ class SpectrumSpectrumMatch:
 
     def fraction_of_matched_spectrum_peak_intensities(self):
         matched_qs_intensity, matched_ls_intensity = 0, 0
-        for qsi, lsi in self.matched_peaks:
+        for qsi, lsi in self.peak_matches:
             matched_qs_intensity += self.query_spectrum.intensity[qsi]
             matched_ls_intensity += self.library_spectrum.intensity[lsi]
         return matched_qs_intensity / sum(self.query_spectrum.intensity) , \
@@ -331,14 +334,14 @@ class SpectrumSpectrumMatch:
     def mse_matched_spec_peak(self,axis):
         qs_list = []
         ls_list = []
-        for qsi,lsi in self.matched_peaks:
+        for qsi,lsi in self.peak_matches:
             if axis == 'intensity':
                 qs_list.append(self.query_spectrum.intensity[qsi])
                 ls_list.append(self.library_spectrum.intensity[lsi])
             else:
                 qs_list.append(self.query_spectrum.mz[qsi])
                 ls_list.append(self.library_spectrum.mz[lsi])
-        return 1 if len(self.matched_peaks) == 0 else mean_squared_error(qs_list,ls_list)
+        return 1 if len(self.peak_matches) == 0 else mean_squared_error(qs_list, ls_list)
 
     def get_spec_2d_representation(self,input_spec):
         spectrum = {}

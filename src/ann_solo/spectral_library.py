@@ -23,6 +23,7 @@ from ann_solo.spectrum import process_spectrum
 from ann_solo.spectrum import spectrum_to_vector
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
+
 class SpectralLibrary:
     """
     Spectral library search engine.
@@ -102,7 +103,8 @@ class SpectralLibrary:
                            self._library_reader.spec_info['charge'].items()
                            if len(charge_info['id']) >= config.num_list]
             for charge in sorted(ann_charges):
-                self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
+                self._ann_filenames[charge] = \
+                    f'{base_filename}_{charge}.idxann'
                 if (not verify_file_existence or
                         not os.path.isfile(self._ann_filenames[charge])):
                     create_ann_charges.append(charge)
@@ -144,7 +146,6 @@ class SpectralLibrary:
                                   ['charge'][charge]['id']), config.hash_len),
                              np.float32)
             for charge in charges}
-     
         i = {charge: 0 for charge in charge_vectors.keys()}
         for lib_spectrum, _ in tqdm.tqdm(
                 self._library_reader.get_all_spectra(),
@@ -171,7 +172,9 @@ class SpectralLibrary:
             ann_index = faiss.IndexIVFFlat(quantizer, config.hash_len,
                                            config.num_list,
                                            faiss.METRIC_INNER_PRODUCT)
+            # noinspection PyArgumentList
             ann_index.train(vectors)
+            # noinspection PyArgumentList
             ann_index.add(vectors)
             faiss.write_index(ann_index, self._ann_filenames[charge])
 
@@ -206,7 +209,6 @@ class SpectralLibrary:
         # Read all spectra in the query file and
         # split based on their precursor charge.
         logging.debug('Read all query spectra')
-
         query_spectra = collections.defaultdict(list)
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
@@ -233,7 +235,6 @@ class SpectralLibrary:
             identifications[ssm.query_identifier] = ssm
         logging.info('%d spectra identified after the standard search',
                      len(identifications))
-     
         if (config.precursor_tolerance_mass_open is not None and
                 config.precursor_tolerance_mode_open is not None):
             # Collect the remaining query spectra for the second cascade level.
@@ -311,9 +312,9 @@ class SpectralLibrary:
             return utils.rescore_matches(ssms.values(), config.fdr)
         elif mode == 'open':
             return utils.group_rescore(ssms.values(), config.fdr,
-                                          config.fdr_tolerance_mass,
-                                          config.fdr_tolerance_mode,
-                                          config.fdr_min_group_size)
+                                       config.fdr_tolerance_mass,
+                                       config.fdr_tolerance_mode,
+                                       config.fdr_min_group_size)
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\
@@ -347,15 +348,16 @@ class SpectralLibrary:
                     query_spectra, charge, mode)):
             # Find the best match candidate.
             if library_candidates:
-                library_match, score, matched_peaks = spectrum_match.get_best_match(
-                    query_spectrum, library_candidates,
-                    config.fragment_mz_tolerance,
-                    config.allow_peak_shifts)
+                library_match, score, peak_matches = \
+                    spectrum_match.get_best_match(
+                        query_spectrum, library_candidates,
+                        config.fragment_mz_tolerance,
+                        config.allow_peak_shifts
+                    )
                 yield SpectrumSpectrumMatch(
-                    query_spectrum, library_match, score,
+                    query_spectrum, library_match, score, peak_matches,
                     num_candidates=len(library_candidates),
-                    matched_peaks=matched_peaks,
-                    mode=mode)
+                )
 
     def _get_library_candidates(self, query_spectra: List[MsmsSpectrum],
                                 charge: int, mode: str)\
@@ -427,6 +429,7 @@ class SpectralLibrary:
                     query_spectrum, config.min_mz, config.max_mz,
                     config.bin_size, config.hash_len, True, query_vectors[i])
             mask = np.zeros_like(candidate_filters)
+            # noinspection PyArgumentList
             for mask_i, ann_filter in zip(mask, ann_index.search(
                     query_vectors, self._num_candidates)[1]):
                 mask_i[ann_filter[ann_filter != -1]] = True
