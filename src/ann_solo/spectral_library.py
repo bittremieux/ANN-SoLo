@@ -355,7 +355,7 @@ class SpectralLibrary:
                         config.allow_peak_shifts
                     )
                 yield SpectrumSpectrumMatch(
-                    query_spectrum, library_match, score, peak_matches,
+                    query_spectrum, library_match, score, np.asarray(peak_matches),
                     num_candidates=len(library_candidates),
                 )
 
