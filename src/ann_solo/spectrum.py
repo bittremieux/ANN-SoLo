@@ -11,7 +11,7 @@ import scipy.stats as stats
 from scipy.special import comb
 
 from ann_solo.config import config
-from .spectral_similarity import all_similarity
+from .spectrum_similarity import all_similarity
 
 
 @nb.njit
