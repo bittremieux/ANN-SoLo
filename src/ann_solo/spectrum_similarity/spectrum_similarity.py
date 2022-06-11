@@ -1,8 +1,8 @@
-import numpy as np
 import scipy.special
 import scipy.stats
 
-from ann_solo import config, spectrum
+from ann_solo import spectrum
+from ann_solo.config import config
 
 
 def frac_n_peaks_query(ssm: spectrum.SpectrumSpectrumMatch) -> float:
@@ -186,16 +186,9 @@ def kendalltau(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     float
         The hypergeometric score of peak matches.
     """
-    max_n_peaks = max(len(ssm.query_spectrum.mz), len(ssm.library_spectrum.mz))
     return scipy.stats.kendalltau(
-        np.pad(
-            ssm.query_spectrum.intensity,
-            (0, max_n_peaks - len(ssm.query_spectrum.mz)),
-        ),
-        np.pad(
-            ssm.library_spectrum.intensity,
-            (0, max_n_peaks - len(ssm.library_spectrum.mz)),
-        ),
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )[0]
 
 
