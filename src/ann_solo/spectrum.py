@@ -5,13 +5,9 @@ from typing import List, Optional
 import mmh3
 import numba as nb
 import numpy as np
-import scipy.special
-import scipy.stats as stats
 from spectrum_utils.spectrum import MsmsSpectrum
-from sklearn.metrics import mean_squared_error
 
 from ann_solo.config import config
-from .spectrum_similarity import all_similarity
 
 
 @nb.njit
