@@ -421,18 +421,6 @@ def dice_distance(p, q) -> float:
         (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)))
 
 
-def inner_product_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Inner Product distance:
-
-    .. math::
-
-        1-\sum{P_iQ_i}
-    """
-    return 1 - np.sum(p * q)
-
-
 def divergence_distance(p, q) -> float:
     r"""
     Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
