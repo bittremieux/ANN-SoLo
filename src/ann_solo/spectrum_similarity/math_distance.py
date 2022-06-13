@@ -447,32 +447,6 @@ def absolute_value_distance(p, q) -> float:
     return dist
 
 
-def dot_product_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Dot product distance:
-
-    .. math::
-
-        1 - \sqrt{\frac{(\sum{Q_iP_i})^2}{\sum{Q_i^2\sum P_i^2}}}
-    """
-    score = np.power(np.sum(q * p), 2) / \
-        (np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
-    return 1 - np.sqrt(score)
-
-
-def cosine_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Cosine distance, it gives the same result as the dot product.
-
-    .. math::
-
-        1 - \sqrt{\frac{(\sum{Q_iP_i})^2}{\sum{Q_i^2\sum P_i^2}}}
-    """
-    return dot_product_distance(p, q)
-
-
 def spectral_contrast_angle_distance(p, q) -> float:
     r"""
     Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
