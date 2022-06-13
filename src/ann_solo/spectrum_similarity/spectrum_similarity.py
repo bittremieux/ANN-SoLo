@@ -264,6 +264,104 @@ def ms_for_id_v2(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
+def entropy(
+    ssm: spectrum.SpectrumSpectrumMatch, weighted: bool = False
+) -> float:
+    """
+    Get the entropy between two spectra.
+
+    For the original description, see:
+    Li, Y. et al. Spectral entropy outperforms MS/MS dot product similarity for
+    small-molecule compound identification. Nature Methods 18, 1524–1531
+    (2021).
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+    weighted : bool
+        Whether to use the unweighted or weighted version of entropy.
+
+    Returns
+    -------
+    float
+        The entropy between both spectra.
+    """
+    query_entropy = _spectrum_entropy(ssm.query_spectrum.intensity, weighted)
+    library_entropy = _spectrum_entropy(
+        ssm.library_spectrum.intensity, weighted
+    )
+    merged_entropy = _spectrum_entropy(_merge_entropy(ssm), weighted)
+    return 2 * merged_entropy - query_entropy - library_entropy
+
+
+def _spectrum_entropy(
+    spectrum_intensity: np.ndarray, weighted: bool = False
+) -> float:
+    """
+    Compute the entropy of a spectrum from its peak intensities.
+
+    Parameters
+    ----------
+    spectrum_intensity : np.ndarray
+        The intensities of the spectrum peaks.
+    weighted : bool
+        Whether to use the unweighted or weighted version of entropy.
+
+    Returns
+    -------
+    float
+        The entropy of the given spectrum.
+    """
+    weight_start, entropy_cutoff = 0.25, 3
+    weight_slope = (1 - weight_start) / entropy_cutoff
+    spec_entropy = scipy.stats.entropy(spectrum_intensity)
+    if not weighted or spec_entropy > entropy_cutoff:
+        return spec_entropy
+    else:
+        weight = weight_start + weight_slope * spec_entropy
+        weighted_intensity = spectrum_intensity**weight
+        weighted_intensity /= weighted_intensity.sum()
+        return scipy.stats.entropy(weighted_intensity)
+
+
+def _merge_entropy(ssm: spectrum.SpectrumSpectrumMatch) -> np.ndarray:
+    """
+    Merge two spectra prior to entropy calculation of the spectrum-spectrum
+    match.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    np.ndarray
+        NumPy array with the intensities of the merged peaks summed.
+    """
+    # Initialize with the query spectrum peaks.
+    merged = ssm.query_spectrum.intensity.copy()
+    # Sum the intensities of matched peaks.
+    merged[ssm.peak_matches[:, 0]] += ssm.library_spectrum.intensity[
+        ssm.peak_matches[:, 1]
+    ]
+    # Append the unmatched library spectrum peaks.
+    merged = np.hstack(
+        (
+            merged,
+            ssm.library_spectrum.intensity[
+                np.setdiff1d(
+                    np.arange(len(ssm.library_spectrum.intensity)),
+                    ssm.peak_matches[:, 1],
+                    assume_unique=True,
+                )
+            ],
+        )
+    )
+    return merged
+
+
 def manhattan(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Manhattan distance between two spectra.
