@@ -213,12 +213,13 @@ def ms_for_id_v1(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The MSforID (v1) similarity between both spectra.
     """
     return len(ssm.peak_matches) ** 4 / (
-        len(ssm.query_spectrum.mz) *
-        len(ssm.library_spectrum.mz) *
-        np.abs(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        ).sum() ** 0.25
+        len(ssm.query_spectrum.mz)
+        * len(ssm.library_spectrum.mz)
+        * np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ).sum()
+        ** 0.25
     )
 
 
@@ -244,23 +245,21 @@ def ms_for_id_v2(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The MSforID (v2) similarity between both spectra.
     """
     return (
-        len(ssm.peak_matches) ** 4 *
-        (
-            ssm.query_spectrum.intensity.sum() +
-            2 * ssm.library_spectrum.intensity.sum()
-        ) ** 1.25
+        len(ssm.peak_matches) ** 4
+        * (
+            ssm.query_spectrum.intensity.sum()
+            + 2 * ssm.library_spectrum.intensity.sum()
+        )
+        ** 1.25
     ) / (
-        (
-            len(ssm.query_spectrum.mz) +
-            2 * len(ssm.library_spectrum.mz)
-        ) ** 2 +
-        np.abs(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        ).sum() +
-        np.abs(
-            ssm.query_spectrum.mz[ssm.peak_matches[:, 0]] -
-            ssm.library_spectrum.mz[ssm.peak_matches[:, 1]]
+        (len(ssm.query_spectrum.mz) + 2 * len(ssm.library_spectrum.mz)) ** 2
+        + np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ).sum()
+        + np.abs(
+            ssm.query_spectrum.mz[ssm.peak_matches[:, 0]]
+            - ssm.library_spectrum.mz[ssm.peak_matches[:, 1]]
         ).sum()
     )
 
@@ -281,8 +280,8 @@ def manhattan(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     # Matching peaks.
     dist = np.abs(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
     ).sum()
     # Unmatched peaks in the query spectrum.
     dist += ssm.query_spectrum.intensity[
@@ -390,12 +389,12 @@ def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The Bray-Curtis distance between both spectra.
     """
     numerator = np.abs(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
     ).sum()
     denominator = (
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] +
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
     ).sum()
     query_unique = ssm.query_spectrum.intensity[
         np.setdiff1d(
