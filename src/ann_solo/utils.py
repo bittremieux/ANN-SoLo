@@ -1,15 +1,15 @@
 import itertools
 import operator
-from typing import Iterator
 import os
+from typing import Iterator
 
+import mokapot
 import numpy as np
 import pandas as pd
 import pyteomics.auxiliary
 import tqdm
-from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
-import mokapot
+from sklearn.model_selection import GridSearchCV
 
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
