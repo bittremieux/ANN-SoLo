@@ -61,18 +61,6 @@ def euclidean_distance(p, q) -> float:
     return np.sqrt(np.sum(np.power(p - q, 2)))
 
 
-def manhattan_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Manhattan distance:
-
-    .. math::
-
-        \sum|P_{i}-Q_{i}|
-    """
-    return np.sum(np.abs(p - q))
-
-
 def chebyshev_distance(p, q) -> float:
     r"""
     Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf

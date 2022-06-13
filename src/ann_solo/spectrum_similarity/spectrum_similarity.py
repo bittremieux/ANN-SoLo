@@ -265,6 +265,44 @@ def ms_for_id_v2(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
+def manhattan(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the Manhattan distance between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The Manhattan distance between both spectra.
+    """
+    # Matching peaks.
+    dist = np.abs(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    ).sum()
+    # Unmatched peaks in the query spectrum.
+    dist += ssm.query_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.query_spectrum.intensity)),
+            ssm.peak_matches[:, 0],
+            assume_unique=True,
+        )
+    ].sum()
+    # Unmatched peaks in the library spectrum.
+    dist += ssm.library_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.library_spectrum.intensity)),
+            ssm.peak_matches[:, 1],
+            assume_unique=True,
+        )
+    ].sum()
+    return dist
+
+
 def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Pearson correlation between peak matches in two spectra.
