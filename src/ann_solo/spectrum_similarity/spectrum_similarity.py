@@ -265,6 +265,26 @@ def ms_for_id_v2(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
+def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the Pearson correlation between peak matches in two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The Pearson correlation of peak matches.
+    """
+    return scipy.stats.pearsonr(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )[0]
+
+
 def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Bray-Curtis distance between two spectra.

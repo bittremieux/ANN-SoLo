@@ -389,37 +389,6 @@ def symmetric_chi_squared_distance(p, q) -> float:
     return np.sqrt(d1 * np.sum(np.power(p * q_avg - q * p_avg, 2) / (p + q)))
 
 
-def pearson_correlation_distance(p, q) -> float:
-    r"""
-    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
-    Pearson/Spearman Correlation Coefficient:
-
-    .. math::
-
-        \frac{\sum[(Q_i-\bar{Q})(P_i-\bar{P})]}{\sqrt{\sum(Q_i-\bar{Q})^2\sum(P_i-\bar{P})^2}}
-    """
-    p_avg = np.mean(p)
-    q_avg = np.mean(q)
-
-    x = np.sum((q - q_avg) * (p - p_avg))
-    y = np.sqrt(
-        np.sum(
-            np.power(
-                q -
-                q_avg,
-                2)) *
-        np.sum(
-            np.power(
-                p -
-                p_avg,
-                2)))
-
-    if x == 0 and y == 0:
-        return 0.
-    else:
-        return -x / y
-
-
 def improved_similarity_distance(p, q) -> float:
     r"""
     Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
