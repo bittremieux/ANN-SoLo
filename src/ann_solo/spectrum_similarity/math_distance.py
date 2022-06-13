@@ -49,18 +49,6 @@ def _weight_intensity_by_entropy(x) -> float:
     return x
 
 
-def euclidean_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Euclidean distance:
-
-    .. math::
-
-        (\sum|P_{i}-Q_{i}|^2)^{1/2}
-    """
-    return np.sqrt(np.sum(np.power(p - q, 2)))
-
-
 def chebyshev_distance(p, q) -> float:
     r"""
     Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
@@ -71,18 +59,6 @@ def chebyshev_distance(p, q) -> float:
         \underset{i}{\max}{(|P_{i}\ -\ Q_{i}|)}
     """
     return np.max(np.abs(p - q))
-
-
-def squared_euclidean_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Squared Euclidean distance:
-
-    .. math::
-
-        \sum(P_{i}-Q_{i})^2
-    """
-    return np.sum(np.power(p - q, 2))
 
 
 def fidelity_distance(p, q) -> float:
