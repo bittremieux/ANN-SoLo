@@ -1,3 +1,4 @@
+import numpy as np
 import scipy.special
 import scipy.stats
 
@@ -192,8 +193,47 @@ def kendalltau(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )[0]
 
 
-def bray_curtis_dissimilarity(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    # TODO: Do this using intensity instead?
-    return 1 - (2 * len(ssm.peak_matches)) / (
-        len(ssm.library_spectrum.mz) + len(ssm.query_spectrum.mz)
-    )
+def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the Bray-Curtis distance between two spectra.
+
+    The Bray-Curtis distance is defined as:
+
+    .. math::
+       \\sum{|u_i-v_i|} / \\sum{|u_i+v_i|}
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The Bray-Curtis distance between both spectra.
+    """
+    numerator = np.abs(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    ).sum()
+    denominator = (
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] +
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    ).sum()
+    query_unique = ssm.query_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.query_spectrum.intensity)),
+            ssm.peak_matches[:, 0],
+            assume_unique=True,
+        )
+    ].sum()
+    library_unique = ssm.library_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.library_spectrum.intensity)),
+            ssm.peak_matches[:, 1],
+            assume_unique=True,
+        )
+    ].sum()
+    numerator += query_unique + library_unique
+    denominator += query_unique + library_unique
+    return numerator / denominator
