@@ -193,6 +193,78 @@ def kendalltau(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )[0]
 
 
+def ms_for_id_v1(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the MSforID (v1) similarity between two spectra.
+
+    For the original description, see:
+    Pavlic, M., Libiseller, K. & Oberacher, H. Combined use of ESI–QqTOF-MS and
+    ESI–QqTOF-MS/MS with mass-spectral library search for qualitative analysis
+    of drugs. Analytical and Bioanalytical Chemistry 386, 69–82 (2006).
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The MSforID (v1) similarity between both spectra.
+    """
+    return len(ssm.peak_matches) ** 4 / (
+        len(ssm.query_spectrum.mz) *
+        len(ssm.library_spectrum.mz) *
+        np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ).sum() ** 0.25
+    )
+
+
+def ms_for_id_v2(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the MSforID (v2) similarity between two spectra.
+
+    For the original description, see:
+    Oberacher, H. et al. On the inter-instrument and the inter-laboratory
+    transferability of a tandem mass spectral reference library: 2.
+    Optimization and characterization of the search algorithm: About an
+    advanced search algorithm for tandem mass spectral reference libraries.
+    Journal of Mass Spectrometry 44, 494–502 (2009).
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The MSforID (v2) similarity between both spectra.
+    """
+    return (
+        len(ssm.peak_matches) ** 4 *
+        (
+            ssm.query_spectrum.intensity.sum() +
+            2 * ssm.library_spectrum.intensity.sum()
+        ) ** 1.25
+    ) / (
+        (
+            len(ssm.query_spectrum.mz) +
+            2 * len(ssm.library_spectrum.mz)
+        ) ** 2 +
+        np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] -
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ).sum() +
+        np.abs(
+            ssm.query_spectrum.mz[ssm.peak_matches[:, 0]] -
+            ssm.library_spectrum.mz[ssm.peak_matches[:, 1]]
+        ).sum()
+    )
+
+
 def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Bray-Curtis distance between two spectra.
