@@ -49,18 +49,6 @@ def _weight_intensity_by_entropy(x) -> float:
     return x
 
 
-def chebyshev_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Chebyshev distance:
-
-    .. math::
-
-        \underset{i}{\max}{(|P_{i}\ -\ Q_{i}|)}
-    """
-    return np.max(np.abs(p - q))
-
-
 def fidelity_distance(p, q) -> float:
     r"""
     Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf

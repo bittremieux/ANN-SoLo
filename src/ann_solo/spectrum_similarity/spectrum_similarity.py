@@ -349,6 +349,54 @@ def euclidean(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return np.sqrt(dist)
 
 
+def chebyshev(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the Chebyshev distance between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The Chebyshev distance between both spectra.
+    """
+    # Matching peaks.
+    dist = np.abs(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    )
+    # Unmatched peaks in the query spectrum.
+    dist = np.hstack(
+        (
+            dist,
+            ssm.query_spectrum.intensity[
+                np.setdiff1d(
+                    np.arange(len(ssm.query_spectrum.intensity)),
+                    ssm.peak_matches[:, 0],
+                    assume_unique=True,
+                )
+            ],
+        )
+    )
+    # Unmatched peaks in the library spectrum.
+    dist = np.hstack(
+        (
+            dist,
+            ssm.library_spectrum.intensity[
+                np.setdiff1d(
+                    np.arange(len(ssm.library_spectrum.intensity)),
+                    ssm.peak_matches[:, 1],
+                    assume_unique=True,
+                )
+            ],
+        )
+    )
+    return dist.max()
+
+
 def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Pearson correlation between peak matches in two spectra.
