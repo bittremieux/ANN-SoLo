@@ -2,7 +2,7 @@ import numpy as np
 import scipy.stats
 
 
-def unweighted_entropy_distance(p, q):
+def unweighted_entropy_distance(p, q): -> float
     r"""
     Unweighted entropy distance:
 
@@ -17,8 +17,10 @@ def unweighted_entropy_distance(p, q):
     return entropy_increase
 
 
-def entropy_distance(p, q):
+def entropy_distance(p, q): -> float
     r"""
+	Reference: https://www.nature.com/articles/s41592-021-01331-z
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Entropy distance:
 
     .. math::
@@ -31,7 +33,7 @@ def entropy_distance(p, q):
     return unweighted_entropy_distance(p, q)
 
 
-def _weight_intensity_by_entropy(x):
+def _weight_intensity_by_entropy(x): -> float
     weight_start = 0.25
     entropy_cutoff = 3
 
@@ -47,19 +49,9 @@ def _weight_intensity_by_entropy(x):
     return x
 
 
-def _select_common_peaks(p, q):
-    select = q > 0
-    p = p[select]
-    p_sum = np.sum(p)
-    if p_sum > 0:
-        p = p / p_sum
-    q = q[select]
-    q = q / np.sum(q)
-    return p, q
-
-
-def euclidean_distance(p, q):
+def euclidean_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Euclidean distance:
 
     .. math::
@@ -69,8 +61,9 @@ def euclidean_distance(p, q):
     return np.sqrt(np.sum(np.power(p - q, 2)))
 
 
-def manhattan_distance(p, q):
+def manhattan_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Manhattan distance:
 
     .. math::
@@ -80,8 +73,9 @@ def manhattan_distance(p, q):
     return np.sum(np.abs(p - q))
 
 
-def chebyshev_distance(p, q):
+def chebyshev_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Chebyshev distance:
 
     .. math::
@@ -91,8 +85,9 @@ def chebyshev_distance(p, q):
     return np.max(np.abs(p - q))
 
 
-def squared_euclidean_distance(p, q):
+def squared_euclidean_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Squared Euclidean distance:
 
     .. math::
@@ -102,8 +97,9 @@ def squared_euclidean_distance(p, q):
     return np.sum(np.power(p - q, 2))
 
 
-def fidelity_distance(p, q):
+def fidelity_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Fidelity distance:
 
     .. math::
@@ -113,8 +109,9 @@ def fidelity_distance(p, q):
     return 1 - np.sum(np.sqrt(p * q))
 
 
-def matusita_distance(p, q):
+def matusita_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Matusita distance:
 
     .. math::
@@ -124,8 +121,9 @@ def matusita_distance(p, q):
     return np.sqrt(np.sum(np.power(np.sqrt(p) - np.sqrt(q), 2)))
 
 
-def squared_chord_distance(p, q):
+def squared_chord_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Squared-chord distance:
 
     .. math::
@@ -135,8 +133,9 @@ def squared_chord_distance(p, q):
     return np.sum(np.power(np.sqrt(p) - np.sqrt(q), 2))
 
 
-def bhattacharya_1_distance(p, q):
+def bhattacharya_1_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Bhattacharya 1 distance:
 
     .. math::
@@ -149,8 +148,9 @@ def bhattacharya_1_distance(p, q):
     return np.power(np.arccos(s), 2)
 
 
-def bhattacharya_2_distance(p, q):
+def bhattacharya_2_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Bhattacharya 2 distance:
 
     .. math::
@@ -164,9 +164,11 @@ def bhattacharya_2_distance(p, q):
         return -np.log(s)
 
 
-def harmonic_mean_distance(p, q):
+def harmonic_mean_distance(p, q): -> float
     r"""
-    Harmonic mean distance:
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
+    
+	Harmonic mean distance:
 
     .. math::
 
@@ -175,8 +177,9 @@ def harmonic_mean_distance(p, q):
     return 1 - 2 * np.sum(p * q / (p + q))
 
 
-def probabilistic_symmetric_chi_squared_distance(p, q):
+def probabilistic_symmetric_chi_squared_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Probabilistic symmetric χ2 distance:
 
     .. math::
@@ -186,8 +189,9 @@ def probabilistic_symmetric_chi_squared_distance(p, q):
     return 1 / 2 * np.sum(np.power(p - q, 2) / (p + q))
 
 
-def ruzicka_distance(p, q):
+def ruzicka_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Ruzicka distance:
 
     .. math::
@@ -198,8 +202,9 @@ def ruzicka_distance(p, q):
     return dist
 
 
-def roberts_distance(p, q):
+def roberts_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Roberts distance:
 
     .. math::
@@ -210,8 +215,9 @@ def roberts_distance(p, q):
                       np.minimum(p, q) / np.maximum(p, q))
 
 
-def intersection_distance(p, q):
+def intersection_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Intersection distance:
 
     .. math::
@@ -221,8 +227,9 @@ def intersection_distance(p, q):
     return 1 - np.sum(np.minimum(p, q)) / min(np.sum(p), np.sum(q))
 
 
-def motyka_distance(p, q):
+def motyka_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Motyka distance:
 
     .. math::
@@ -233,8 +240,9 @@ def motyka_distance(p, q):
     return -dist
 
 
-def canberra_distance(p, q):
+def canberra_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Canberra distance:
 
     .. math::
@@ -244,8 +252,9 @@ def canberra_distance(p, q):
     return np.sum(np.abs(p - q) / (np.abs(p) + np.abs(q)))
 
 
-def baroni_urbani_buser_distance(p, q):
+def baroni_urbani_buser_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Baroni-Urbani-Buser distance:
 
     .. math::
@@ -259,8 +268,9 @@ def baroni_urbani_buser_distance(p, q):
         (np.sum(np.maximum(p, q)) + d1)
 
 
-def penrose_size_distance(p, q):
+def penrose_size_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Penrose size distance:
 
     .. math::
@@ -271,8 +281,9 @@ def penrose_size_distance(p, q):
     return np.sqrt(n) * np.sum(np.abs(p - q))
 
 
-def mean_character_distance(p, q):
+def mean_character_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Mean character distance:
 
     .. math::
@@ -283,8 +294,9 @@ def mean_character_distance(p, q):
     return 1 / n * np.sum(np.abs(p - q))
 
 
-def lorentzian_distance(p, q):
+def lorentzian_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Lorentzian distance:
 
     .. math::
@@ -294,8 +306,9 @@ def lorentzian_distance(p, q):
     return np.sum(np.log(1 + np.abs(p - q)))
 
 
-def penrose_shape_distance(p, q):
+def penrose_shape_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Penrose shape distance:
 
     .. math::
@@ -307,8 +320,9 @@ def penrose_shape_distance(p, q):
     return np.sqrt(np.sum(np.power((p - p_avg) - (q - q_avg), 2)))
 
 
-def clark_distance(p, q):
+def clark_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Clark distance:
 
     .. math::
@@ -320,8 +334,9 @@ def clark_distance(p, q):
         1 / n * np.sum(np.power((p - q) / (np.abs(p) + np.abs(q)), 2)))
 
 
-def hellinger_distance(p, q):
+def hellinger_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Hellinger distance:
 
     .. math::
@@ -343,8 +358,9 @@ def hellinger_distance(p, q):
                 2)))
 
 
-def whittaker_index_of_association_distance(p, q):
+def whittaker_index_of_association_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Whittaker index of association distance:
 
     .. math::
@@ -356,8 +372,9 @@ def whittaker_index_of_association_distance(p, q):
     return 1 / 2 * np.sum(np.abs(p / p_avg - q / q_avg))
 
 
-def symmetric_chi_squared_distance(p, q):
+def symmetric_chi_squared_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Symmetric χ2 distance:
 
     .. math::
@@ -372,8 +389,9 @@ def symmetric_chi_squared_distance(p, q):
     return np.sqrt(d1 * np.sum(np.power(p * q_avg - q * p_avg, 2) / (p + q)))
 
 
-def pearson_correlation_distance(p, q):
+def pearson_correlation_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Pearson/Spearman Correlation Coefficient:
 
     .. math::
@@ -402,8 +420,9 @@ def pearson_correlation_distance(p, q):
         return -x / y
 
 
-def improved_similarity_distance(p, q):
+def improved_similarity_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Improved Similarity Index:
 
     .. math::
@@ -414,8 +433,9 @@ def improved_similarity_distance(p, q):
     return np.sqrt(1 / n * np.sum(np.power((p - q) / (p + q), 2)))
 
 
-def absolute_value_distance(p, q):
+def absolute_value_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Absolute Value Distance:
 
     .. math::
@@ -427,8 +447,9 @@ def absolute_value_distance(p, q):
     return dist
 
 
-def dot_product_distance(p, q):
+def dot_product_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Dot product distance:
 
     .. math::
@@ -440,8 +461,9 @@ def dot_product_distance(p, q):
     return 1 - np.sqrt(score)
 
 
-def cosine_distance(p, q):
+def cosine_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Cosine distance, it gives the same result as the dot product.
 
     .. math::
@@ -451,8 +473,9 @@ def cosine_distance(p, q):
     return dot_product_distance(p, q)
 
 
-def spectral_contrast_angle_distance(p, q):
+def spectral_contrast_angle_distance(p, q): -> float
     r"""
+    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
     Spectral Contrast Angle distance.
     Please note that the value calculated here is :math:`\cos\theta`.
     If you want to get the :math:`\theta`, you can calculate with: :math:`\arccos(1-distance)`
@@ -465,8 +488,9 @@ def spectral_contrast_angle_distance(p, q):
         np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
 
 
-def wave_hedges_distance(p, q):
+def wave_hedges_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Wave Hedges distance:
 
     .. math::
@@ -476,8 +500,9 @@ def wave_hedges_distance(p, q):
     return np.sum(np.abs(p - q) / np.maximum(p, q))
 
 
-def jaccard_distance(p, q):
+def jaccard_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Jaccard distance:
 
     .. math::
@@ -488,8 +513,9 @@ def jaccard_distance(p, q):
         (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)) - np.sum(p * q))
 
 
-def dice_distance(p, q):
+def dice_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Dice distance:
 
     .. math::
@@ -500,8 +526,9 @@ def dice_distance(p, q):
         (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)))
 
 
-def inner_product_distance(p, q):
+def inner_product_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Inner Product distance:
 
     .. math::
@@ -511,8 +538,9 @@ def inner_product_distance(p, q):
     return 1 - np.sum(p * q)
 
 
-def divergence_distance(p, q):
+def divergence_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Divergence distance:
 
     .. math::
@@ -522,8 +550,9 @@ def divergence_distance(p, q):
     return 2 * np.sum((np.power(p - q, 2)) / np.power(p + q, 2))
 
 
-def vicis_symmetric_chi_squared_3_distance(p, q):
+def vicis_symmetric_chi_squared_3_distance(p, q): -> float
     r"""
+    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
     Vicis-Symmetric χ2 3 distance:
 
     .. math::

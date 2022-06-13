@@ -75,13 +75,9 @@ def rescore_matches(ssms: Iterator[SpectrumSpectrumMatch], fdr: float = 0.01,
                             'peptide': ssm.sequence}
             full_dataset = full_dataset.append({**features, **ssm_meta}, ignore_index = True)
             pbar.update(1)
-			
-    #full_dataset = assert_columns_dtypes(full_dataset)
-    #fileName = 'ssms.csv' if mode == 'std' else 'ssms_open.csv'
-    #full_dataset.to_csv(fileName, index=False)
     #Define ML algorithm and hyperparameter search space
     inducer_details = {
-        'RandomForestClassifier': {'parameters': {'n_estimators': [20, 50, 80, 100], 'max_depth': [8, 10, 20, 30, 50],
+        'RandomForestClassifier': {'parameters': {'n_estimators': [120], 'max_depth': [8, 10, 20, 30, 50],
                                                   'criterion':['gini'],'bootstrap':[True]},
                                    'model': RandomForestClassifier()}}
         #Criterion of split can either use the Gini Index for impurity or Entropy for information gain.

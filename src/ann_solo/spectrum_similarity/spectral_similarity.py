@@ -3,8 +3,8 @@ from typing import Union
 import numpy as np
 
 from . import math_distance, ms_distance
-from .tools import clean_spectrum, match_peaks_in_spectra, normalize_distance
-
+from .tools import matched_peaks_with_intensity_info, normalize_distance
+from spectrum_utils.spectrum import MsmsSpectrum
 
 methods_name = {
     "entropy": "Entropy distance",
@@ -37,7 +37,6 @@ methods_name = {
     "pearson_correlation": "Pearson/Spearman Correlation Coefficient",
     "improved_similarity": "Improved Similarity",
     "absolute_value": "Absolute Value Distance",
-    "dot_product": "Dot product distance",
     "cosine": "Cosine distance",
     "spectral_contrast_angle": "Spectral Contrast Angle",
     "wave_hedges": "Wave Hedges distance",
@@ -83,9 +82,10 @@ methods_range = {
     "whittaker_index_of_association": [0, np.inf]
 }
 
-def all_similarity(spectrum_query: Union[list, np.ndarray], spectrum_library: Union[list, np.ndarray],
-                   ms2_ppm: float = None, ms2_da: float = None,
-                   need_clean_spectra: bool = True, need_normalize_result: bool = True) -> dict:
+
+def all_similarity(spectrum_query: MsmsSpectrum,
+                     spectrum_library: MsmsSpectrum = None,
+                    matched_peaks: []= None) -> dict:
     """
     Calculate all the similarity between two spectra, find common peaks.
     If both ms2_ppm and ms2_da is defined, ms2_da will be used.
@@ -98,74 +98,34 @@ def all_similarity(spectrum_query: Union[list, np.ndarray], spectrum_library: Un
     :param need_normalize_result: Normalize the result into [0,1].
     :return: A dict contains all similarity.
     """
-    all_similarity_score = all_distance(spectrum_query=spectrum_query, spectrum_library=spectrum_library,
-                                        need_clean_spectra=need_clean_spectra,
-                                        need_normalize_result=need_normalize_result,
-                                        ms2_ppm=ms2_ppm, ms2_da=ms2_da)
-    for m in all_similarity_score:
-        if need_normalize_result:
-            all_similarity_score[m] = 1 - all_similarity_score[m]
-        else:
-            all_similarity_score[m] = 0 - all_similarity_score[m]
-    return all_similarity_score
-
-
-
-def all_distance(spectrum_query: Union[list, np.ndarray], spectrum_library: Union[list, np.ndarray],
-                 ms2_ppm: float = None, ms2_da: float = None,
-                 need_clean_spectra: bool = True, need_normalize_result: bool = True) -> dict:
-    """
-    Calculate the distance between two spectra, find common peaks.
-    If both ms2_ppm and ms2_da is defined, ms2_da will be used.
-
-    :param spectrum_query: The query spectrum, need to be in numpy array format.
-    :param spectrum_library: The library spectrum, need to be in numpy array format.
-    :param ms2_ppm: The MS/MS tolerance in ppm.
-    :param ms2_da: The MS/MS tolerance in Da.
-    :param need_clean_spectra: Normalize spectra before comparing, required for not normalized spectrum.
-    :param need_normalize_result: Normalize the result into [0,1].
-    :return: Distance between two spectra
-
-    """
-
-    if ms2_ppm is None and ms2_da is None:
-        raise ValueError("MS2 tolerance need to be defined!")
-    spectrum_query = np.asarray(spectrum_query, dtype=np.float32)
-    spectrum_library = np.asarray(spectrum_library, dtype=np.float32)
-    if need_clean_spectra:
-        spectrum_query = clean_spectrum(spectrum_query, ms2_ppm=ms2_ppm, ms2_da=ms2_da)
-        spectrum_library = clean_spectrum(spectrum_library, ms2_ppm=ms2_ppm, ms2_da=ms2_da)
-
     # Calculate similarity
     result = {}
-    if spectrum_query.shape[0] > 0 and spectrum_library.shape[0] > 0:
-        spec_matched = match_peaks_in_spectra(spec_a=spectrum_query, spec_b=spectrum_library,
-                                              ms2_ppm=ms2_ppm, ms2_da=ms2_da)
+    if matched_peaks is not None and len(matched_peaks) > 0:
+        spec_matched = matched_peaks_with_intensity_info(
+										spectrum_query=spectrum_query,
+										spectrum_library=spectrum_library,
+										matched_peaks=matched_peaks)
+
         for method in methods_name:
             function_name = method + "_distance"
             if hasattr(math_distance, function_name):
                 f = getattr(math_distance, function_name)
-                dist = f(spec_matched[:, 1], spec_matched[:, 2])
+                dist = f(spec_matched[0, :], spec_matched[1, :])
             elif hasattr(ms_distance, function_name):
                 f = getattr(ms_distance, function_name)
-                dist = f(spectrum_query, spectrum_library, ms2_ppm=ms2_ppm, ms2_da=ms2_da)
+                dist = f(spectrum_query, spectrum_library, matched_peaks)
+
+        # Normalize result
+            if method not in methods_range:
+                dist_range = [0, 1]
             else:
-                raise RuntimeError("Method name: {} error!".format(method))
+                dist_range = methods_range[method]
 
-            # Normalize result
-            if need_normalize_result:
-                if method not in methods_range:
-                    dist_range = [0, 1]
-                else:
-                    dist_range = methods_range[method]
-
-                dist = normalize_distance(dist, dist_range)
-            result[method] = dist
-
+            result[method] = normalize_distance(dist, dist_range)
+        result[method] = dist
     else:
         for method in methods_name:
-            if need_normalize_result:
-                result[method] = 1
-            else:
-                result[method] = np.inf
+            result[method] = 1
+
     return result
+

@@ -1,14 +1,13 @@
 import numpy as np
 
-from .tools import match_peaks_in_spectra, match_peaks_with_mz_info_in_spectra
+from .tools import matched_peaks_with_intensity_info, matched_peaks_with_mz_and_intensity_info
 from . import math_distance
+from spectrum_utils.spectrum import MsmsSpectrum
 
 
-def weighted_dot_product_distance(
-        spec_query,
-        spec_reference,
-        ms2_ppm=None,
-        ms2_da=None):
+def weighted_dot_product_distance(spectrum_query: MsmsSpectrum,
+                                  spectrum_library: MsmsSpectrum = None,
+                                  matched_peaks: []= None): -> float
     r"""
     Weighted Dot-Product distance:
 
@@ -21,12 +20,13 @@ def weighted_dot_product_distance(
 
     """
 
-    spec_matched = match_peaks_with_mz_info_in_spectra(
-        spec_query, spec_reference, ms2_ppm, ms2_da)
-    m_q = spec_matched[:, 0]
-    i_q = spec_matched[:, 1]
-    m_r = spec_matched[:, 2]
-    i_r = spec_matched[:, 3]
+    spec_matched = matched_peaks_with_mz_and_intensity_info( spectrum_query=spectrum_query,
+                                                           spectrum_library=spectrum_library,
+                                                           matched_peaks=matched_peaks)
+    m_q = spec_matched[0, :]
+    i_q = spec_matched[1, :]
+    m_r = spec_matched[2, :]
+    i_r = spec_matched[3, :]
     k = 0.6
     l = 3
     w_q = np.power(i_q, k) * np.power(m_q, l)
@@ -35,12 +35,12 @@ def weighted_dot_product_distance(
     return math_distance.dot_product_distance(w_q, w_r)
 
 
-def ms_for_id_v1_distance(
-        spec_query,
-        spec_reference,
-        ms2_ppm=None,
-        ms2_da=None):
+def ms_for_id_v1_distance(spectrum_query: MsmsSpectrum,
+                          spectrum_library: MsmsSpectrum = None,
+                          matched_peaks: []= None): -> float
     r"""
+	reference: https://analyticalsciencejournals.onlinelibrary.wiley.com/doi/10.1002/jms.1525
+	
     MSforID distance version 1:
 
     .. math::
@@ -53,14 +53,12 @@ def ms_for_id_v1_distance(
     :return: :math:`Distance`
     """
 
-    spec_matched = match_peaks_in_spectra(
-        spec_a=spec_query,
-        spec_b=spec_reference,
-        ms2_ppm=ms2_ppm,
-        ms2_da=ms2_da)
+    spec_matched = matched_peaks_with_intensity_info(spectrum_query=spectrum_query,
+                                                   spectrum_library=spectrum_library,
+                                                    matched_peaks=matched_peaks)
 
-    i_q = spec_matched[:, 1]
-    i_r = spec_matched[:, 2]
+    i_q = spec_matched[0, :]
+    i_r = spec_matched[1, :]
 
     n_m = np.sum(np.bitwise_and(i_q > 0, i_r > 0))
     n_q = np.sum(i_q > 0)
@@ -78,8 +76,12 @@ def ms_for_id_v1_distance(
     return dist
 
 
-def ms_for_id_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
+def ms_for_id_distance(spectrum_query: MsmsSpectrum,
+                       spectrum_library: MsmsSpectrum = None,
+                       matched_peaks: []= None): -> float
     r"""
+	reference: https://analyticalsciencejournals.onlinelibrary.wiley.com/doi/10.1002/jms.1525
+	
     MSforID distance:
 
     .. math::
@@ -97,28 +99,22 @@ def ms_for_id_distance(spec_query, spec_reference, ms2_ppm=None, ms2_da=None):
     :math:`I_q,I_r`: intensity of peak in query and reference spectrum
     """
 
-    # Filter spectrum to have intensity >0.05
-    if len(spec_query) == 0 or len(spec_reference) == 0:
-        return np.inf
-
-    spec_query = spec_query[spec_query[:, 1] > 0.05]
-    spec_reference = spec_reference[spec_reference[:, 1] > 0.05]
-
-    spec_matched = match_peaks_with_mz_info_in_spectra(
-        spec_query, spec_reference, ms2_ppm, ms2_da)
+    spec_matched = matched_peaks_with_mz_and_intensity_info(spectrum_query=spectrum_query,
+                                                          spectrum_library=spectrum_library,
+                                                          matched_peaks=matched_peaks)
 
     b = 4
     c = 1.25
     d = 2
 
-    i_q = spec_matched[:, 1]
-    i_r = spec_matched[:, 3]
+    i_q = spec_matched[1, :]
+    i_r = spec_matched[3, :]
     matched_peak = np.bitwise_and(i_q > 0, i_r > 0)
     n_m = np.sum(matched_peak)
     n_q = np.sum(i_q > 0)
     n_r = np.sum(i_r > 0)
     i_delta = (i_q - i_r)[matched_peak]
-    m_delta = (spec_matched[:, 0] - spec_matched[:, 2])[matched_peak]
+    m_delta = (spec_matched[0, :] - spec_matched[2, :])[matched_peak]
 
     s1 = np.power(n_m, b) * np.power(np.sum(i_q) + 2 * np.sum(i_r), c)
     s2 = np.power(n_q + 2 * n_r, d) + \
