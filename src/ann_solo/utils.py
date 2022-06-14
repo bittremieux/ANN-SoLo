@@ -1,6 +1,7 @@
 from typing import Iterator
 
 import mokapot
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
@@ -124,6 +125,8 @@ def score_ssms(
             spectrum_similarity.bray_curtis_distance(ssm)
         )
         features["is_target"].append(not ssm.is_decoy)
+        # Reset previous search engine score.
+        ssm.search_engine_score = np.nan
     dataset = mokapot.dataset.LinearPsmDataset(
         pd.DataFrame(features),
         target_column="is_target",
