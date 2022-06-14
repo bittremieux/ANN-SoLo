@@ -215,10 +215,10 @@ def ms_for_id_v1(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return len(ssm.peak_matches) ** 4 / (
         len(ssm.query_spectrum.mz)
         * len(ssm.library_spectrum.mz)
-        * np.abs(
+        * max(np.abs(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
             - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        ).sum()
+        ).sum(), np.finfo(float).eps)
         ** 0.25
     )
 
