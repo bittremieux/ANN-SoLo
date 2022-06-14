@@ -13,7 +13,8 @@ from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
 def score_ssms(
-    ssms: Iterator[SpectrumSpectrumMatch], fdr: float,
+    ssms: Iterator[SpectrumSpectrumMatch],
+    fdr: float,
 ) -> Iterator[SpectrumSpectrumMatch]:
     """
     Score SSMs using semi-supervised learning with Mokapot.
@@ -144,7 +145,13 @@ def score_ssms(
     )
     # Train the Mokapot model and score the SSMs.
     confidences, _ = mokapot.brew(dataset, model, fdr, max_workers=-1)
-    ssm_scores = confidences.psms.sort_values("ssm_id")
+    ssm_scores = pd.concat(
+        [
+            confidences.group_confidence_estimates[group].psms
+            for group in confidences.groups
+        ],
+        ignore_index=True,
+    )
     for i, score, q in zip(
         ssm_scores["ssm_id"],
         ssm_scores["mokapot score"],
