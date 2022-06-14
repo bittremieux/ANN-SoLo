@@ -309,7 +309,7 @@ class SpectralLibrary:
         logging.debug('Filter the spectrum—spectrum matches on FDR '
                       '(threshold = %s)', config.fdr)
         if mode == 'std':
-            return utils.rescore_matches(ssms.values(), config.fdr)
+            return utils.rescore_matches(ssms.values(), config.fdr, "std")
         elif mode == 'open':
             return utils.group_rescore(ssms.values(), config.fdr,
                                        config.fdr_tolerance_mass,

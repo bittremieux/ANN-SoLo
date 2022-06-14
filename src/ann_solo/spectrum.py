@@ -228,7 +228,6 @@ class SpectrumSpectrumMatch:
             peak_matches: Optional[List] = None,
             q: float = math.nan,
             group: str = None,
-            mode: str = "std",
             num_candidates: int = 0,
     ):
         self.query_spectrum = query_spectrum
@@ -237,10 +236,6 @@ class SpectrumSpectrumMatch:
         self.peak_matches = peak_matches
         self.q = q
         self.group = group
-        self.mode = mode
-        self.std_features = {}
-        self.open_features = {}
-        self.compute_features()
         self.num_candidates = num_candidates
 
     def __str__(self):
