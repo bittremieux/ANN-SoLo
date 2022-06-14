@@ -55,11 +55,13 @@ def score_ssms(
     #   - We perform minimal tuning of TODO hyperparameters.
     hyperparameters = {"max_depth": [None]}
     model = mokapot.Model(
-        GridSearchCV(RandomForestClassifier(), param_grid=hyperparameters),
+        GridSearchCV(
+            RandomForestClassifier(n_jobs=-1), param_grid=hyperparameters
+        ),
         train_fdr=fdr,
     )
     # Train the mokapot model and combine the SSMs for all groups.
-    confidences, _ = mokapot.brew(dataset, model, fdr, max_workers=-1)
+    confidences, _ = mokapot.brew(dataset, model, fdr)
     ssm_scores = pd.concat(
         [
             confidences.group_confidence_estimates[group].psms
