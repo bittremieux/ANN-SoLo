@@ -138,9 +138,6 @@ def score_ssms(
     model = mokapot.Model(
         GridSearchCV(RandomForestClassifier(), param_grid=hyperparameters),
         train_fdr=fdr,
-        # FIXME: We want to use the shifted dot product here, but Mokapot
-        #   currently assumes that lower values are better.
-        direction="entropy_unweighted",
     )
     # Train the Mokapot model and score the SSMs.
     confidences, _ = mokapot.brew(dataset, model, fdr, max_workers=-1)
