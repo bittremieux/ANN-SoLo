@@ -227,23 +227,18 @@ class SpectrumSpectrumMatch:
             search_engine_score: float = math.nan,
             peak_matches: Optional[List] = None,
             q: float = math.nan,
-            group: int = -1,
-            num_candidates: int = 0,
     ):
         self.query_spectrum = query_spectrum
         self.library_spectrum = library_spectrum
         self.search_engine_score = search_engine_score
         self.peak_matches = peak_matches
         self.q = q
-        self.group = group
-        self.num_candidates = num_candidates
 
     def __str__(self):
         return " query_spectrum: " + str(self.query_spectrum) + \
                " library_spectrum: " + str(self.library_spectrum) + \
                " search_engine_score: " + str(self.search_engine_score) + \
-               " q: " + str(self.q) + \
-               " num_candidates: " + str(self.num_candidates)
+               " q: " + str(self.q)
 
     @property
     def sequence(self):
