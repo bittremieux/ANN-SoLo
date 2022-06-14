@@ -56,7 +56,7 @@ def rescore_matches(
         "chebyshev": [],
         "pearson_correlation": [],
         "bray_curtis_distance": [],
-        "is_decoy": [],
+        "is_target": [],
     }
     for ssm in ssms:
         if len(ssm.peak_matches) <= 1:
@@ -120,11 +120,10 @@ def rescore_matches(
         features["bray_curtis_distance"].append(
             spectrum_similarity.bray_curtis_distance(ssm)
         )
-        features["is_decoy"].append(ssm.is_decoy)
-    pd.DataFrame(features).to_csv("features.csv", index=False)
+        features["is_target"].append(not ssm.is_decoy)
     features = mokapot.dataset.LinearPsmDataset(
         pd.DataFrame(features),
-        target_column="is_decoy",
+        target_column="is_target",
         spectrum_columns="ssm_id",
         peptide_column="sequence",
         group_column="group" if mode == "open" else None,
