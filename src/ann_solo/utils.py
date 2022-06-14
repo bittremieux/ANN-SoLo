@@ -5,6 +5,7 @@ import mokapot
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
+from spectrum_utils.utils import mass_diff
 
 from ann_solo import spectrum_similarity
 from ann_solo.spectrum import SpectrumSpectrumMatch
@@ -36,6 +37,7 @@ def rescore_matches(
         "query_precursor_charge": [],
         "library_precursor_mz": [],
         "library_precursor_charge": [],
+        "mz_diff_ppm": [],
         "shifted_dot": [],
         "frac_n_peaks_query": [],
         "frac_n_peaks_library": [],
@@ -70,6 +72,13 @@ def rescore_matches(
         )
         features["library_precursor_charge"].append(
             ssm.library_spectrum.precursor_charge
+        )
+        features["mz_diff_ppm"].append(
+            mass_diff(
+                ssm.query_spectrum.precursor_mz,
+                ssm.library_spectrum.precursor_mz,
+                False,
+            )
         )
         features["shifted_dot"].append(ssm.search_engine_score)
         features["frac_n_peaks_query"].append(
