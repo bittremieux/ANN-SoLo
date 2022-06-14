@@ -227,7 +227,7 @@ class SpectrumSpectrumMatch:
             search_engine_score: float = math.nan,
             peak_matches: Optional[List] = None,
             q: float = math.nan,
-            group: str = None,
+            group: int = None,
             num_candidates: int = 0,
     ):
         self.query_spectrum = query_spectrum

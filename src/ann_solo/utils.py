@@ -1,3 +1,4 @@
+import operator
 from typing import Iterator
 
 import mokapot
@@ -19,14 +20,14 @@ def score_ssms(
 
     Parameters
     ----------
-        ssms : Iterator[SpectrumSpectrumMatch]
-            SSMs to be scored.
-        fdr : float
-            The minimum FDR threshold to accept target SSMs.
-        mode : str
-            Whether the SSMs come from a standard ("std") or open ("open")
-            search. Standard SSMs will be scored jointly, whereas open SSMs
-            will be scored per group.
+    ssms : Iterator[SpectrumSpectrumMatch]
+        SSMs to be scored.
+    fdr : float
+        The minimum FDR threshold to accept target SSMs.
+    mode : str
+        Whether the SSMs come from a standard ("std") or open ("open")
+        search. Standard SSMs will be scored jointly, whereas open SSMs
+        will be scored per group.
 
     Returns
     -------
@@ -61,6 +62,7 @@ def score_ssms(
         "pearson_correlation": [],
         "bray_curtis_distance": [],
         "is_target": [],
+        "group": [],
     }
     for i, ssm in enumerate(ssms):
         if len(ssm.peak_matches) <= 1:
@@ -125,6 +127,7 @@ def score_ssms(
             spectrum_similarity.bray_curtis_distance(ssm)
         )
         features["is_target"].append(not ssm.is_decoy)
+        features["group"].append(ssm.group)
         # Reset previous search engine score.
         ssm.search_engine_score = np.nan
     dataset = mokapot.dataset.LinearPsmDataset(
@@ -153,3 +156,81 @@ def score_ssms(
         ssms[i].search_engine_score = score
         ssms[i].q = q
     yield from ssms
+
+
+def score_ssms_grouped(
+    ssms: Iterator[SpectrumSpectrumMatch],
+    fdr: float,
+    tol_mass: float,
+    tol_mode: str,
+    min_group_size: int,
+) -> Iterator[SpectrumSpectrumMatch]:
+    """
+    Score SSMs using semi-supervised learning with Mokapot.
+
+    SSMs are assigned to groups based on the precursor mass differences prior
+    to scoring.
+
+    Parameters
+    ----------
+    ssms : Iterator[SpectrumSpectrumMatch]
+        SSMs to be scored.
+    fdr : float
+        The minimum FDR threshold to accept target SSMs.
+    tol_mass : float
+        The mass range to group SSMs.
+    tol_mode : str
+        The unit in which the mass range is specified ('Da' or 'ppm').
+    min_group_size : int
+        The minimum number of SSMs that should be present in a group for it
+        to be considered common.
+
+    Returns
+    -------
+    Iterator[SpectrumSpectrumMatch]
+        An iterator of the SSMs with updated scores and q-values.
+    """
+    # Assign SSMs to groups.
+    ssms_remaining = np.asarray(
+        sorted(
+            ssms, key=operator.attrgetter("search_engine_score"), reverse=True
+        )
+    )
+    exp_masses = np.asarray([ssm.exp_mass_to_charge for ssm in ssms_remaining])
+    mass_diffs = np.asarray(
+        [
+            (ssm.exp_mass_to_charge - ssm.calc_mass_to_charge) * ssm.charge
+            for ssm in ssms_remaining
+        ]
+    )
+
+    # Start with the highest ranked SSM.
+    group = 1
+    while ssms_remaining.size > 0:
+        # Find all remaining SSMs within the mass difference window.
+        if (
+            tol_mass is None
+            or tol_mode not in ("Da", "ppm")
+            or min_group_size is None
+        ):
+            mask = np.full(len(ssms_remaining), True, dtype=bool)
+        elif tol_mode == "Da":
+            mask = np.fabs(mass_diffs - mass_diffs[0]) <= tol_mass
+        elif tol_mode == "ppm":
+            mask = (
+                np.fabs(mass_diffs - mass_diffs[0]) / exp_masses * 10**6
+                <= tol_mass
+            )
+        if np.count_nonzero(mask) >= min_group_size:
+            for ssm in ssms_remaining[mask]:
+                ssm.group = group
+            group += 1
+        else:
+            for ssm in ssms_remaining[mask]:
+                ssm.group = 0
+        # Exclude the selected SSMs from further selections.
+        ssms_remaining = ssms_remaining[~mask]
+        exp_masses = exp_masses[~mask]
+        mass_diffs = mass_diffs[~mask]
+    # Score the SSMs.
+    yield from score_ssms(ssms, fdr, "open")
