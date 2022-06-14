@@ -57,6 +57,8 @@ def rescore_matches(
         "is_decoy": [],
     }
     for ssm in ssms:
+        if len(ssm.peak_matches) <= 1:
+            continue
         features["ssm_id"].append(ssm.query_identifier)
         features["sequence"].append(ssm.sequence)
         features["query_precursor_mz"].append(ssm.query_spectrum.precursor_mz)
