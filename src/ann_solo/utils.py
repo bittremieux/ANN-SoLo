@@ -30,6 +30,7 @@ def score_ssms(
     Iterator[SpectrumSpectrumMatch]
         An iterator of the SSMs with updated scores and q-values.
     """
+    ssms = list(ssms)
     # Compute all SSM features.
     features = {
         "ssm_id": [],
