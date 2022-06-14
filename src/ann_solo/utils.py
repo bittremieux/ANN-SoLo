@@ -56,7 +56,8 @@ def score_ssms(
     hyperparameters = {"max_depth": [None]}
     model = mokapot.Model(
         GridSearchCV(
-            RandomForestClassifier(n_jobs=-1), param_grid=hyperparameters
+            RandomForestClassifier(n_jobs=-1, random_state=1),
+            param_grid=hyperparameters,
         ),
         train_fdr=fdr,
     )
