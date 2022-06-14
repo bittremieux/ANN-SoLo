@@ -121,7 +121,7 @@ def rescore_matches(
             spectrum_similarity.bray_curtis_distance(ssm)
         )
         features["is_target"].append(not ssm.is_decoy)
-    features = mokapot.dataset.LinearPsmDataset(
+    dataset = mokapot.dataset.LinearPsmDataset(
         pd.DataFrame(features),
         target_column="is_target",
         spectrum_columns="ssm_id",
@@ -129,7 +129,7 @@ def rescore_matches(
         group_column="group" if mode == "open" else None,
     )
     # Define the Mokapot model.
-    hyperparameters = {"max_depth": [8, 10, 20, 30, 50]}
+    hyperparameters = {"max_depth": [None]}
     # FIXME: Add feature preprocessing steps (remove correlated and zero
     #   variance features).
     model = mokapot.Model(
@@ -137,7 +137,7 @@ def rescore_matches(
     )
     # Train the Mokapot model and rescore the SSMs.
     results, models = mokapot.brew(
-        features, model, fdr, folds=10, max_workers=os.cpu_count()
+        dataset, model, fdr, folds=10, max_workers=os.cpu_count()
     )
     targets = results.confidence_estimates["psms"]
     decoys = results.decoy_confidence_estimates["psms"]
