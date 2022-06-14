@@ -509,10 +509,13 @@ def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     float
         The Pearson correlation of peak matches.
     """
-    return scipy.stats.pearsonr(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-    )[0]
+    if len(ssm.peak_matches) < 2:
+        return 0.0
+    else:
+        return scipy.stats.pearsonr(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+        )[0]
 
 
 def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
