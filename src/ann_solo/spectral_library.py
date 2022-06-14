@@ -309,12 +309,15 @@ class SpectralLibrary:
         logging.debug('Filter the spectrum—spectrum matches on FDR '
                       '(threshold = %s)', config.fdr)
         if mode == 'std':
-            return utils.rescore_matches(ssms.values(), config.fdr, "std")
+            return utils.score_ssms(ssms.values(), config.fdr)
         elif mode == 'open':
-            return utils.group_rescore(ssms.values(), config.fdr,
-                                       config.fdr_tolerance_mass,
-                                       config.fdr_tolerance_mode,
-                                       config.fdr_min_group_size)
+            return utils.score_ssms_grouped(
+                ssms.values(),
+                config.fdr,
+                config.fdr_tolerance_mass,
+                config.fdr_tolerance_mode,
+                config.fdr_min_group_size
+            )
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\

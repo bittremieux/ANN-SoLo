@@ -13,7 +13,7 @@ from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
 def score_ssms(
-    ssms: Iterator[SpectrumSpectrumMatch], fdr: float, mode: str
+    ssms: Iterator[SpectrumSpectrumMatch], fdr: float,
 ) -> Iterator[SpectrumSpectrumMatch]:
     """
     Score SSMs using semi-supervised learning with Mokapot.
@@ -24,10 +24,6 @@ def score_ssms(
         SSMs to be scored.
     fdr : float
         The minimum FDR threshold to accept target SSMs.
-    mode : str
-        Whether the SSMs come from a standard ("std") or open ("open")
-        search. Standard SSMs will be scored jointly, whereas open SSMs
-        will be scored per group.
 
     Returns
     -------
@@ -135,7 +131,7 @@ def score_ssms(
         target_column="is_target",
         spectrum_columns="ssm_id",
         peptide_column="sequence",
-        group_column="group" if mode == "open" else None,
+        group_column="group",
     )
     # Define the Mokapot model.
     hyperparameters = {"max_depth": [None]}
@@ -233,4 +229,4 @@ def score_ssms_grouped(
         exp_masses = exp_masses[~mask]
         mass_diffs = mass_diffs[~mask]
     # Score the SSMs.
-    yield from score_ssms(ssms, fdr, "open")
+    yield from score_ssms(ssms, fdr)
