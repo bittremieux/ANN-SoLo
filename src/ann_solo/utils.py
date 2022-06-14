@@ -1,9 +1,9 @@
-import operator
 from typing import Dict, Iterator, List, Union
 
 import mokapot
 import numpy as np
 import pandas as pd
+import scipy.signal
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from spectrum_utils.utils import mass_diff
@@ -16,9 +16,7 @@ def score_ssms(
     ssms: List[SpectrumSpectrumMatch],
     fdr: float,
     grouped: bool = False,
-    tol_mass: float = None,
-    tol_mode: str = None,
-    min_group_size: int = None,
+    min_group_size: int = 100,
 ) -> List[SpectrumSpectrumMatch]:
     """
     Score SSMs using semi-supervised learning with mokapot.
@@ -31,15 +29,9 @@ def score_ssms(
         The minimum FDR threshold to accept target SSMs.
     grouped : bool
         Compute q-values per SSM group or not (default: False).
-    tol_mass : float
-        The mass tolerance to group SSMs. Must be specified if `grouped` is
-        True.
-    tol_mode : str
-        The unit in which the mass tolerance is specified ("Da" or "ppm").
-        Must be specified if `grouped` is True.
     min_group_size : int
-        The minimum group size. SSMs in smaller groups are combined into a
-        residual group. Must be specified if `grouped` is True.
+        The minimum group size (default: 100). SSMs in smaller groups are
+        combined into a residual group. Must be specified if `grouped` is True.
 
     Returns
     -------
@@ -48,12 +40,7 @@ def score_ssms(
     """
     # Create a Dataset with SSM features.
     features = pd.DataFrame(_compute_ssm_features(ssms))
-    if grouped:
-        features["group"] = _get_ssm_groups(
-            ssms, tol_mass, tol_mode, min_group_size
-        )
-    else:
-        features["group"] = 0
+    features["group"] = _get_ssm_groups(ssms, min_group_size) if grouped else 0
     dataset = mokapot.dataset.LinearPsmDataset(
         features,
         target_column="is_target",
@@ -92,72 +79,74 @@ def score_ssms(
 
 
 def _get_ssm_groups(
-    ssms: List[SpectrumSpectrumMatch],
-    tol_mass: float,
-    tol_mode: str,
-    min_group_size: int,
-) -> np.ndarray:
+    ssms: List[SpectrumSpectrumMatch], min_group_size: int
+) -> pd.Series:
     """
     Get SSM group labels based on the precursor mass differences.
+
+    SSMs are grouped by finding peaks in histograms centered around each
+    nominal mass difference and assigning SSMs to the nearest peak.
 
     Parameters
     ----------
     ssms : Iterator[SpectrumSpectrumMatch]
         SSMs to be grouped.
-    tol_mass : float
-        The mass tolerance to group SSMs.
-    tol_mode : str
-        The unit in which the mass tolerance is specified ("Da" or "ppm").
     min_group_size : int
         The minimum group size. SSMs in smaller groups are combined into a
         residual group.
 
     Returns
     -------
-    np.ndarray
-        An array with group labels for all SSMs.
+    pd.Series
+        A Series with group labels for all SSMs.
     """
-    groups = -np.ones(len(ssms), np.int32)
-    ssms_remaining = np.asarray(
-        sorted(
-            ssms, key=operator.attrgetter("search_engine_score"), reverse=True
-        )
-    )
-    exp_masses = np.asarray([ssm.exp_mass_to_charge for ssm in ssms_remaining])
+    # Group SSMs in a window around each nominal mass difference.
     mass_diffs = np.asarray(
         [
             (ssm.exp_mass_to_charge - ssm.calc_mass_to_charge) * ssm.charge
-            for ssm in ssms_remaining
+            for ssm in ssms
         ]
     )
-    # Start with the highest ranked SSM.
-    group = 0
-    while ssms_remaining.size > 0:
-        # Find all remaining SSMs within the mass difference window.
-        if (
-            tol_mass is None
-            or tol_mode not in ("Da", "ppm")
-            or min_group_size is None
-        ):
-            mask = np.full(len(ssms_remaining), True, dtype=bool)
-        elif tol_mode == "Da":
-            mask = np.fabs(mass_diffs - mass_diffs[0]) <= tol_mass
-        elif tol_mode == "ppm":
-            mask = (
-                np.fabs(mass_diffs - mass_diffs[0]) / exp_masses * 10**6
-                <= tol_mass
-            )
-        if np.count_nonzero(mask) >= min_group_size:
-            for ssm in ssms_remaining[mask]:
-                ssm.group = group
-            group += 1
-        else:
-            for ssm in ssms_remaining[mask]:
-                ssm.group = 0
-        # Exclude the selected SSMs from further selections.
-        ssms_remaining = ssms_remaining[~mask]
-        exp_masses = exp_masses[~mask]
-        mass_diffs = mass_diffs[~mask]
+    order = np.argsort(mass_diffs)
+    groups, group = -np.ones(len(ssms), np.int32), 0
+    group_md, group_i = np.nan, []
+    for counter, (md, i) in enumerate(zip(mass_diffs[order], order)):
+        if round(md) != group_md or counter == len(mass_diffs) - 1:
+            if round(md) == group_md:
+                group_i.append(i)
+            if len(group_i) > 0:
+                # Assign groups within the current interval.
+                # Create a mass difference histogram and find peaks.
+                bins = np.linspace(group_md - 0.5, group_md + 0.5, 101)
+                hist, _ = np.histogram(mass_diffs[group_i], bins=bins)
+                peaks_bin_i, prominences = scipy.signal.find_peaks(
+                    hist, prominence=(None, None)
+                )
+                if len(peaks_bin_i) > 0:
+                    # Assign mass differences to their closest peak.
+                    for md_j, j in zip(mass_diffs[group_i], group_i):
+                        peak_assignment = -1, np.inf
+                        for peak_i, peak in enumerate(bins[peaks_bin_i]):
+                            distance_to_peak = abs(peak - md_j)
+                            if (
+                                bins[prominences["left_bases"][peak_i]]
+                                < md_j
+                                < bins[prominences["right_bases"][peak_i]]
+                                and distance_to_peak < peak_assignment[1]
+                            ):
+                                peak_assignment = peak_i, distance_to_peak
+                        if peak_assignment[0] != -1:
+                            groups[j] = group + peak_assignment[0]
+                group += len(peaks_bin_i)
+            # Start a new interval.
+            group_i = []
+        group_i.append(i)
+        group_md = round(md)
+    groups = pd.Series(groups)
+    # Reassign small groups to a residual group (accurate FDR calculation is
+    # not possible in overly small groups).
+    group_counts = groups.value_counts()
+    groups[groups.isin(group_counts.index[group_counts < min_group_size])] = -1
     return groups
 
 
