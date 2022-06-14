@@ -1,4 +1,3 @@
-import os
 from typing import Iterator
 
 import mokapot
@@ -11,23 +10,27 @@ from ann_solo import spectrum_similarity
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
-def rescore_matches(
+def score_ssms(
     ssms: Iterator[SpectrumSpectrumMatch], fdr: float, mode: str
 ) -> Iterator[SpectrumSpectrumMatch]:
     """
-    Rescore SSMs using semi-supervised learning with Mokapot.
+    Score SSMs using semi-supervised learning with Mokapot.
 
     Parameters
     ----------
         ssms : Iterator[SpectrumSpectrumMatch]
-            SSMs to be rescored.
+            SSMs to be scored.
+        fdr : float
+            The minimum FDR threshold to accept target SSMs.
+        mode : str
+            Whether the SSMs come from a standard ("std") or open ("open")
+            search. Standard SSMs will be scored jointly, whereas open SSMs
+            will be scored per group.
 
     Returns
     -------
     Iterator[SpectrumSpectrumMatch]
-        FIXME
-        An iterator of the SSMs with an FDR below the given FDR threshold. Each
-        SSM is assigned its q-value in the `q` attribute.
+        An iterator of the SSMs with updated scores and q-values.
     """
     # Compute all SSM features.
     features = {
@@ -58,10 +61,10 @@ def rescore_matches(
         "bray_curtis_distance": [],
         "is_target": [],
     }
-    for ssm in ssms:
+    for i, ssm in enumerate(ssms):
         if len(ssm.peak_matches) <= 1:
             continue
-        features["ssm_id"].append(ssm.query_identifier)
+        features["ssm_id"].append(i)
         features["sequence"].append(ssm.sequence)
         features["query_precursor_mz"].append(ssm.query_spectrum.precursor_mz)
         features["query_precursor_charge"].append(
@@ -139,11 +142,14 @@ def rescore_matches(
         #   currently assumes that lower values are better.
         direction="entropy_unweighted",
     )
-    # Train the Mokapot model and rescore the SSMs.
-    results, models = mokapot.brew(
-        dataset, model, fdr, folds=10, max_workers=os.cpu_count()
-    )
-    targets = results.confidence_estimates["psms"]
-    decoys = results.decoy_confidence_estimates["psms"]
-    ssms_rescored = pd.concat([targets, decoys], ignore_index=True)
-    return ssms_rescored
+    # Train the Mokapot model and score the SSMs.
+    confidences, _ = mokapot.brew(dataset, model, fdr, max_workers=-1)
+    ssm_scores = confidences.psms.sort_values("ssm_id")
+    for i, score, q in zip(
+        ssm_scores["ssm_id"],
+        ssm_scores["mokapot score"],
+        ssm_scores["mokapot q-value"],
+    ):
+        ssms[i].search_engine_score = score
+        ssms[i].q = q
+    yield from ssms
