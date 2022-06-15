@@ -562,3 +562,61 @@ def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     numerator += query_unique + library_unique
     denominator += query_unique + library_unique
     return numerator / denominator
+
+
+def canberra_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the Canberra distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The hypergeometric score of peak matches.
+    """
+    return scipy.spatial.distance.canberra(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )
+
+def jaccard_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the Jaccard distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The hypergeometric score of peak matches.
+    """
+    return scipy.spatial.distance.jaccard(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )
+
+def dice_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the Dice distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The hypergeometric score of peak matches.
+    """
+    return scipy.spatial.distance.dice(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )

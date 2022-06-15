@@ -144,16 +144,7 @@ def motyka_distance(p, q) -> float:
     return -dist
 
 
-def canberra_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Canberra distance:
 
-    .. math::
-
-        \sum\frac{|P_{i}-Q_{i}|}{|P_{i}|+|Q_{i}|}
-    """
-    return np.sum(np.abs(p - q) / (np.abs(p) + np.abs(q)))
 
 
 def baroni_urbani_buser_distance(p, q) -> float:
@@ -347,30 +338,7 @@ def wave_hedges_distance(p, q) -> float:
     return np.sum(np.abs(p - q) / np.maximum(p, q))
 
 
-def jaccard_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Jaccard distance:
 
-    .. math::
-
-        \frac{\sum(P_i-Q_i)^2}{\sum P_i^2+\sum{Q_i^2-\sum{P_iQ_i}}}
-    """
-    return np.sum(np.power(p - q, 2)) / \
-        (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)) - np.sum(p * q))
-
-
-def dice_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Dice distance:
-
-    .. math::
-
-        \frac{\sum(P_i-Q_i)^2}{\sum P_i^2+\sum Q_i^2}
-    """
-    return np.sum(np.power(p - q, 2)) / \
-        (np.sum(np.power(p, 2)) + np.sum(np.power(q, 2)))
 
 
 def divergence_distance(p, q) -> float:
