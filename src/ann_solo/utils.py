@@ -15,6 +15,7 @@ from ann_solo.spectrum import SpectrumSpectrumMatch
 def score_ssms(
     ssms: List[SpectrumSpectrumMatch],
     fdr: float,
+    model: str,
     grouped: bool = False,
     min_group_size: int = 100,
 ) -> List[SpectrumSpectrumMatch]:
@@ -27,6 +28,10 @@ def score_ssms(
         SSMs to be scored.
     fdr : float
         The minimum FDR threshold to accept target SSMs.
+    model : str
+        The type of machine learning model to use. Can be "rf" for a random
+        forest classifier, "svm" for a Percolator-like linear SVM, or `None`
+        to disable semi-supervised learning.
     grouped : bool
         Compute q-values per SSM group or not (default: False).
     min_group_size : int
@@ -49,20 +54,31 @@ def score_ssms(
         group_column="group",
     )
     # Define the mokapot model.
-    #   - We use a random forest.
+    #   - Choice between a random forest, linear SVM, or no semi-supervised
+    #     learning.
     #   - Features are preprocessed by TODO (remove correlated and zero
     #                                        variance features).
     #   - We perform minimal tuning of TODO hyperparameters.
-    hyperparameters = {"max_depth": [None]}
-    model = mokapot.Model(
-        GridSearchCV(
-            RandomForestClassifier(n_jobs=-1, random_state=1),
-            param_grid=hyperparameters,
-        ),
-        train_fdr=fdr,
-    )
-    # Train the mokapot model and combine the SSMs for all groups.
-    confidences, _ = mokapot.brew(dataset, model, fdr)
+    if model is None:
+        # Calculate q-values based on the cosine similarity.
+        confidences = dataset.assign_confidence(features["cosine"], True)
+    else:
+        if model == "svm":
+            clf = mokapot.model.PercolatorModel(train_fdr=fdr)
+        elif model == "rf":
+            clf = mokapot.Model(
+                GridSearchCV(
+                    RandomForestClassifier(n_jobs=-1, random_state=1),
+                    param_grid={"max_depth": [None]},
+                ),
+                train_fdr=fdr,
+            )
+        else:
+            raise ValueError(
+                "Unknown semi-supervised machine learning model given"
+            )
+        # Train the mokapot model and combine the SSMs for all groups.
+        confidences, _ = mokapot.brew(dataset, clf, fdr)
     ssm_scores = pd.concat(
         [
             confidences.group_confidence_estimates[group].psms
