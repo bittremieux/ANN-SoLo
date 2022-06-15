@@ -16,7 +16,6 @@ from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
 class CorrelationThreshold:
-
     def __init__(self, threshold=None):
         self.threshold = threshold if threshold is not None else 1.0
 
@@ -240,8 +239,17 @@ def _compute_ssm_features(
         "manhattan": [],
         "euclidean": [],
         "chebyshev": [],
-        "pearson_correlation": [],
-        "bray_curtis_distance": [],
+        "pearsonr": [],
+        "braycurtis": [],
+        "canberra": [],
+        "jaccard": [],
+        "dice": [],
+        "improved_sim": [],
+        "jensenshannon": [],
+        "ruzicka": [],
+        "wave_hedges": [],
+        "squared_chord": [],
+        "divergence": [],
         "is_target": [],
         "group": [],
     }
@@ -279,8 +287,17 @@ def _compute_ssm_features(
         features["manhattan"].append(sim.manhattan(ssm))
         features["euclidean"].append(sim.euclidean(ssm))
         features["chebyshev"].append(sim.chebyshev(ssm))
-        features["pearson_correlation"].append(sim.pearson_correlation(ssm))
-        features["bray_curtis_distance"].append(sim.bray_curtis_distance(ssm))
+        features["pearsonr"].append(sim.pearsonr(ssm))
+        features["braycurtis"].append(sim.braycurtis(ssm))
+        features["canberra"].append(sim.canberra(ssm))
+        features["jaccard"].append(sim.jaccard(ssm))
+        features["dice"].append(sim.dice(ssm))
+        features["improved_sim"].append(sim.improved_sim(ssm))
+        features["jensenshannon"].append(sim.jensenshannon(ssm))
+        features["ruzicka"].append(sim.ruzicka(ssm))
+        features["wave_hedges"].append(sim.wave_hedges(ssm))
+        features["squared_chord"].append(sim.squared_chord(ssm))
+        features["divergence"].append(sim.divergence(ssm))
         features["is_target"].append(not ssm.is_decoy)
         features["group"].append(ssm.group)
     return features

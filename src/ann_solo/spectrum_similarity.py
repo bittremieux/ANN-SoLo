@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.spatial.distance
 import scipy.special
 import scipy.stats
 
@@ -215,10 +216,13 @@ def ms_for_id_v1(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return len(ssm.peak_matches) ** 4 / (
         len(ssm.query_spectrum.mz)
         * len(ssm.library_spectrum.mz)
-        * max(np.abs(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        ).sum(), np.finfo(float).eps)
+        * max(
+            np.abs(
+                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+            ).sum(),
+            np.finfo(float).eps,
+        )
         ** 0.25
     )
 
@@ -495,7 +499,7 @@ def chebyshev(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return dist.max()
 
 
-def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def pearsonr(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Pearson correlation between peak matches in two spectra.
 
@@ -518,7 +522,7 @@ def pearson_correlation(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         )[0]
 
 
-def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def braycurtis(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Bray-Curtis distance between two spectra.
 
@@ -564,9 +568,9 @@ def bray_curtis_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return numerator / denominator
 
 
-def canberra_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def canberra(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Canberra distance of peak matches between two spectra.
+    Get the Canberra distance of peak matches between two spectra.
 
     Parameters
     ----------
@@ -583,9 +587,10 @@ def canberra_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )
 
-def jaccard_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def jaccard(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Jaccard distance of peak matches between two spectra.
+    Get the Jaccard distance of peak matches between two spectra.
 
     Parameters
     ----------
@@ -595,16 +600,17 @@ def jaccard_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The jaccard distance of peak matches.
+        The Jaccard distance of peak matches.
     """
     return scipy.spatial.distance.jaccard(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )
 
-def dice_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def dice(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Dice distance of peak matches between two spectra.
+    Get the Dice dissimilarity of peak matches between two spectra.
 
     Parameters
     ----------
@@ -614,7 +620,7 @@ def dice_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The dice distance of peak matches.
+        The Dice dissimilarity of peak matches.
     """
     return scipy.spatial.distance.dice(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
@@ -622,10 +628,11 @@ def dice_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
-def improved_similarity_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def improved_sim(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Improved Similarity Index of peak matches between two
-    spectra.
+    Get the Improved Similarity Index of peak matches between two spectra.
+
+    TODO: reference needed.
 
     Parameters
     ----------
@@ -638,20 +645,27 @@ def improved_similarity_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The improved similarity index of peak matches.
     """
     return np.sqrt(
-        1 / np.sum(ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] > 0)
+        1
+        / np.sum(ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] > 0)
         * np.sum(
             np.power(
-                (ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]])
-                    / (ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-                + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]),
-                2)
+                (
+                    ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                    - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+                )
+                / (
+                    ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                    + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+                ),
+                2,
+            )
         )
     )
 
-def jensenshannon_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def jensenshannon(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Jensenshannon distance of peak matches between two spectra.
+    Get the Jensen-Shannon distance of peak matches between two spectra.
 
     Parameters
     ----------
@@ -661,16 +675,17 @@ def jensenshannon_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The jensenshannon distance of peak matches.
+        The Jensen-Shannon distance of peak matches.
     """
     return scipy.spatial.distance.jensenshannon(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )
 
-def ruzicka_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def ruzicka(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the ruzicka distance of peak matches between two spectra.
+    Compute the Ruzicka distance of peak matches between two spectra.
 
     Parameters
     ----------
@@ -680,24 +695,24 @@ def ruzicka_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The ruzicka distance of peak matches.
+        The Ruzicka distance of peak matches.
     """
     return np.sum(
         np.abs(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-            -
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
         )
     ) / np.sum(
         np.maximum(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
         )
     )
 
-def wave_hedges_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def wave_hedges(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the wave hedges distance of peak matches between two spectra.
+    Compute the Wave Hedges distance of peak matches between two spectra.
 
     Parameters
     ----------
@@ -707,21 +722,21 @@ def wave_hedges_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The wave hedges distance of peak matches.
+        The Wave Hedges distance of peak matches.
     """
     return np.sum(
         np.abs(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-            -
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]])
-        /
-        np.maximum(
+            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        )
+        / np.maximum(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
         )
     )
 
-def squared_chord_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def squared_chord(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Compute the squared chord distance of peak matches between two spectra.
 
@@ -739,13 +754,16 @@ def squared_chord_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         np.power(
             np.sqrt(ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]])
             - np.sqrt(ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]),
-            2
+            2,
         )
     )
 
-def divergence_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+
+def divergence(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Compute the divergence distance of peak matches between two spectra.
+
+    TODO: reference needed.
 
     Parameters
     ----------
@@ -758,14 +776,16 @@ def divergence_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The divergence distance of peak matches.
     """
     return 2 * np.sum(
-        (np.power(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-            2
+        (
+            np.power(
+                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+                2,
+            )
         )
-        ) / np.power(
+        / np.power(
             ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
             + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-            2
+            2,
         )
     )
