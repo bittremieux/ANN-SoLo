@@ -648,3 +648,75 @@ def improved_similarity_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
                 2)
         )
     )
+
+def jensenshannon_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the Jensenshannon distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The jensenshannon distance of peak matches.
+    """
+    return scipy.spatial.distance.jensenshannon(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )
+
+def ruzicka_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the ruzicka distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The ruzicka distance of peak matches.
+    """
+    return np.sum(
+        np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            -
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        )
+    ) / np.sum(
+        np.maximum(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        )
+    )
+
+def wave_hedges_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the wave hedges distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The wave hedges distance of peak matches.
+    """
+    return np.sum(
+        np.abs(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            -
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]])
+        /
+        np.maximum(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        )
+    )

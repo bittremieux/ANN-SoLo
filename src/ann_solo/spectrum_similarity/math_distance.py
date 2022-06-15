@@ -93,17 +93,6 @@ def probabilistic_symmetric_chi_squared_distance(p, q) -> float:
     return 1 / 2 * np.sum(np.power(p - q, 2) / (p + q))
 
 
-def ruzicka_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Ruzicka distance:
-
-    .. math::
-
-        \frac{\sum{|P_{i}-Q_{i}|}}{\sum{\max(P_{i},Q_{i})}}
-    """
-    dist = np.sum(np.abs(p - q)) / np.sum(np.maximum(p, q))
-    return dist
 
 
 def roberts_distance(p, q) -> float:
@@ -316,16 +305,7 @@ def spectral_contrast_angle_distance(p, q) -> float:
         np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
 
 
-def wave_hedges_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Wave Hedges distance:
 
-    .. math::
-
-        \sum\frac{|P_i-Q_i|}{\max{(P_i,Q_i)}}
-    """
-    return np.sum(np.abs(p - q) / np.maximum(p, q))
 
 
 
