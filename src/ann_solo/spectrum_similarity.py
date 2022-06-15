@@ -576,7 +576,7 @@ def canberra_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The hypergeometric score of peak matches.
+        The canberra distance of peak matches.
     """
     return scipy.spatial.distance.canberra(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
@@ -595,7 +595,7 @@ def jaccard_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The hypergeometric score of peak matches.
+        The jaccard distance of peak matches.
     """
     return scipy.spatial.distance.jaccard(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
@@ -614,9 +614,37 @@ def dice_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The hypergeometric score of peak matches.
+        The dice distance of peak matches.
     """
     return scipy.spatial.distance.dice(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )
+
+
+def improved_similarity_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the Improved Similarity Index of peak matches between two
+    spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The improved similarity index of peak matches.
+    """
+    return np.sqrt(
+        1 / np.sum(ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]] > 0)
+        * np.sum(
+            np.power(
+                (ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]])
+                    / (ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]),
+                2)
+        )
     )
