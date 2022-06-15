@@ -5,11 +5,34 @@ import numpy as np
 import pandas as pd
 import scipy.signal
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from spectrum_utils.utils import mass_diff
 
 from ann_solo import spectrum_similarity as sim
 from ann_solo.spectrum import SpectrumSpectrumMatch
+
+
+class CorrelationThreshold:
+
+    def __init__(self, threshold=None):
+        self.threshold = threshold if threshold is not None else 1.0
+
+    def fit(self, X, y=None):
+        corr = np.abs(np.corrcoef(X, rowvar=False))
+        self.mask = ~(np.tril(corr, k=-1) > self.threshold).any(axis=1)
+        return self
+
+    def transform(self, X, y=None):
+        return X[:, self.mask]
+
+    def fit_transform(self, X, y=None):
+        return self.fit(X, y).transform(X, y)
+
+    def get_support(self, indices=False):
+        return self.mask if not indices else np.where(self.mask)[0]
 
 
 def score_ssms(
@@ -56,21 +79,27 @@ def score_ssms(
     # Define the mokapot model.
     #   - Choice between a random forest, linear SVM, or no semi-supervised
     #     learning.
-    #   - Features are preprocessed by TODO (remove correlated and zero
-    #                                        variance features).
+    #   - Features are preprocessed by standardizing them, removing
+    #     zero-variance features, and removing highly correlated features.
     #   - We perform minimal tuning of TODO hyperparameters.
     if model is None:
         # Calculate q-values based on the cosine similarity.
         confidences = dataset.assign_confidence(features["cosine"], True)
     else:
+        scaler = make_pipeline(
+            StandardScaler(),
+            VarianceThreshold(),
+            CorrelationThreshold(0.95),
+        )
         if model == "svm":
-            clf = mokapot.model.PercolatorModel(train_fdr=fdr)
+            clf = mokapot.model.PercolatorModel(scaler, train_fdr=fdr)
         elif model == "rf":
             clf = mokapot.Model(
                 GridSearchCV(
                     RandomForestClassifier(n_jobs=-1, random_state=1),
                     param_grid={"max_depth": [None]},
                 ),
+                scaler,
                 train_fdr=fdr,
             )
         else:
