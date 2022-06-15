@@ -234,12 +234,6 @@ class SpectrumSpectrumMatch:
         self.peak_matches = peak_matches
         self.q = q
 
-    def __str__(self):
-        return " query_spectrum: " + str(self.query_spectrum) + \
-               " library_spectrum: " + str(self.library_spectrum) + \
-               " search_engine_score: " + str(self.search_engine_score) + \
-               " q: " + str(self.q)
-
     @property
     def sequence(self):
         return (self.library_spectrum.peptide

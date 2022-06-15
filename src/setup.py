@@ -58,7 +58,6 @@ ext_parsers = setuptools.Extension(
     extra_link_args=compile_args, include_dirs=[np.get_include()])
 ext_parsers.cython_directives = cython_directives
 
-
 cmdclass = {}
 if use_cython:
     cmdclass.update({'build_ext': Cython.Distutils.build_ext})
