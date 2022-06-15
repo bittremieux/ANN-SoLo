@@ -720,3 +720,52 @@ def wave_hedges_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
             ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
         )
     )
+
+def squared_chord_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the squared chord distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The squared chord distance of peak matches.
+    """
+    return np.sum(
+        np.power(
+            np.sqrt(ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]])
+            - np.sqrt(ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]),
+            2
+        )
+    )
+
+def divergence_distance(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Compute the divergence distance of peak matches between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The divergence distance of peak matches.
+    """
+    return 2 * np.sum(
+        (np.power(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+            2
+        )
+        ) / np.power(
+            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+            + ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+            2
+        )
+    )

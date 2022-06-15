@@ -25,16 +25,7 @@ def matusita_distance(p, q) -> float:
     return np.sqrt(np.sum(np.power(np.sqrt(p) - np.sqrt(q), 2)))
 
 
-def squared_chord_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Squared-chord distance:
 
-    .. math::
-
-        \sum(\sqrt{P_{i}}-\sqrt{Q_{i}})^2
-    """
-    return np.sum(np.power(np.sqrt(p) - np.sqrt(q), 2))
 
 
 def bhattacharya_1_distance(p, q) -> float:
@@ -272,10 +263,6 @@ def symmetric_chi_squared_distance(p, q) -> float:
     d1 = (p_avg + q_avg) / (n * np.power(p_avg + q_avg, 2))
     return np.sqrt(d1 * np.sum(np.power(p * q_avg - q * p_avg, 2) / (p + q)))
 
-
-
-
-
 def absolute_value_distance(p, q) -> float:
     r"""
     Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
@@ -303,24 +290,6 @@ def spectral_contrast_angle_distance(p, q) -> float:
     """
     return 1 - np.sum(q * p) / \
         np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
-
-
-
-
-
-
-
-
-def divergence_distance(p, q) -> float:
-    r"""
-    Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf
-    Divergence distance:
-
-    .. math::
-
-        2\sum\frac{(P_i-Q_i)^2}{(P_i+Q_i)^2}
-    """
-    return 2 * np.sum((np.power(p - q, 2)) / np.power(p + q, 2))
 
 
 def vicis_symmetric_chi_squared_3_distance(p, q) -> float:
