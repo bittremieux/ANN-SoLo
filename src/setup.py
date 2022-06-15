@@ -101,6 +101,7 @@ setuptools.setup(
         'joblib',
         'matplotlib',
         'mmh3',
+        'mokapot',
         'numba>=0.41',
         'numexpr',
         'numpy',
@@ -108,8 +109,7 @@ setuptools.setup(
         'pyteomics',
         'scipy',
         'spectrum_utils>=0.3.0',
-        'tqdm',
-        'mokapot'],
+        'tqdm'],
     setup_requires=[
         'Cython',
         'numpy'],
