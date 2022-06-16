@@ -154,8 +154,8 @@ class Config:
                  'search (default: %(default)s)')
         # Machine learning model to use for SSM scoring.
         self._parser.add_argument(
-            '--model', default="rf", type=str,
-            help='machine learning model for spectrum match scoring: `None` '
+            '--model', default="rf", type=str, choices=["rf", "svm", "none"],
+            help='machine learning model for spectrum match scoring: "none" '
                  'for no semi-supervised learning, "svm" for a Percolator-like'
                  ' linear SVM, "rf" for random forest (default: %(default)s)')
         # Minimum group size for sub-group FDR for open search results.
