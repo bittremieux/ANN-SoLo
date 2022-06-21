@@ -675,46 +675,6 @@ def canberra(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
-def jaccard(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the Jaccard distance of peak matches between two spectra.
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-
-    Returns
-    -------
-    float
-        The Jaccard distance of peak matches.
-    """
-    return scipy.spatial.distance.jaccard(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-    )
-
-
-def dice(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the Dice dissimilarity of peak matches between two spectra.
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-
-    Returns
-    -------
-    float
-        The Dice dissimilarity of peak matches.
-    """
-    return scipy.spatial.distance.dice(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-    )
-
-
 def improved_sim(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Improved Similarity Index of peak matches between two spectra.
