@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Iterator, List, Union
 
 import mokapot
@@ -65,6 +66,9 @@ def score_ssms(
     Iterator[SpectrumSpectrumMatch]
         An iterator of the SSMs with assigned scores and q-values.
     """
+    logging.debug(
+        "Compute features for semi-supervised scoring from %d SSMs", len(ssms)
+    )
     # Create a Dataset with SSM features.
     features = pd.DataFrame(_compute_ssm_features(ssms))
     features["group"] = _get_ssm_groups(ssms, min_group_size) if grouped else 0
@@ -75,6 +79,12 @@ def score_ssms(
         peptide_column="sequence",
         group_column="group",
     )
+    if grouped:
+        logging.debug(
+            "Partitioned %d SSMs into %d groups",
+            len(ssms),
+            features["group"].nunique(),
+        )
     # Define the mokapot model.
     #   - Choice between a random forest, linear SVM, or no semi-supervised
     #     learning.
@@ -82,9 +92,13 @@ def score_ssms(
     #     zero-variance features, and removing highly correlated features.
     #   - We perform minimal tuning of TODO hyperparameters.
     if model is None:
+        logging.debug("Calculate q-values based on the cosine similarity")
         # Calculate q-values based on the cosine similarity.
         confidences = dataset.assign_confidence(features["cosine"], True)
     else:
+        logging.debug(
+            "Train semi-supervised %s model and score SSMs", model.upper()
+        )
         scaler = make_pipeline(
             StandardScaler(),
             VarianceThreshold(),
