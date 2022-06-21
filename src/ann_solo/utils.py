@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import Dict, Iterator, List, Union
 
@@ -5,8 +7,9 @@ import mokapot
 import numpy as np
 import pandas as pd
 import scipy.signal
+from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import SelectorMixin, VarianceThreshold
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -16,23 +19,50 @@ from ann_solo import spectrum_similarity as sim
 from ann_solo.spectrum import SpectrumSpectrumMatch
 
 
-class CorrelationThreshold:
-    def __init__(self, threshold=None):
+class CorrelationThreshold(SelectorMixin, BaseEstimator):
+    """
+    Feature selector that removes correlated features.
+
+    This feature selection algorithm looks only at the features (X), not the
+    desired outputs (y), and can thus be used for unsupervised learning.
+
+    Parameters
+    ----------
+    threshold : float
+        For pairwise features with a training-set absolute correlation
+        lower than this threshold, one of the features will be removed. The
+        default is to keep all features that are not perfectly correlated,
+        i.e. remove the features that are identical or opposite in all
+        samples.
+    """
+
+    def __init__(self, threshold: float = None) -> None:
         self.threshold = threshold if threshold is not None else 1.0
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None) -> CorrelationThreshold:
+        """
+        Learn empirical correlations from X.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Data from which to compute correlations, where `n_samples` is the
+            number of samples and `n_features` is the number of features.
+        y : any, default=None
+            Ignored. This parameter exists only for compatibility with
+            sklearn.pipeline.Pipeline.
+
+        Returns
+        -------
+        self : object
+            Returns the instance itself.
+        """
         corr = np.abs(np.corrcoef(X, rowvar=False))
         self.mask = ~(np.tril(corr, k=-1) > self.threshold).any(axis=1)
         return self
 
-    def transform(self, X, y=None):
-        return X[:, self.mask]
-
-    def fit_transform(self, X, y=None):
-        return self.fit(X, y).transform(X, y)
-
-    def get_support(self, indices=False):
-        return self.mask if not indices else np.where(self.mask)[0]
+    def _get_support_mask(self):
+        return self.mask
 
 
 def score_ssms(
