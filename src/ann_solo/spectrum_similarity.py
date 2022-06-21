@@ -674,8 +674,8 @@ def canberra(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )
     # Account for unmatched peaks in the query and library spectra.
-    dist += (len(ssm.query_spectrum.mz) - len(ssm.peak_matches))
-    dist += (len(ssm.library_spectrum.mz) - len(ssm.peak_matches))
+    dist += len(ssm.query_spectrum.mz) - len(ssm.peak_matches)
+    dist += len(ssm.library_spectrum.mz) - len(ssm.peak_matches)
     return dist
 
 
@@ -695,7 +695,7 @@ def ruzicka(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     numerator = np.minimum(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     ).sum()
     denominator = np.maximum(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
