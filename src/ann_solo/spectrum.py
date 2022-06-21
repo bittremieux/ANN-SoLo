@@ -224,14 +224,14 @@ class SpectrumSpectrumMatch:
             self,
             query_spectrum: MsmsSpectrum,
             library_spectrum: MsmsSpectrum = None,
+            peak_matches: Optional[np.ndarray] = None,
             search_engine_score: float = math.nan,
-            peak_matches: Optional[List] = None,
             q: float = math.nan,
     ):
         self.query_spectrum = query_spectrum
         self.library_spectrum = library_spectrum
-        self.search_engine_score = search_engine_score
         self.peak_matches = peak_matches
+        self.search_engine_score = search_engine_score
         self.q = q
 
     @property
