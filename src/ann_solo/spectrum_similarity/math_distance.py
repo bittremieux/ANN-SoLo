@@ -277,21 +277,6 @@ def absolute_value_distance(p, q) -> float:
     return dist
 
 
-def spectral_contrast_angle_distance(p, q) -> float:
-    r"""
-    Refrence: https://trepo.tuni.fi/bitstream/handle/10024/124353/Distance%20measures%20for%20classi%ef%ac%81cation%20of%20numerical%20features.pdf?sequence=2&isAllowed=y
-    Spectral Contrast Angle distance.
-    Please note that the value calculated here is :math:`\cos\theta`.
-    If you want to get the :math:`\theta`, you can calculate with: :math:`\arccos(1-distance)`
-
-    .. math::
-
-        1 - \frac{\sum{Q_iP_i}}{\sqrt{\sum Q_i^2\sum P_i^2}}
-    """
-    return 1 - np.sum(q * p) / \
-        np.sqrt(np.sum(np.power(q, 2)) * np.sum(np.power(p, 2)))
-
-
 def vicis_symmetric_chi_squared_3_distance(p, q) -> float:
     r"""
     Reference: https://pdodds.w3.uvm.edu/research/papers/others/everything/cha2007a.pdf

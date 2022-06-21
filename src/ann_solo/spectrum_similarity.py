@@ -149,6 +149,38 @@ def mean_squared_error(
     ).sum() / len(ssm.peak_matches)
 
 
+def spectral_contrast_angle(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the spectral contrast angle between two spectra.
+
+    For the original description, see:
+    Toprak, U. H. et al. Conserved peptide fragmentation as a benchmarking tool
+    for mass spectrometers and a discriminating feature for targeted
+    proteomics. Molecular & Cellular Proteomics 13, 2056–2071 (2014).
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The spectral contrast angle between both spectra.
+    """
+    return (
+        1
+        - 2
+        * np.arccos(
+            np.dot(
+                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+                ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+            )
+        )
+        / np.pi
+    )
+
+
 def hypergeometric_score(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the hypergeometric score of peak matches between two spectra.

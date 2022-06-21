@@ -232,6 +232,7 @@ def _compute_ssm_features(
         "frac_int_lib": [],
         "mse_mz": [],
         "mse_int": [],
+        "contrast_angle": [],
         "hypergeometric_score": [],
         "kendalltau": [],
         "ms_for_id_v1": [],
@@ -297,6 +298,7 @@ def _compute_ssm_features(
         features["frac_int_lib"].append(sim.frac_intensity_library(ssm))
         features["mse_mz"].append(sim.mean_squared_error(ssm, "mz"))
         features["mse_int"].append(sim.mean_squared_error(ssm, "intensity"))
+        features["contrast_angle"].append(sim.spectral_contrast_angle(ssm))
         features["hypergeometric_score"].append(sim.hypergeometric_score(ssm))
         features["kendalltau"].append(sim.kendalltau(ssm))
         features["ms_for_id_v1"].append(sim.ms_for_id_v1(ssm))
