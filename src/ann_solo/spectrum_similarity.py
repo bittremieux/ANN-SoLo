@@ -710,26 +710,6 @@ def improved_sim(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
-def jensenshannon(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the Jensen-Shannon distance of peak matches between two spectra.
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-
-    Returns
-    -------
-    float
-        The Jensen-Shannon distance of peak matches.
-    """
-    return scipy.spatial.distance.jensenshannon(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-    )
-
-
 def ruzicka(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Compute the Ruzicka distance of peak matches between two spectra.
