@@ -95,8 +95,18 @@ def score_ssms(
         elif model == "rf":
             clf = mokapot.Model(
                 GridSearchCV(
-                    RandomForestClassifier(n_jobs=-1, random_state=1),
-                    param_grid={"max_depth": [3, 5, 7, 9, None]},
+                    RandomForestClassifier(random_state=1),
+                    param_grid={
+                        "max_depth": [3, 5, 7, 9, None],
+                        "class_weight": [
+                            {0: neg, 1: pos}
+                            for neg in (0.1, 1, 10)
+                            for pos in (0.1, 1, 10)
+                        ],
+                    },
+                    refit=False,
+                    cv=3,
+                    n_jobs=-1,
                 ),
                 scaler,
                 train_fdr=fdr,
