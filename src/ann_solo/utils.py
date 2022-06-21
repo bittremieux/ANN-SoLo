@@ -304,7 +304,6 @@ def _compute_ssm_features(
         "canberra": [],
         "ruzicka": [],
         "is_target": [],
-        "group": [],
     }
     for i, ssm in enumerate(ssms):
         # Skip low-quality spectrum matches.
@@ -364,5 +363,4 @@ def _compute_ssm_features(
         features["canberra"].append(sim.canberra(ssm))
         features["ruzicka"].append(sim.ruzicka(ssm))
         features["is_target"].append(not ssm.is_decoy)
-        features["group"].append("G")
     return features
