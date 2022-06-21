@@ -423,6 +423,36 @@ def _merge_entropy(ssm: spectrum.SpectrumSpectrumMatch) -> np.ndarray:
     return merged
 
 
+def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the Scribe fragmentation accuracy between two spectra.
+
+    For the original description, see:
+    Searle, B. C. et al. Scribe: next-generation library searching for DDA
+    experiments. ASMS 2022.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The Scribe fragmentation accuracy between both spectra.
+    """
+    return np.log(
+        1
+        / (
+            (
+                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+            )
+            ** 2
+        ).sum()
+    )
+
+
 def manhattan(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Manhattan distance between two spectra.

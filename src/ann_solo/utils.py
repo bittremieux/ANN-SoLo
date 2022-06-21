@@ -239,6 +239,7 @@ def _compute_ssm_features(
         "ms_for_id_v2": [],
         "entropy_unweighted": [],
         "entropy_weighted": [],
+        "scribe_fragment_acc": [],
         "manhattan": [],
         "euclidean": [],
         "chebyshev": [],
@@ -305,6 +306,7 @@ def _compute_ssm_features(
         features["ms_for_id_v2"].append(sim.ms_for_id_v2(ssm))
         features["entropy_unweighted"].append(sim.entropy(ssm, False))
         features["entropy_weighted"].append(sim.entropy(ssm, True))
+        features["scribe_fragment_acc"].append(sim.scribe_fragment_acc(ssm))
         features["manhattan"].append(sim.manhattan(ssm))
         features["euclidean"].append(sim.euclidean(ssm))
         features["chebyshev"].append(sim.chebyshev(ssm))
