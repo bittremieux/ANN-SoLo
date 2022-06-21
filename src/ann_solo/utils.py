@@ -218,10 +218,12 @@ def _compute_ssm_features(
     features = {
         "index": [],
         "sequence": [],
+        "precursor_charge_2": [],
+        "precursor_charge_3": [],
+        "precursor_charge_4": [],
+        "precursor_charge_5": [],
         "query_prec_mz": [],
-        "query_prec_ch": [],
         "lib_prec_mz": [],
-        "lib_prec_ch": [],
         "mz_diff_ppm": [],
         "cosine": [],
         "frac_n_peaks_query": [],
@@ -259,10 +261,28 @@ def _compute_ssm_features(
             continue
         features["index"].append(i)
         features["sequence"].append(ssm.sequence)
+        if ssm.query_spectrum.precursor_charge <= 2:
+            features["precursor_charge_2"].append(1)
+            features["precursor_charge_3"].append(0)
+            features["precursor_charge_4"].append(0)
+            features["precursor_charge_5"].append(0)
+        elif ssm.query_spectrum.precursor_charge == 3:
+            features["precursor_charge_2"].append(0)
+            features["precursor_charge_3"].append(1)
+            features["precursor_charge_4"].append(0)
+            features["precursor_charge_5"].append(0)
+        elif ssm.query_spectrum.precursor_charge == 4:
+            features["precursor_charge_2"].append(0)
+            features["precursor_charge_3"].append(0)
+            features["precursor_charge_4"].append(1)
+            features["precursor_charge_5"].append(0)
+        elif ssm.query_spectrum.precursor_charge >= 5:
+            features["precursor_charge_2"].append(0)
+            features["precursor_charge_3"].append(0)
+            features["precursor_charge_4"].append(0)
+            features["precursor_charge_5"].append(1)
         features["query_prec_mz"].append(ssm.query_spectrum.precursor_mz)
-        features["query_prec_ch"].append(ssm.query_spectrum.precursor_charge)
         features["lib_prec_mz"].append(ssm.library_spectrum.precursor_mz)
-        features["lib_prec_ch"].append(ssm.library_spectrum.precursor_charge)
         features["mz_diff_ppm"].append(
             mass_diff(
                 ssm.query_spectrum.precursor_mz,
