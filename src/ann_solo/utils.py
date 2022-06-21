@@ -290,8 +290,7 @@ def _compute_ssm_features(
                 False,
             )
         )
-        # TODO: Explicitly compute the cosine similarity.
-        features["cosine"].append(ssm.search_engine_score)
+        features["cosine"].append(sim.cosine(ssm))
         features["frac_n_peaks_query"].append(sim.frac_n_peaks_query(ssm))
         features["frac_n_peaks_lib"].append(sim.frac_n_peaks_library(ssm))
         features["frac_int_query"].append(sim.frac_intensity_query(ssm))

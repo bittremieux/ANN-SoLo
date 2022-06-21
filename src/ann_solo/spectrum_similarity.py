@@ -7,6 +7,31 @@ from ann_solo import spectrum
 from ann_solo.config import config
 
 
+def cosine(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+    """
+    Get the cosine similarity between two spectra.
+
+    For the original description, see:
+    Bittremieux, W., Meysman, P., Noble, W. S. & Laukens, K. Fast open
+    modification spectral library searching through approximate nearest
+    neighbor indexing. Journal of Proteome Research 17, 3463–3474 (2018).
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    float
+        The cosine similarity between both spectra.
+    """
+    return np.dot(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    )
+
+
 def frac_n_peaks_query(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the number of shared peaks as a fraction of the number of peaks in the
