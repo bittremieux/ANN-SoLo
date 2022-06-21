@@ -246,14 +246,7 @@ def _compute_ssm_features(
         "pearsonr": [],
         "braycurtis": [],
         "canberra": [],
-        "jaccard": [],
-        "dice": [],
-        "improved_sim": [],
-        "jensenshannon": [],
         "ruzicka": [],
-        "wave_hedges": [],
-        "squared_chord": [],
-        "divergence": [],
         "is_target": [],
         "group": [],
     }
@@ -313,14 +306,7 @@ def _compute_ssm_features(
         features["pearsonr"].append(sim.pearsonr(ssm))
         features["braycurtis"].append(sim.braycurtis(ssm))
         features["canberra"].append(sim.canberra(ssm))
-        features["jaccard"].append(sim.jaccard(ssm))
-        features["dice"].append(sim.dice(ssm))
-        features["improved_sim"].append(sim.improved_sim(ssm))
-        features["jensenshannon"].append(sim.jensenshannon(ssm))
         features["ruzicka"].append(sim.ruzicka(ssm))
-        features["wave_hedges"].append(sim.wave_hedges(ssm))
-        features["squared_chord"].append(sim.squared_chord(ssm))
-        features["divergence"].append(sim.divergence(ssm))
         features["is_target"].append(not ssm.is_decoy)
         features["group"].append(ssm.group)
     return features
