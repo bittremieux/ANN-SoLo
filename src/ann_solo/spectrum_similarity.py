@@ -657,7 +657,7 @@ def braycurtis(ssm: spectrum.SpectrumSpectrumMatch) -> float:
 
 def canberra(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Get the Canberra distance of peak matches between two spectra.
+    Get the Canberra distance between two spectra.
 
     Parameters
     ----------
@@ -667,12 +667,16 @@ def canberra(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The canberra distance of peak matches.
+        The canberra distance between both spectra.
     """
-    return scipy.spatial.distance.canberra(
+    dist = scipy.spatial.distance.canberra(
         ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
         ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
     )
+    # Account for unmatched peaks in the query and library spectra.
+    dist += (len(ssm.query_spectrum.mz) - len(ssm.peak_matches))
+    dist += (len(ssm.library_spectrum.mz) - len(ssm.peak_matches))
+    return dist
 
 
 def improved_sim(ssm: spectrum.SpectrumSpectrumMatch) -> float:
@@ -712,7 +716,7 @@ def improved_sim(ssm: spectrum.SpectrumSpectrumMatch) -> float:
 
 def ruzicka(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
-    Compute the Ruzicka distance of peak matches between two spectra.
+    Compute the Ruzicka similarity between two spectra.
 
     Parameters
     ----------
@@ -722,19 +726,32 @@ def ruzicka(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     Returns
     -------
     float
-        The Ruzicka distance of peak matches.
+        The Ruzicka similarity between both spectra.
     """
-    return np.sum(
-        np.abs(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-            - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    numerator = np.minimum(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    ).sum()
+    denominator = np.maximum(
+        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
+        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    ).sum()
+    # Account for unmatched peaks in the query and library spectra.
+    denominator += ssm.query_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.query_spectrum.intensity)),
+            ssm.peak_matches[:, 0],
+            assume_unique=True,
         )
-    ) / np.sum(
-        np.maximum(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
+    ].sum()
+    denominator += ssm.library_spectrum.intensity[
+        np.setdiff1d(
+            np.arange(len(ssm.library_spectrum.intensity)),
+            ssm.peak_matches[:, 1],
+            assume_unique=True,
         )
-    )
+    ].sum()
+    return numerator / denominator
 
 
 def wave_hedges(ssm: spectrum.SpectrumSpectrumMatch) -> float:
