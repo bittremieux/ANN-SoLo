@@ -443,13 +443,16 @@ def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     return np.log(
         1
-        / (
+        / np.clip(
             (
-                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-                - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-            )
-            ** 2
-        ).sum()
+                (
+                    ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                    - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+                )
+                ** 2
+            ).sum(),
+            0.0001,
+            None)
     )
 
 

@@ -40,7 +40,7 @@ def score_ssms(
     fdr: float,
     model: str,
     grouped: bool = False,
-    min_group_size: int = 100,
+    min_group_size: int = 100
 ) -> List[SpectrumSpectrumMatch]:
     """
     Score SSMs using semi-supervised learning with mokapot.
@@ -332,5 +332,5 @@ def _compute_ssm_features(
         features["canberra"].append(sim.canberra(ssm))
         features["ruzicka"].append(sim.ruzicka(ssm))
         features["is_target"].append(not ssm.is_decoy)
-        features["group"].append(ssm.group)
+        features["group"].append("G")
     return features

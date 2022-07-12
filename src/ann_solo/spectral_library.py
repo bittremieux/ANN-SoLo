@@ -312,7 +312,7 @@ class SpectralLibrary:
             list(ssms.values()),
             config.fdr,
             config.model if config.model is not "none" else None,
-            mode == "open",
+            mode == "open"
         )
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
