@@ -130,7 +130,7 @@ def score_ssms(
                 "Unknown semi-supervised machine learning model given"
             )
         # Train the mokapot model and combine the SSMs for all groups.
-        confidences, _ = mokapot.brew(dataset, clf, fdr)
+        confidences, _ = mokapot.brew(dataset, clf, fdr, folds=5)
     ssm_scores = pd.concat(
         [
             confidences.group_confidence_estimates[group].psms[
