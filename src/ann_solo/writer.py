@@ -98,8 +98,7 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
         'precursor_tolerance_mass', 'precursor_tolerance_mode',
         'precursor_tolerance_mass_open', 'precursor_tolerance_mode_open',
         'fragment_mz_tolerance', 'allow_peak_shifts', 'fdr',
-        'fdr_tolerance_mass', 'fdr_tolerance_mode', 'fdr_min_group_size',
-        'mode']
+        'fdr_min_group_size','mode']
     if config.mode == 'ann':
         config_keys.extend(['bin_size', 'hash_len', 'num_candidates',
                             'num_list', 'num_probe'])
@@ -146,7 +145,6 @@ def write_mztab(identifications: List[SpectrumSpectrumMatch], filename: str,
                 f'ms_run[1]:index={ssm.query_index}',
                 'null', 'null', 'null', 'null',
                 str(ssm.library_identifier),
-                f'{ssm.is_decoy:d}',
-                str(ssm.num_candidates)]) + '\n')
+                f'{ssm.is_decoy:d}']) + '\n')
 
     return filename
