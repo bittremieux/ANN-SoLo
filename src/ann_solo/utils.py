@@ -133,7 +133,9 @@ def score_ssms(
         confidences, _ = mokapot.brew(dataset, clf, fdr)
     ssm_scores = pd.concat(
         [
-            confidences.group_confidence_estimates[group].psms
+            confidences.group_confidence_estimates[group].psms[
+                confidences.group_confidence_estimates[group].psms[
+                    'mokapot q-value'] <= fdr]
             for group in confidences.groups
         ],
         ignore_index=True,
@@ -146,7 +148,7 @@ def score_ssms(
     ):
         ssms[i].search_engine_score = score
         ssms[i].q = q
-    return ssms
+        yield ssms[i]
 
 
 def _get_ssm_groups(
