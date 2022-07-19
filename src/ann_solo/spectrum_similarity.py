@@ -441,18 +441,25 @@ def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     float
         The Scribe fragmentation accuracy between both spectra.
     """
+    # FIXME: Use all library spectrum peaks.
     return np.log(
         1
-        / np.clip(
+        / max(
+            0.001,  # Guard against infinity for identical spectra.
             (
                 (
                     ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+                    / ssm.query_spectrum.intensity[
+                        ssm.peak_matches[:, 0]
+                    ].sum()
                     - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+                    / ssm.library_spectrum.intensity[
+                        ssm.peak_matches[:, 1]
+                    ].sum()
                 )
                 ** 2
             ).sum(),
-            0.0001,
-            None)
+        ),
     )
 
 
