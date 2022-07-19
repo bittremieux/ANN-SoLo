@@ -145,9 +145,13 @@ def score_ssms(
                     param_grid={
                         "max_depth": [3, 5, 7, 9, None],
                         "class_weight": [
-                            {0: neg, 1: pos}
-                            for neg in (0.1, 1, 10)
-                            for pos in (0.1, 1, 10)
+                            None,
+                            {0: 0.1, 1: 1},
+                            {0: 0.1, 1: 10},
+                            {0: 1, 1: 0.1},
+                            {0: 1, 1: 10},
+                            {0: 10, 1: 0.1},
+                            {0: 10, 1: 1},
                         ],
                     },
                     refit=False,
