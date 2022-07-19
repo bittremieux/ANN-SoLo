@@ -135,7 +135,9 @@ def score_ssms(
             CorrelationThreshold(0.95),
         )
         if model == "svm":
-            clf = mokapot.model.PercolatorModel(scaler, train_fdr=fdr)
+            clf = mokapot.model.PercolatorModel(
+                scaler, train_fdr=fdr, direction="cosine"
+            )
         elif model == "rf":
             clf = mokapot.Model(
                 GridSearchCV(
@@ -154,6 +156,7 @@ def score_ssms(
                 ),
                 scaler,
                 train_fdr=fdr,
+                direction="cosine",
             )
         else:
             raise ValueError(
