@@ -274,6 +274,7 @@ def _compute_ssm_features(
     features = {
         "index": [],
         "sequence": [],
+        "sequence_len": [],
         "precursor_charge_2": [],
         "precursor_charge_3": [],
         "precursor_charge_4": [],
@@ -311,6 +312,7 @@ def _compute_ssm_features(
             continue
         features["index"].append(i)
         features["sequence"].append(ssm.sequence)
+        features["sequence_len"].append(len(ssm.sequence))
         if ssm.query_spectrum.precursor_charge <= 2:
             features["precursor_charge_2"].append(1)
             features["precursor_charge_3"].append(0)
