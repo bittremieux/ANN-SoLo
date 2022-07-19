@@ -663,19 +663,20 @@ def pearsonr(
     float
         The Pearson correlation of peak matches.
     """
-    if len(ssm.peak_matches) < 2:
-        return 0.0
-    else:
-        peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-        peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        if top is not None:
-            mask = np.isin(
-                ssm.peak_matches[:, 1],
-                np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
-                assume_unique=True,
-            )
-            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    # FIXME: Use all library spectrum peaks.
+    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
+        )
+        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    if len(peaks_query) > 1:
         return scipy.stats.pearsonr(peaks_query, peaks_library)[0]
+    else:
+        return 0.0
 
 
 def spearmanr(
@@ -698,19 +699,19 @@ def spearmanr(
         The Spearman correlation of peak matches.
     """
     # FIXME: Use all library spectrum peaks.
-    if len(ssm.peak_matches) < 2:
-        return 0.0
-    else:
-        peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-        peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-        if top is not None:
-            mask = np.isin(
-                ssm.peak_matches[:, 1],
-                np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
-                assume_unique=True,
-            )
-            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
+        )
+        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    if len(peaks_query) > 1:
         return scipy.stats.spearmanr(peaks_query, peaks_library)[0]
+    else:
+        return 0.0
 
 
 def braycurtis(ssm: spectrum.SpectrumSpectrumMatch) -> float:
