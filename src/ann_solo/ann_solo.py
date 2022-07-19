@@ -64,6 +64,7 @@ def main(args: Union[str, List[str]] = None) -> int:
     root.addHandler(handler)
     # Disable dependency non-critical log messages.
     logging.getLogger('faiss').setLevel(logging.WARNING)
+    logging.getLogger('mokapot').setLevel(logging.WARNING)
     logging.getLogger('numba').setLevel(logging.WARNING)
     logging.getLogger('numexpr').setLevel(logging.WARNING)
 
