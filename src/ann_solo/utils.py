@@ -282,7 +282,11 @@ def _compute_ssm_features(
         "query_prec_mz": [],
         "lib_prec_mz": [],
         "mz_diff_ppm": [],
+        "abs_mz_diff_ppm": [],
+        "mz_diff_da": [],
+        "abs_mz_diff_da": [],
         "cosine": [],
+        "n_matched_peaks": [],
         "frac_n_peaks_query": [],
         "frac_n_peaks_lib": [],
         "frac_int_query": [],
@@ -340,6 +344,31 @@ def _compute_ssm_features(
                 ssm.query_spectrum.precursor_mz,
                 ssm.library_spectrum.precursor_mz,
                 False,
+            )
+        )
+        features["abs_mz_diff_ppm"].append(
+            abs(
+                mass_diff(
+                    ssm.query_spectrum.precursor_mz,
+                    ssm.library_spectrum.precursor_mz,
+                    False,
+                )
+            )
+        )
+        features["mz_diff_da"].append(
+            mass_diff(
+                ssm.query_spectrum.precursor_mz,
+                ssm.library_spectrum.precursor_mz,
+                True,
+            )
+        )
+        features["abs_mz_diff_da"].append(
+            abs(
+                mass_diff(
+                    ssm.query_spectrum.precursor_mz,
+                    ssm.library_spectrum.precursor_mz,
+                    True,
+                )
             )
         )
         features["cosine"].append(sim.cosine(ssm))
