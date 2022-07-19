@@ -70,7 +70,7 @@ def score_ssms(
     fdr: float,
     model: str,
     grouped: bool = False,
-    min_group_size: int = 100
+    min_group_size: int = 100,
 ) -> List[SpectrumSpectrumMatch]:
     """
     Score SSMs using semi-supervised learning with mokapot.
@@ -163,12 +163,7 @@ def score_ssms(
         confidences, _ = mokapot.brew(dataset, clf, fdr)
     ssm_scores = pd.concat(
         [
-            confidences.group_confidence_estimates[group].psms[
-                confidences.group_confidence_estimates[group].psms[
-                    "mokapot q-value"
-                ]
-                <= fdr
-            ]
+            confidences.group_confidence_estimates[group].psms
             for group in confidences.groups
         ],
         ignore_index=True,
@@ -181,7 +176,7 @@ def score_ssms(
     ):
         ssms[i].search_engine_score = score
         ssms[i].q = q
-        yield ssms[i]
+    return ssms
 
 
 def _get_ssm_groups(
