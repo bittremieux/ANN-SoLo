@@ -311,6 +311,8 @@ def _compute_ssm_features(
         "chebyshev": [],
         "pearsonr": [],
         "pearsonr_top5": [],
+        "spearmanr": [],
+        "spearmanr_top5": [],
         "braycurtis": [],
         "canberra": [],
         "ruzicka": [],
@@ -409,6 +411,8 @@ def _compute_ssm_features(
         features["chebyshev"].append(sim.chebyshev(ssm))
         features["pearsonr"].append(sim.pearsonr(ssm))
         features["pearsonr_top5"].append(sim.pearsonr(ssm, 5))
+        features["spearmanr"].append(sim.spearmanr(ssm))
+        features["spearmanr_top5"].append(sim.spearmanr(ssm, 5))
         features["braycurtis"].append(sim.braycurtis(ssm))
         features["canberra"].append(sim.canberra(ssm))
         features["ruzicka"].append(sim.ruzicka(ssm))

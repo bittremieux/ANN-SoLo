@@ -678,6 +678,41 @@ def pearsonr(
         return scipy.stats.pearsonr(peaks_query, peaks_library)[0]
 
 
+def spearmanr(
+    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+) -> float:
+    """
+    Get the Spearman correlation between peak matches in two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
+
+    Returns
+    -------
+    float
+        The Spearman correlation of peak matches.
+    """
+    # FIXME: Use all library spectrum peaks.
+    if len(ssm.peak_matches) < 2:
+        return 0.0
+    else:
+        peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        if top is not None:
+            mask = np.isin(
+                ssm.peak_matches[:, 1],
+                np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+                assume_unique=True,
+            )
+            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+        return scipy.stats.spearmanr(peaks_query, peaks_library)[0]
+
+
 def braycurtis(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the Bray-Curtis distance between two spectra.
