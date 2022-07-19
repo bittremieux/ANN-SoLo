@@ -32,6 +32,23 @@ def cosine(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     )
 
 
+def n_matched_peaks(ssm: spectrum.SpectrumSpectrumMatch) -> int:
+    """
+    Get the number of matching peaks between two spectra.
+
+    Parameters
+    ----------
+    ssm : spectrum.SpectrumSpectrumMatch
+        The match between a query spectrum and a library spectrum.
+
+    Returns
+    -------
+    int
+        The number of matching peaks between both spectra.
+    """
+    return len(ssm.peak_matches)
+
+
 def frac_n_peaks_query(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     """
     Get the number of shared peaks as a fraction of the number of peaks in the

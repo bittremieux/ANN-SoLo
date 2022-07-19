@@ -341,6 +341,7 @@ def _compute_ssm_features(
             )
         )
         features["cosine"].append(sim.cosine(ssm))
+        features["n_matched_peaks"].append(sim.n_matched_peaks(ssm))
         features["frac_n_peaks_query"].append(sim.frac_n_peaks_query(ssm))
         features["frac_n_peaks_lib"].append(sim.frac_n_peaks_library(ssm))
         features["frac_int_query"].append(sim.frac_intensity_query(ssm))
