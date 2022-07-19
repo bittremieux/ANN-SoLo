@@ -230,19 +230,27 @@ class SpectralLibrary:
         # Identify all query spectra.
         logging.debug('Process all query spectra')
         identifications = {}
+        do_cascade_open = (
+            config.precursor_tolerance_mass_open is not None and
+            config.precursor_tolerance_mode_open is not None
+        )
         # Cascade level 1: standard search.
         for ssm in self._search_cascade(query_spectra, 'std'):
-            identifications[ssm.query_identifier] = ssm
+            # Only retain confidently identified spectra (below FDR threshold)
+            # if we're doing a cascade (open) search.
+            if not do_cascade_open or ssm.q < config.fdr:
+                identifications[ssm.query_identifier] = ssm
         logging.info('%d spectra identified after the standard search',
                      len(identifications))
-        if (config.precursor_tolerance_mass_open is not None and
-                config.precursor_tolerance_mode_open is not None):
+        if do_cascade_open:
             # Collect the remaining query spectra for the second cascade level.
             for charge, query_spectra_charge in query_spectra.items():
                 query_spectra[charge] = [
                     spectrum for spectrum in query_spectra_charge
                     if spectrum.identifier not in identifications]
             # Cascade level 2: open search.
+            # No FDR filtering necessary here to have an entry for each query
+            # spectrum in the output.
             for ssm in self._search_cascade(query_spectra, 'open'):
                 identifications[ssm.query_identifier] = ssm
             logging.info('%d spectra identified after the open search',
