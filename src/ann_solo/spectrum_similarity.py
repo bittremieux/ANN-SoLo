@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import scipy.spatial.distance
 import scipy.special
@@ -7,7 +9,9 @@ from ann_solo import spectrum
 from ann_solo.config import config
 
 
-def cosine(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def cosine(
+    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+) -> float:
     """
     Get the cosine similarity between two spectra.
 
@@ -20,16 +24,25 @@ def cosine(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     ----------
     ssm : spectrum.SpectrumSpectrumMatch
         The match between a query spectrum and a library spectrum.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
 
     Returns
     -------
     float
         The cosine similarity between both spectra.
     """
-    return np.dot(
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-    )
+    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
+        )
+        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    return np.dot(peaks_query, peaks_library)
 
 
 def n_matched_peaks(ssm: spectrum.SpectrumSpectrumMatch) -> int:
@@ -126,7 +139,7 @@ def frac_intensity_library(ssm: spectrum.SpectrumSpectrumMatch) -> float:
 
 
 def mean_squared_error(
-    ssm: spectrum.SpectrumSpectrumMatch, axis: str
+    ssm: spectrum.SpectrumSpectrumMatch, axis: str, top: Optional[int] = None
 ) -> float:
     """
     Get the mean squared error (MSE) of peak matches between two spectra.
@@ -138,6 +151,9 @@ def mean_squared_error(
     axis : str
         Calculate the MSE between the m/z values ("mz") or intensity values
         ("intensity") of the matched peaks.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
 
     Returns
     -------
@@ -150,23 +166,28 @@ def mean_squared_error(
         If the specified axis is not "mz" or "intensity".
     """
     if axis == "mz":
-        query_arr = ssm.query_spectrum.mz
-        library_arr = ssm.library_spectrum.mz
+        query_arr = ssm.query_spectrum.mz[ssm.peak_matches[:, 0]]
+        library_arr = ssm.library_spectrum.mz[ssm.peak_matches[:, 1]]
     elif axis == "intensity":
-        query_arr = ssm.query_spectrum.intensity
-        library_arr = ssm.library_spectrum.intensity
+        query_arr = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        library_arr = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
     else:
         raise ValueError("Unknown axis specified")
-    return (
-        (
-            query_arr[ssm.peak_matches[:, 0]]
-            - library_arr[ssm.peak_matches[:, 1]]
+    n_peaks = len(ssm.peak_matches)
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
         )
-        ** 2
-    ).sum() / len(ssm.peak_matches)
+        query_arr, library_arr = query_arr[mask], library_arr[mask]
+        n_peaks = top
+    return ((query_arr - library_arr) ** 2).sum() / n_peaks
 
 
-def spectral_contrast_angle(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def spectral_contrast_angle(
+    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+) -> float:
     """
     Get the spectral contrast angle between two spectra.
 
@@ -179,23 +200,25 @@ def spectral_contrast_angle(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     ----------
     ssm : spectrum.SpectrumSpectrumMatch
         The match between a query spectrum and a library spectrum.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
 
     Returns
     -------
     float
         The spectral contrast angle between both spectra.
     """
-    return (
-        1
-        - 2
-        * np.arccos(
-            np.dot(
-                ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-                ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-            )
+    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
         )
-        / np.pi
-    )
+        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+    return 1 - 2 * np.arccos(np.dot(peaks_query, peaks_library)) / np.pi
 
 
 def hypergeometric_score(ssm: spectrum.SpectrumSpectrumMatch) -> float:
@@ -440,7 +463,9 @@ def _merge_entropy(ssm: spectrum.SpectrumSpectrumMatch) -> np.ndarray:
     return merged
 
 
-def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def scribe_fragment_acc(
+    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+) -> float:
     """
     Get the Scribe fragmentation accuracy between two spectra.
 
@@ -452,6 +477,9 @@ def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     ----------
     ssm : spectrum.SpectrumSpectrumMatch
         The match between a query spectrum and a library spectrum.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
 
     Returns
     -------
@@ -459,20 +487,23 @@ def scribe_fragment_acc(ssm: spectrum.SpectrumSpectrumMatch) -> float:
         The Scribe fragmentation accuracy between both spectra.
     """
     # FIXME: Use all library spectrum peaks.
+    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+    if top is not None:
+        mask = np.isin(
+            ssm.peak_matches[:, 1],
+            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+            assume_unique=True,
+        )
+        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
     return np.log(
         1
         / max(
             0.001,  # Guard against infinity for identical spectra.
             (
                 (
-                    ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-                    / ssm.query_spectrum.intensity[
-                        ssm.peak_matches[:, 0]
-                    ].sum()
-                    - ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-                    / ssm.library_spectrum.intensity[
-                        ssm.peak_matches[:, 1]
-                    ].sum()
+                    peaks_query / peaks_query.sum()
+                    - peaks_library / peaks_library.sum()
                 )
                 ** 2
             ).sum(),
@@ -613,7 +644,9 @@ def chebyshev(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     return dist.max()
 
 
-def pearsonr(ssm: spectrum.SpectrumSpectrumMatch) -> float:
+def pearsonr(
+    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+) -> float:
     """
     Get the Pearson correlation between peak matches in two spectra.
 
@@ -621,6 +654,9 @@ def pearsonr(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     ----------
     ssm : spectrum.SpectrumSpectrumMatch
         The match between a query spectrum and a library spectrum.
+    top: Optional[int] = None
+        The number of library peaks with highest intensity to consider. If
+        `None`, all peaks are used.
 
     Returns
     -------
@@ -630,10 +666,16 @@ def pearsonr(ssm: spectrum.SpectrumSpectrumMatch) -> float:
     if len(ssm.peak_matches) < 2:
         return 0.0
     else:
-        return scipy.stats.pearsonr(
-            ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]],
-            ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]],
-        )[0]
+        peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
+        peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
+        if top is not None:
+            mask = np.isin(
+                ssm.peak_matches[:, 1],
+                np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
+                assume_unique=True,
+            )
+            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+        return scipy.stats.pearsonr(peaks_query, peaks_library)[0]
 
 
 def braycurtis(ssm: spectrum.SpectrumSpectrumMatch) -> float:

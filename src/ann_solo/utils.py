@@ -286,14 +286,18 @@ def _compute_ssm_features(
         "mz_diff_da": [],
         "abs_mz_diff_da": [],
         "cosine": [],
+        "cosine_top5": [],
         "n_matched_peaks": [],
         "frac_n_peaks_query": [],
         "frac_n_peaks_lib": [],
         "frac_int_query": [],
         "frac_int_lib": [],
         "mse_mz": [],
+        "mse_mz_top5": [],
         "mse_int": [],
+        "mse_int_top5": [],
         "contrast_angle": [],
+        "contrast_angle_top5": [],
         "hypergeometric_score": [],
         "kendalltau": [],
         "ms_for_id_v1": [],
@@ -301,10 +305,12 @@ def _compute_ssm_features(
         "entropy_unweighted": [],
         "entropy_weighted": [],
         "scribe_fragment_acc": [],
+        "scribe_fragment_acc_top5": [],
         "manhattan": [],
         "euclidean": [],
         "chebyshev": [],
         "pearsonr": [],
+        "pearsonr_top5": [],
         "braycurtis": [],
         "canberra": [],
         "ruzicka": [],
@@ -372,14 +378,22 @@ def _compute_ssm_features(
             )
         )
         features["cosine"].append(sim.cosine(ssm))
+        features["cosine_top5"].append(sim.cosine(ssm, 5))
         features["n_matched_peaks"].append(sim.n_matched_peaks(ssm))
         features["frac_n_peaks_query"].append(sim.frac_n_peaks_query(ssm))
         features["frac_n_peaks_lib"].append(sim.frac_n_peaks_library(ssm))
         features["frac_int_query"].append(sim.frac_intensity_query(ssm))
         features["frac_int_lib"].append(sim.frac_intensity_library(ssm))
         features["mse_mz"].append(sim.mean_squared_error(ssm, "mz"))
+        features["mse_mz_top5"].append(sim.mean_squared_error(ssm, "mz", 5))
         features["mse_int"].append(sim.mean_squared_error(ssm, "intensity"))
+        features["mse_int_top5"].append(
+            sim.mean_squared_error(ssm, "intensity", 5)
+        )
         features["contrast_angle"].append(sim.spectral_contrast_angle(ssm))
+        features["contrast_angle_top5"].append(
+            sim.spectral_contrast_angle(ssm, 5)
+        )
         features["hypergeometric_score"].append(sim.hypergeometric_score(ssm))
         features["kendalltau"].append(sim.kendalltau(ssm))
         features["ms_for_id_v1"].append(sim.ms_for_id_v1(ssm))
@@ -387,10 +401,14 @@ def _compute_ssm_features(
         features["entropy_unweighted"].append(sim.entropy(ssm, False))
         features["entropy_weighted"].append(sim.entropy(ssm, True))
         features["scribe_fragment_acc"].append(sim.scribe_fragment_acc(ssm))
+        features["scribe_fragment_acc_top5"].append(
+            sim.scribe_fragment_acc(ssm, 5)
+        )
         features["manhattan"].append(sim.manhattan(ssm))
         features["euclidean"].append(sim.euclidean(ssm))
         features["chebyshev"].append(sim.chebyshev(ssm))
         features["pearsonr"].append(sim.pearsonr(ssm))
+        features["pearsonr_top5"].append(sim.pearsonr(ssm, 5))
         features["braycurtis"].append(sim.braycurtis(ssm))
         features["canberra"].append(sim.canberra(ssm))
         features["ruzicka"].append(sim.ruzicka(ssm))
