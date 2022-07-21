@@ -323,7 +323,7 @@ class SpectralLibrary:
         return utils.score_ssms(
             list(ssms.values()),
             config.fdr,
-            config.model if config.model is not "none" else None,
+            config.model if config.model != "none" else None,
             mode == "open"
         )
 
