@@ -9,216 +9,181 @@ from ann_solo import spectrum
 from ann_solo.config import config
 
 
-def cosine(
-    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
-) -> float:
-    """
-    Get the cosine similarity between two spectra.
+class SpectrumSimilarityFactory:
+    def __init__(
+        self, ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
+    ):
+        """
+        Instantiate the `SpectrumSimilarityFactory` to compute various spectrum
+        similarities between the two spectra in the `SpectrumSpectrumMatch`.
 
-    For the original description, see:
-    Bittremieux, W., Meysman, P., Noble, W. S. & Laukens, K. Fast open
-    modification spectral library searching through approximate nearest
-    neighbor indexing. Journal of Proteome Research 17, 3463–3474 (2018).
+        Parameters
+        ----------
+        ssm : spectrum.SpectrumSpectrumMatch
+            The match between a query spectrum and a library spectrum.
+        top: Optional[int] = None
+            The number of library peaks with highest intensity to consider. If
+            `None`, all peaks are used.
+        """
+        self.mz1 = ssm.query_spectrum.mz
+        self.int1 = ssm.query_spectrum.intensity
+        self.mz2 = ssm.library_spectrum.mz
+        self.int2 = ssm.library_spectrum.intensity
+        if len(ssm.peak_matches) > 0:
+            self.matched_mz1 = self.mz1[ssm.peak_matches[:, 0]]
+            self.matched_int1 = self.int1[ssm.peak_matches[:, 0]]
+            self.matched_mz2 = self.mz2[ssm.peak_matches[:, 1]]
+            self.matched_int2 = self.int2[ssm.peak_matches[:, 1]]
+            # Filter the peak matches by the `top` highest intensity peaks in
+            # the library spectrum.
+            if top is not None:
+                library_top_i = np.argpartition(self.int2, -top)[-top:]
+                mask = np.isin(
+                    ssm.peak_matches[:, 1], library_top_i, assume_unique=True
+                )
+                self.matched_mz1 = self.matched_mz1[mask]
+                self.matched_int1 = self.matched_int1[mask]
+                self.matched_mz2 = self.matched_mz2[mask]
+                self.matched_int2 = self.matched_int2[mask]
+        else:
+            self.matched_mz1, self.matched_int1 = None, None
+            self.matched_mz2, self.matched_int2 = None, None
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-    top: Optional[int] = None
-        The number of library peaks with highest intensity to consider. If
-        `None`, all peaks are used.
+    def cosine(self) -> float:
+        """
+        Get the cosine similarity.
 
-    Returns
-    -------
-    float
-        The cosine similarity between both spectra.
-    """
-    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-    if top is not None:
-        mask = np.isin(
-            ssm.peak_matches[:, 1],
-            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
-            assume_unique=True,
-        )
-        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
-    return np.dot(peaks_query, peaks_library)
+        For the original description, see:
+        Bittremieux, W., Meysman, P., Noble, W. S. & Laukens, K. Fast open
+        modification spectral library searching through approximate nearest
+        neighbor indexing. Journal of Proteome Research 17, 3463–3474 (2018).
 
+        Returns
+        -------
+        float
+            The cosine similarity between the two spectra.
+        """
+        if self.matched_int1 is not None and self.matched_int2 is not None:
+            return np.dot(self.matched_int1, self.matched_int2)
+        else:
+            return 0.0
 
-def n_matched_peaks(ssm: spectrum.SpectrumSpectrumMatch) -> int:
-    """
-    Get the number of matching peaks between two spectra.
+    def n_matched_peaks(self) -> int:
+        """
+        Get the number of shared peaks.
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
+        Returns
+        -------
+        int
+            The number of matching peaks between the two spectra.
+        """
+        return len(self.matched_mz1) if self.matched_mz1 is not None else 0
 
-    Returns
-    -------
-    int
-        The number of matching peaks between both spectra.
-    """
-    return len(ssm.peak_matches)
+    def frac_n_peaks_query(self) -> float:
+        """
+        Get the number of shared peaks as a fraction of the number of peaks in
+        the query spectrum.
 
+        Returns
+        -------
+        float
+            The fraction of shared peaks in the query spectrum.
+        """
+        if self.matched_mz1 is not None:
+            return len(self.matched_mz1) / len(self.mz1)
+        else:
+            return 0.0
 
-def frac_n_peaks_query(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the number of shared peaks as a fraction of the number of peaks in the
-    query spectrum.
+    def frac_n_peaks_library(self) -> float:
+        """
+        Get the number of shared peaks as a fraction of the number of peaks in
+        the library spectrum.
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
+        Returns
+        -------
+        float
+            The fraction of shared peaks in the library spectrum.
+        """
+        if self.matched_mz2 is not None:
+            return len(self.matched_mz2) / len(self.mz2)
+        else:
+            return 0.0
 
-    Returns
-    -------
-    float
-        The fraction of shared peaks.
-    """
-    return len(ssm.peak_matches) / len(ssm.query_spectrum.mz)
+    def frac_intensity_query(self) -> float:
+        """
+        Get the fraction of explained intensity in the query spectrum.
 
+        Returns
+        -------
+        float
+            The fraction of explained intensity in the query spectrum.
+        """
+        if self.matched_int1 is not None:
+            return self.matched_int1.sum() / self.int1.sum()
+        else:
+            return 0.0
 
-def frac_n_peaks_library(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the number of shared peaks as a fraction of the number of peaks in the
-    library spectrum.
+    def frac_intensity_library(self) -> float:
+        """
+        Get the fraction of explained intensity in the library spectrum.
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
+        Returns
+        -------
+        float
+            The fraction of explained intensity in the library spectrum.
+        """
+        if self.matched_int2 is not None:
+            return self.matched_int2.sum() / self.int2.sum()
+        else:
+            return 0.0
 
-    Returns
-    -------
-    float
-        The fraction of shared peaks.
-    """
-    return len(ssm.peak_matches) / len(ssm.library_spectrum.mz)
+    def mean_squared_error(self, axis: str) -> float:
+        """
+        Get the mean squared error (MSE) of peak matches.
 
+        Parameters
+        ----------
+        axis : str
+            Calculate the MSE between the m/z values ("mz") or intensity values
+            ("intensity") of the matched peaks.
 
-def frac_intensity_query(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the fraction of explained intensity in the query spectrum.
+        Returns
+        -------
+        float
+            The MSE between the m/z or intensity values of the matched peaks in
+            the two spectra.
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
+        Raises
+        ------
+        ValueError
+            If the specified axis is not "mz" or "intensity".
+        """
+        if axis == "mz":
+            arr1, arr2 = self.matched_mz1, self.matched_mz2
+        elif axis == "intensity":
+            arr1, arr2 = self.matched_int1, self.matched_int2
+        else:
+            raise ValueError("Unknown axis specified")
+        if arr1 is not None and arr2 is not None:
+            return ((arr1 - arr2) ** 2).sum() / len(self.mz1)
+        else:
+            return np.inf
 
-    Returns
-    -------
-    float
-        The fraction of explained intensity.
-    """
-    return (
-        ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]].sum()
-        / ssm.query_spectrum.intensity.sum()
-    )
+    def spectral_contrast_angle(self) -> float:
+        """
+        Get the spectral contrast angle.
 
+        For the original description, see:
+        Toprak, U. H. et al. Conserved peptide fragmentation as a benchmarking
+        tool for mass spectrometers and a discriminating feature for targeted
+        proteomics. Molecular & Cellular Proteomics 13, 2056–2071 (2014).
 
-def frac_intensity_library(ssm: spectrum.SpectrumSpectrumMatch) -> float:
-    """
-    Get the fraction of explained intensity in the library spectrum.
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-
-    Returns
-    -------
-    float
-        The fraction of explained intensity.
-    """
-    return (
-        ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]].sum()
-        / ssm.library_spectrum.intensity.sum()
-    )
-
-
-def mean_squared_error(
-    ssm: spectrum.SpectrumSpectrumMatch, axis: str, top: Optional[int] = None
-) -> float:
-    """
-    Get the mean squared error (MSE) of peak matches between two spectra.
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-    axis : str
-        Calculate the MSE between the m/z values ("mz") or intensity values
-        ("intensity") of the matched peaks.
-    top: Optional[int] = None
-        The number of library peaks with highest intensity to consider. If
-        `None`, all peaks are used.
-
-    Returns
-    -------
-    float
-        The MSE between the m/z or intensity values of the matched peaks.
-
-    Raises
-    ------
-    ValueError
-        If the specified axis is not "mz" or "intensity".
-    """
-    if axis == "mz":
-        query_arr = ssm.query_spectrum.mz[ssm.peak_matches[:, 0]]
-        library_arr = ssm.library_spectrum.mz[ssm.peak_matches[:, 1]]
-    elif axis == "intensity":
-        query_arr = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-        library_arr = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-    else:
-        raise ValueError("Unknown axis specified")
-    n_peaks = len(ssm.peak_matches)
-    if top is not None:
-        mask = np.isin(
-            ssm.peak_matches[:, 1],
-            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
-            assume_unique=True,
-        )
-        query_arr, library_arr = query_arr[mask], library_arr[mask]
-        n_peaks = top
-    return ((query_arr - library_arr) ** 2).sum() / n_peaks
-
-
-def spectral_contrast_angle(
-    ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
-) -> float:
-    """
-    Get the spectral contrast angle between two spectra.
-
-    For the original description, see:
-    Toprak, U. H. et al. Conserved peptide fragmentation as a benchmarking tool
-    for mass spectrometers and a discriminating feature for targeted
-    proteomics. Molecular & Cellular Proteomics 13, 2056–2071 (2014).
-
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
-    top: Optional[int] = None
-        The number of library peaks with highest intensity to consider. If
-        `None`, all peaks are used.
-
-    Returns
-    -------
-    float
-        The spectral contrast angle between both spectra.
-    """
-    peaks_query = ssm.query_spectrum.intensity[ssm.peak_matches[:, 0]]
-    peaks_library = ssm.library_spectrum.intensity[ssm.peak_matches[:, 1]]
-    if top is not None:
-        mask = np.isin(
-            ssm.peak_matches[:, 1],
-            np.argpartition(ssm.library_spectrum.intensity, -top)[-top:],
-            assume_unique=True,
-        )
-        peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
-    return 1 - 2 * np.arccos(np.dot(peaks_query, peaks_library)) / np.pi
+        Returns
+        -------
+        float
+            The spectral contrast angle between the two spectra.
+        """
+        return 1 - 2 * np.arccos(self.cosine()) / np.pi
 
 
 def hypergeometric_score(ssm: spectrum.SpectrumSpectrumMatch) -> float:
