@@ -17,7 +17,7 @@ from spectrum_utils.utils import mass_diff
 
 from ann_solo import spectrum_similarity as sim
 from ann_solo.spectrum import SpectrumSpectrumMatch
-
+from ann_solo.config import config
 
 class CorrelationThreshold(SelectorMixin, BaseEstimator):
     """
@@ -401,7 +401,9 @@ def _compute_ssm_features(
         features["contrast_angle_top5"].append(
             sim.spectral_contrast_angle(ssm, 5)
         )
-        features["hypergeometric_score"].append(sim.hypergeometric_score(ssm))
+        features["hypergeometric_score"].append(sim.hypergeometric_score(
+                            ssm, min_mz=config.min_mz, max_mz=config.max_mz, \
+                            bin_size=config.bin_size))
         features["kendalltau"].append(sim.kendalltau(ssm))
         features["ms_for_id_v1"].append(sim.ms_for_id_v1(ssm))
         features["ms_for_id_v2"].append(sim.ms_for_id_v2(ssm))
