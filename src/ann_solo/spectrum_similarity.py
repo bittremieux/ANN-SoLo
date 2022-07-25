@@ -24,32 +24,30 @@ class SpectrumSimilarityFactory:
             The number of library peaks with highest intensity to consider. If
             `None`, all peaks are used.
         """
-        self.ssm = ssm
-        self.mz1 = ssm.query_spectrum.mz
-        self.int1 = ssm.query_spectrum.intensity
-        self.mz2 = ssm.library_spectrum.mz
-        self.int2 = ssm.library_spectrum.intensity
-        if len(ssm.peak_matches) > 0:
-            self.matched_mz1 = self.mz1[ssm.peak_matches[:, 0]]
-            self.matched_int1 = self.int1[ssm.peak_matches[:, 0]]
-            self.matched_mz2 = self.mz2[ssm.peak_matches[:, 1]]
-            self.matched_int2 = self.int2[ssm.peak_matches[:, 1]]
+        self.mz_query = ssm.query_spectrum.mz
+        self.int_query = ssm.query_spectrum.intensity
+        self.mz_library = ssm.library_spectrum.mz
+        self.int_library = ssm.library_spectrum.intensity
+        self.peak_matches = ssm.peak_matches
+        if len(self.peak_matches) > 0:
+            self.matched_mz_query = self.mz_query[self.peak_matches[:, 0]]
+            self.matched_int_query = self.int_query[self.peak_matches[:, 0]]
+            self.matched_mz_library = self.mz_library[self.peak_matches[:, 1]]
+            self.matched_int_library = self.int_library[self.peak_matches[:, 1]]
             # Filter the peak matches by the `top` highest intensity peaks in
             # the library spectrum.
             if top is not None:
-                library_top_i = np.argpartition(self.int2, -top)[-top:]
-                mask = np.isin(
-                    ssm.peak_matches[:, 1], library_top_i, assume_unique=True
+                library_top_i = np.argpartition(self.int_library, -top)[-top:]
+                self.top_i_mask = np.isin(
+                    self.peak_matches[:, 1], library_top_i, assume_unique=True
                 )
-                self.matched_mz1 = self.matched_mz1[mask]
-                self.matched_int1 = self.matched_int1[mask]
-                self.matched_mz2 = self.matched_mz2[mask]
-                self.matched_int2 = self.matched_int2[mask]
         else:
-            self.matched_mz1, self.matched_int1 = None, None
-            self.matched_mz2, self.matched_int2 = None, None
+            self.matched_mz_query, self.matched_int_query = None, None
+            self.matched_mz_library, self.matched_int_library = None, None
 
-    def cosine(self) -> float:
+
+
+    def cosine(self, topOnly: bool = False) -> float:
         """
         Get the cosine similarity.
 
@@ -58,13 +56,24 @@ class SpectrumSimilarityFactory:
         modification spectral library searching through approximate nearest
         neighbor indexing. Journal of Proteome Research 17, 3463–3474 (2018).
 
+        Parameters
+        ----------
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
+
         Returns
         -------
         float
             The cosine similarity between the two spectra.
         """
-        if self.matched_int1 is not None and self.matched_int2 is not None:
-            return np.dot(self.matched_int1, self.matched_int2)
+        if self.matched_int_query is not None \
+                and self.matched_int_library is not None:
+            if topOnly:
+                return np.dot(self.matched_int_query[self.top_i_mask],
+                              self.matched_int_library[self.top_i_mask])
+            else:
+                return np.dot(self.matched_int_query,
+                              self.matched_int_library)
         else:
             return 0.0
 
@@ -77,7 +86,7 @@ class SpectrumSimilarityFactory:
         int
             The number of matching peaks between the two spectra.
         """
-        return len(self.matched_mz1) if self.matched_mz1 is not None else 0
+        return len(self.matched_mz_query) if self.matched_mz_query is not None else 0
 
     def frac_n_peaks_query(self) -> float:
         """
@@ -89,8 +98,8 @@ class SpectrumSimilarityFactory:
         float
             The fraction of shared peaks in the query spectrum.
         """
-        if self.matched_mz1 is not None:
-            return len(self.matched_mz1) / len(self.mz1)
+        if self.matched_mz_query is not None:
+            return len(self.matched_mz_query) / len(self.mz_query)
         else:
             return 0.0
 
@@ -104,8 +113,8 @@ class SpectrumSimilarityFactory:
         float
             The fraction of shared peaks in the library spectrum.
         """
-        if self.matched_mz2 is not None:
-            return len(self.matched_mz2) / len(self.mz2)
+        if self.matched_mz_library is not None:
+            return len(self.matched_mz_library) / len(self.mz_library)
         else:
             return 0.0
 
@@ -118,8 +127,8 @@ class SpectrumSimilarityFactory:
         float
             The fraction of explained intensity in the query spectrum.
         """
-        if self.matched_int1 is not None:
-            return self.matched_int1.sum() / self.int1.sum()
+        if self.matched_int_query is not None:
+            return self.matched_int_query.sum() / self.int_query.sum()
         else:
             return 0.0
 
@@ -132,12 +141,12 @@ class SpectrumSimilarityFactory:
         float
             The fraction of explained intensity in the library spectrum.
         """
-        if self.matched_int2 is not None:
-            return self.matched_int2.sum() / self.int2.sum()
+        if self.matched_int_library is not None:
+            return self.matched_int_library.sum() / self.int_library.sum()
         else:
             return 0.0
 
-    def mean_squared_error(self, axis: str) -> float:
+    def mean_squared_error(self, axis: str, topOnly: bool = False) -> float:
         """
         Get the mean squared error (MSE) of peak matches.
 
@@ -146,6 +155,8 @@ class SpectrumSimilarityFactory:
         axis : str
             Calculate the MSE between the m/z values ("mz") or intensity values
             ("intensity") of the matched peaks.
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
 
         Returns
         -------
@@ -158,18 +169,24 @@ class SpectrumSimilarityFactory:
         ValueError
             If the specified axis is not "mz" or "intensity".
         """
-        if axis == "mz":
-            arr1, arr2 = self.matched_mz1, self.matched_mz2
-        elif axis == "intensity":
-            arr1, arr2 = self.matched_int1, self.matched_int2
+        if axis == "mz" and topOnly:
+            arr1, arr2 = self.matched_mz_query[self.top_i_mask],\
+                         self.matched_mz_library[self.top_i_mask]
+        elif axis == "intensity" and topOnly:
+            arr1, arr2 = self.matched_int_query[self.top_i_mask],\
+                         self.matched_int_library[self.top_i_mask]
+        elif axis == "mz" and not topOnly:
+            arr1, arr2 = self.matched_int_query, self.matched_int_library
+        elif axis == "intensity" and not topOnly:
+            arr1, arr2 = self.matched_int_query, self.matched_int_library
         else:
             raise ValueError("Unknown axis specified")
         if arr1 is not None and arr2 is not None:
-            return ((arr1 - arr2) ** 2).sum() / len(self.mz1)
+            return ((arr1 - arr2) ** 2).sum() / len(self.mz_query)
         else:
             return np.inf
 
-    def spectral_contrast_angle(self) -> float:
+    def spectral_contrast_angle(self, topOnly: bool = False) -> float:
         """
         Get the spectral contrast angle.
 
@@ -178,12 +195,17 @@ class SpectrumSimilarityFactory:
         tool for mass spectrometers and a discriminating feature for targeted
         proteomics. Molecular & Cellular Proteomics 13, 2056–2071 (2014).
 
+        Parameters
+        ----------
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
+
         Returns
         -------
         float
             The spectral contrast angle between the two spectra.
         """
-        return 1 - 2 * np.arccos(self.cosine()) / np.pi
+        return 1 - 2 * np.arccos(self.cosine(topOnly)) / np.pi
 
 
     def hypergeometric_score(self,min_mz: int, max_mz: int, bin_size: float) \
@@ -202,16 +224,20 @@ class SpectrumSimilarityFactory:
 
         Parameters
         ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
+        min_mz : int
+            The minimum mz provided in the config file.
+        max_mz : int
+            The maximum mz provided in the config file.
+        bin_size : int
+            The bin size provided in the config file.
 
         Returns
         -------
         float
             The hypergeometric score of peak matches.
         """
-        n_library_peaks = len(self.ssm.library_spectrum.mz)
-        n_matched_peaks = len(self.ssm.peak_matches)
+        n_library_peaks = len(self.mz_library)
+        n_matched_peaks = len(self.matched_mz_library)
         n_peak_bins, _, _ = spectrum.get_dim(
             min_mz, max_mz, bin_size
         )
@@ -241,20 +267,15 @@ class SpectrumSimilarityFactory:
         identification complementarity and quality assessment. Journal of Proteome
         Research 11, 1686–1695 (2012).
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
             The hypergeometric score of peak matches.
         """
-        return -1 if not len(self.ssm.peak_matches) else \
+        return -1 if not len(self.matched_int_query) else \
             scipy.stats.kendalltau(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]],
-            self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]],
+            self.matched_int_query,
+            self.matched_int_library,
         )[0]
 
 
@@ -267,26 +288,19 @@ class SpectrumSimilarityFactory:
         ESI–QqTOF-MS/MS with mass-spectral library search for qualitative analysis
         of drugs. Analytical and Bioanalytical Chemistry 386, 69–82 (2006).
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
             The MSforID (v1) similarity between both spectra.
         """
-        return 0 if not len(self.ssm.peak_matches) else \
-            len(self.ssm.peak_matches) ** 4 / (
-                len(self.ssm.query_spectrum.mz)
-                * len(self.ssm.library_spectrum.mz)
+        return 0 if not len(self.matched_int_query) else \
+            len(self.matched_int_query) ** 4 / (
+                len(self.mz_query)
+                * len(self.mz_library)
                 * max(
                     np.abs(
-                        self.ssm.query_spectrum.intensity[
-                                                self.ssm.peak_matches[:, 0]]
-                        - self.ssm.library_spectrum.intensity[
-                                                self.ssm.peak_matches[:, 1]]
+                        self.matched_int_query
+                        - self.matched_int_library
                     ).sum(),
                     np.finfo(float).eps,
                 )
@@ -305,33 +319,28 @@ class SpectrumSimilarityFactory:
         advanced search algorithm for tandem mass spectral reference libraries.
         Journal of Mass Spectrometry 44, 494–502 (2009).
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
             The MSforID (v2) similarity between both spectra.
         """
-        return 0 if not len(self.ssm.peak_matches) else \
-            (len(self.ssm.peak_matches) ** 4
+        return 0 if not len(self.matched_int_query) else \
+            (len(self.matched_int_query) ** 4
             * (
-                self.ssm.query_spectrum.intensity.sum()
-                + 2 * self.ssm.library_spectrum.intensity.sum()
+                self.int_query.sum()
+                + 2 * self.int_library.sum()
             )
             ** 1.25
         ) / (
-            (len(self.ssm.query_spectrum.mz) + 2
-             * len(self.ssm.library_spectrum.mz)) ** 2
+            (len(self.mz_query) + 2
+             * len(self.mz_library)) ** 2
             + np.abs(
-                self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-                - self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]]
+                self.matched_int_query
+                - self.matched_int_library
             ).sum()
             + np.abs(
-                self.ssm.query_spectrum.mz[self.ssm.peak_matches[:, 0]]
-                - self.ssm.library_spectrum.mz[self.ssm.peak_matches[:, 1]]
+                self.matched_mz_query
+                - self.matched_mz_library
             ).sum()
         )
 
@@ -340,11 +349,6 @@ class SpectrumSimilarityFactory:
         """
         Get the Manhattan distance between two spectra.
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
@@ -352,22 +356,22 @@ class SpectrumSimilarityFactory:
         """
         # Matching peaks.
         dist = np.abs(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-            - self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]]
+            self.matched_int_query
+            - self.matched_int_library
         ).sum()
         # Unmatched peaks in the query spectrum.
-        dist += self.ssm.query_spectrum.intensity[
+        dist += self.int_query[
             np.setdiff1d(
-                np.arange(len(self.ssm.query_spectrum.intensity)),
-                self.ssm.peak_matches[:, 0],
+                np.arange(len(self.int_query)),
+                self.peak_matches[:, 0],
                 assume_unique=True,
             )
         ].sum()
         # Unmatched peaks in the library spectrum.
-        dist += self.ssm.library_spectrum.intensity[
+        dist += self.int_library[
             np.setdiff1d(
-                np.arange(len(self.ssm.library_spectrum.intensity)),
-                self.ssm.peak_matches[:, 1],
+                np.arange(len(self.int_library)),
+                self.peak_matches[:, 1],
                 assume_unique=True,
             )
         ].sum()
@@ -377,11 +381,6 @@ class SpectrumSimilarityFactory:
         """
         Get the Euclidean distance between two spectra.
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
@@ -390,18 +389,17 @@ class SpectrumSimilarityFactory:
         # Matching peaks.
         dist = (
                 (
-                    self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-                    - self.ssm.library_spectrum.intensity[
-                        self.ssm.peak_matches[:, 1]]
+                    self.matched_int_query
+                    - self.matched_int_library
                 )
                 ** 2
         ).sum()
         # Unmatched peaks in the query spectrum.
         dist += (
-                self.ssm.query_spectrum.intensity[
+                self.int_query[
                     np.setdiff1d(
-                        np.arange(len(self.ssm.query_spectrum.intensity)),
-                        self.ssm.peak_matches[:, 0],
+                        np.arange(len(self.int_query)),
+                        self.peak_matches[:, 0],
                         assume_unique=True,
                     )
                 ]
@@ -409,10 +407,10 @@ class SpectrumSimilarityFactory:
         ).sum()
         # Unmatched peaks in the library spectrum.
         dist += (
-                self.ssm.library_spectrum.intensity[
+                self.int_library[
                     np.setdiff1d(
-                        np.arange(len(self.ssm.library_spectrum.intensity)),
-                        self.ssm.peak_matches[:, 1],
+                        np.arange(len(self.int_library)),
+                        self.peak_matches[:, 1],
                         assume_unique=True,
                     )
                 ]
@@ -424,11 +422,6 @@ class SpectrumSimilarityFactory:
         """
         Get the Chebyshev distance between two spectra.
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
@@ -436,17 +429,17 @@ class SpectrumSimilarityFactory:
         """
         # Matching peaks.
         dist = np.abs(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-            - self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]]
+            self.matched_int_query
+            - self.matched_int_library
         )
         # Unmatched peaks in the query spectrum.
         dist = np.hstack(
             (
                 dist,
-                self.ssm.query_spectrum.intensity[
+                self.int_query[
                     np.setdiff1d(
-                        np.arange(len(self.ssm.query_spectrum.intensity)),
-                        self.ssm.peak_matches[:, 0],
+                        np.arange(len(self.int_query)),
+                        self.peak_matches[:, 0],
                         assume_unique=True,
                     )
                 ],
@@ -456,10 +449,10 @@ class SpectrumSimilarityFactory:
         dist = np.hstack(
             (
                 dist,
-                self.ssm.library_spectrum.intensity[
+                self.int_library[
                     np.setdiff1d(
-                        np.arange(len(self.ssm.library_spectrum.intensity)),
-                        self.ssm.peak_matches[:, 1],
+                        np.arange(len(self.int_library)),
+                        self.peak_matches[:, 1],
                         assume_unique=True,
                     )
                 ],
@@ -467,17 +460,14 @@ class SpectrumSimilarityFactory:
         )
         return dist.max()
 
-    def pearsonr(self, top: Optional[int] = None) -> float:
+    def pearsonr(self, topOnly: bool = False) -> float:
         """
         Get the Pearson correlation between peak matches in two spectra.
 
         Parameters
         ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-        top: Optional[int] = None
-            The number of library peaks with highest intensity to consider. If
-            `None`, all peaks are used.
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
 
         Returns
         -------
@@ -485,35 +475,23 @@ class SpectrumSimilarityFactory:
             The Pearson correlation of peak matches.
         """
         # FIXME: Use all library spectrum peaks.
-        peaks_query = self.ssm.query_spectrum.intensity[
-                                        self.ssm.peak_matches[:, 0]]
-        peaks_library = self.ssm.library_spectrum.intensity[
-                                        self.ssm.peak_matches[:, 1]]
-        if top is not None:
-            mask = np.isin(
-                self.ssm.peak_matches[:, 1],
-                np.argpartition(
-                    self.ssm.library_spectrum.intensity, -top)[-top:],
-                    assume_unique=True,
-            )
-            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
-        if len(peaks_query) > 1:
-            return scipy.stats.pearsonr(peaks_query, peaks_library)[0]
-        else:
-            return 0.0
+        peaks_query, peaks_library = self.matched_int_query, \
+                                     self.matched_int_library
+        if topOnly:
+            peaks_query = self.matched_int_query[self.top_i_mask]
+            peaks_library = self.matched_int_library[self.top_i_mask]
+        print('top_i_mask: {}'.forntat(top_i_mask))
+        return 0.0 if len(peaks_query) > 1 else \
+                scipy.stats.pearsonr(peaks_query, peaks_library)[0]
 
-    def spearmanr(self, top: Optional[int] = None
-    ) -> float:
+    def spearmanr(self, topOnly: bool = False) -> float:
         """
         Get the Spearman correlation between peak matches in two spectra.
 
         Parameters
         ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-        top: Optional[int] = None
-            The number of library peaks with highest intensity to consider. If
-            `None`, all peaks are used.
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
 
         Returns
         -------
@@ -521,22 +499,14 @@ class SpectrumSimilarityFactory:
             The Spearman correlation of peak matches.
         """
         # FIXME: Use all library spectrum peaks.
-        peaks_query = self.ssm.query_spectrum.intensity[
-                                        self.ssm.peak_matches[:, 0]]
-        peaks_library = self.ssm.library_spectrum.intensity[
-                                        self.ssm.peak_matches[:, 1]]
-        if top is not None:
-            mask = np.isin(
-                self.ssm.peak_matches[:, 1],
-                np.argpartition(
-                    self.ssm.library_spectrum.intensity, -top)[-top:],
-                    assume_unique=True,
-            )
-            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
-        if len(peaks_query) > 1:
-            return scipy.stats.spearmanr(peaks_query, peaks_library)[0]
-        else:
-            return 0.0
+        peaks_query, peaks_library = self.matched_int_query, \
+                                     self.matched_int_library
+        if topOnly:
+            peaks_query = self.matched_int_query[self.top_i_mask]
+            peaks_library = self.matched_int_library[self.top_i_mask]
+
+        return 0.0 if len(peaks_query) > 1 else \
+            scipy.stats.spearmanr(peaks_query, peaks_library)[0]
 
     def braycurtis(self) -> float:
         """
@@ -547,35 +517,30 @@ class SpectrumSimilarityFactory:
         .. math::
            \\sum{|u_i-v_i|} / \\sum{|u_i+v_i|}
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
             The Bray-Curtis distance between both spectra.
         """
         numerator = np.abs(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-            - self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]]
+            self.matched_int_query
+            - self.matched_int_library
         ).sum()
         denominator = (
-                self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]]
-                + self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]]
+                self.matched_int_query
+                + self.matched_int_library
         ).sum()
-        query_unique = self.ssm.query_spectrum.intensity[
+        query_unique = self.int_query[
             np.setdiff1d(
-                np.arange(len(self.ssm.query_spectrum.intensity)),
-                self.ssm.peak_matches[:, 0],
+                np.arange(len(self.int_query)),
+                self.peak_matches[:, 0],
                 assume_unique=True,
             )
         ].sum()
-        library_unique = self.ssm.library_spectrum.intensity[
+        library_unique = self.int_library[
             np.setdiff1d(
-                np.arange(len(self.ssm.library_spectrum.intensity)),
-                self.ssm.peak_matches[:, 1],
+                np.arange(len(self.int_library)),
+                self.peak_matches[:, 1],
                 assume_unique=True,
             )
         ].sum()
@@ -587,33 +552,23 @@ class SpectrumSimilarityFactory:
         """
         Get the Canberra distance between two spectra.
 
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-
         Returns
         -------
         float
             The canberra distance between both spectra.
         """
         dist = scipy.spatial.distance.canberra(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]],
-            self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]],
+            self.matched_int_query,
+            self.matched_int_library,
         )
         # Account for unmatched peaks in the query and library spectra.
-        dist += len(self.ssm.query_spectrum.mz) - len(self.ssm.peak_matches)
-        dist += len(self.ssm.library_spectrum.mz) - len(self.ssm.peak_matches)
+        dist += len(self.mz_query) - len(self.matched_mz_query)
+        dist += len(self.mz_library) - len(self.matched_mz_query)
         return dist
 
     def ruzicka(self) -> float:
         """
         Compute the Ruzicka similarity between two spectra.
-
-        Parameters
-        ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
 
         Returns
         -------
@@ -621,31 +576,31 @@ class SpectrumSimilarityFactory:
             The Ruzicka similarity between both spectra.
         """
         numerator = np.minimum(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]],
-            self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]],
+            self.matched_int_query,
+            self.matched_int_library,
         ).sum()
         denominator = np.maximum(
-            self.ssm.query_spectrum.intensity[self.ssm.peak_matches[:, 0]],
-            self.ssm.library_spectrum.intensity[self.ssm.peak_matches[:, 1]],
+            self.matched_int_query,
+            self.matched_int_library,
         ).sum()
         # Account for unmatched peaks in the query and library spectra.
-        denominator += self.ssm.query_spectrum.intensity[
+        denominator += self.int_query[
             np.setdiff1d(
-                np.arange(len(self.ssm.query_spectrum.intensity)),
-                self.ssm.peak_matches[:, 0],
+                np.arange(len(self.int_query)),
+                self.peak_matches[:, 0],
                 assume_unique=True,
             )
         ].sum()
-        denominator += self.ssm.library_spectrum.intensity[
+        denominator += self.int_library[
             np.setdiff1d(
-                np.arange(len(self.ssm.library_spectrum.intensity)),
-                self.ssm.peak_matches[:, 1],
+                np.arange(len(self.int_library)),
+                self.peak_matches[:, 1],
                 assume_unique=True,
             )
         ].sum()
         return numerator / denominator
 
-    def scribe_fragment_acc(self, top: Optional[int] = None) -> float:
+    def scribe_fragment_acc(self, topOnly: bool = False) -> float:
         """
         Get the Scribe fragmentation accuracy between two spectra.
 
@@ -655,11 +610,8 @@ class SpectrumSimilarityFactory:
 
         Parameters
         ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
-        top: Optional[int] = None
-            The number of library peaks with highest intensity to consider. If
-            `None`, all peaks are used.
+        topOnly: bool = False
+            Compute similarity measure for top peaks only.
 
         Returns
         -------
@@ -667,18 +619,11 @@ class SpectrumSimilarityFactory:
             The Scribe fragmentation accuracy between both spectra.
         """
         # FIXME: Use all library spectrum peaks.
-        peaks_query = self.ssm.query_spectrum.intensity[
-                                                self.ssm.peak_matches[:, 0]]
-        peaks_library = self.ssm.library_spectrum.intensity[
-                                                self.ssm.peak_matches[:, 1]]
-        if top is not None:
-            mask = np.isin(
-                self.ssm.peak_matches[:, 1],
-                np.argpartition(
-                    self.ssm.library_spectrum.intensity, -top)[-top:],
-                    assume_unique=True,
-            )
-            peaks_query, peaks_library = peaks_query[mask], peaks_library[mask]
+        peaks_query, peaks_library = self.matched_int_query, \
+                                     self.matched_int_library
+        if topOnly:
+            peaks_query = self.matched_int_query[self.top_i_mask]
+            peaks_library = self.matched_int_library[self.top_i_mask]
         return np.log(
             1
             / max(
@@ -704,8 +649,6 @@ class SpectrumSimilarityFactory:
 
         Parameters
         ----------
-        ssm : spectrum.SpectrumSpectrumMatch
-            The match between a query spectrum and a library spectrum.
         weighted : bool
             Whether to use the unweighted or weighted version of entropy.
 
@@ -714,76 +657,70 @@ class SpectrumSimilarityFactory:
         float
             The entropy between both spectra.
         """
-        query_entropy = _spectrum_entropy(self.ssm.query_spectrum.intensity,
-                                          weighted)
-        library_entropy = _spectrum_entropy(
-            self.ssm.library_spectrum.intensity, weighted
-        )
-        merged_entropy = _spectrum_entropy(_merge_entropy(self.ssm), weighted)
+        query_entropy = self._spectrum_entropy(self.int_query,weighted)
+        library_entropy = self._spectrum_entropy(self.int_library, weighted)
+        merged_entropy = self._spectrum_entropy(self._merge_entropy(),
+                                                        weighted)
         return 2 * merged_entropy - query_entropy - library_entropy
 
-def _spectrum_entropy(
-    spectrum_intensity: np.ndarray, weighted: bool = False
-) -> float:
-    """
-    Compute the entropy of a spectrum from its peak intensities.
+    def _spectrum_entropy(
+        self,spectrum_intensity: np.ndarray, weighted: bool = False
+    ) -> float:
+        """
+        Compute the entropy of a spectrum from its peak intensities.
 
-    Parameters
-    ----------
-    spectrum_intensity : np.ndarray
-        The intensities of the spectrum peaks.
-    weighted : bool
-        Whether to use the unweighted or weighted version of entropy.
+        Parameters
+        ----------
+        spectrum_intensity : np.ndarray
+            The intensities of the spectrum peaks.
+        weighted : bool
+            Whether to use the unweighted or weighted version of entropy.
 
-    Returns
-    -------
-    float
-        The entropy of the given spectrum.
-    """
-    weight_start, entropy_cutoff = 0.25, 3
-    weight_slope = (1 - weight_start) / entropy_cutoff
-    spec_entropy = scipy.stats.entropy(spectrum_intensity)
-    if not weighted or spec_entropy > entropy_cutoff:
-        return spec_entropy
-    else:
-        weight = weight_start + weight_slope * spec_entropy
-        weighted_intensity = spectrum_intensity**weight
-        weighted_intensity /= weighted_intensity.sum()
-        return scipy.stats.entropy(weighted_intensity)
+        Returns
+        -------
+        float
+            The entropy of the given spectrum.
+        """
+        weight_start, entropy_cutoff = 0.25, 3
+        weight_slope = (1 - weight_start) / entropy_cutoff
+        spec_entropy = scipy.stats.entropy(spectrum_intensity)
+        if not weighted or spec_entropy > entropy_cutoff:
+            return spec_entropy
+        else:
+            weight = weight_start + weight_slope * spec_entropy
+            weighted_intensity = spectrum_intensity**weight
+            weighted_intensity /= weighted_intensity.sum()
+            return scipy.stats.entropy(weighted_intensity)
 
 
-def _merge_entropy(ssm: spectrum.SpectrumSpectrumMatch) -> np.ndarray:
-    """
-    Merge two spectra prior to entropy calculation of the spectrum-spectrum
-    match.
+    def _merge_entropy(self) -> np.ndarray:
+        """
+        Merge two spectra prior to entropy calculation of the spectrum-spectrum
+        match.
 
-    Parameters
-    ----------
-    ssm : spectrum.SpectrumSpectrumMatch
-        The match between a query spectrum and a library spectrum.
 
-    Returns
-    -------
-    np.ndarray
-        NumPy array with the intensities of the merged peaks summed.
-    """
-    # Initialize with the query spectrum peaks.
-    merged = ssm.query_spectrum.intensity.copy()
-    # Sum the intensities of matched peaks.
-    merged[ssm.peak_matches[:, 0]] += ssm.library_spectrum.intensity[
-        ssm.peak_matches[:, 1]
-    ]
-    # Append the unmatched library spectrum peaks.
-    merged = np.hstack(
-        (
-            merged,
-            ssm.library_spectrum.intensity[
-                np.setdiff1d(
-                    np.arange(len(ssm.library_spectrum.intensity)),
-                    ssm.peak_matches[:, 1],
-                    assume_unique=True,
-                )
-            ],
+        Returns
+        -------
+        np.ndarray
+            NumPy array with the intensities of the merged peaks summed.
+        """
+        # Initialize with the query spectrum peaks.
+        merged = self.int_query.copy()
+        # Sum the intensities of matched peaks.
+        merged[self.peak_matches[:, 0]] += self.int_library[
+                                                    self.peak_matches[:, 1]
+                                                    ]
+        # Append the unmatched library spectrum peaks.
+        merged = np.hstack(
+            (
+                merged,
+                self.int_library[
+                    np.setdiff1d(
+                        np.arange(len(self.int_library)),
+                        self.peak_matches[:, 1],
+                        assume_unique=True,
+                    )
+                ],
+            )
         )
-    )
-    return merged
+        return merged
