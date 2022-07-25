@@ -68,7 +68,9 @@ class SpectrumSimilarityFactory:
         """
         if self.matched_int_query is not None \
                 and self.matched_int_library is not None:
-            if topOnly:
+            if topOnly and sum(self.top_i_mask)<2:
+                return 0.0
+            elif topOnly:
                 return np.dot(self.matched_int_query[self.top_i_mask],
                               self.matched_int_library[self.top_i_mask])
             else:
@@ -169,7 +171,9 @@ class SpectrumSimilarityFactory:
         ValueError
             If the specified axis is not "mz" or "intensity".
         """
-        if axis == "mz" and topOnly:
+        if topOnly and sum(self.top_i_mask)<2:
+            return 0.0
+        elif axis == "mz" and topOnly:
             arr1, arr2 = self.matched_mz_query[self.top_i_mask],\
                          self.matched_mz_library[self.top_i_mask]
         elif axis == "intensity" and topOnly:
@@ -477,10 +481,12 @@ class SpectrumSimilarityFactory:
         # FIXME: Use all library spectrum peaks.
         peaks_query, peaks_library = self.matched_int_query, \
                                      self.matched_int_library
-        if topOnly:
+        if topOnly and sum(self.top_i_mask)<2:
+            return 0.0
+        elif topOnly:
             peaks_query = self.matched_int_query[self.top_i_mask]
             peaks_library = self.matched_int_library[self.top_i_mask]
-        print('top_i_mask: {}'.forntat(top_i_mask))
+
         return 0.0 if len(peaks_query) > 1 else \
                 scipy.stats.pearsonr(peaks_query, peaks_library)[0]
 
@@ -501,7 +507,9 @@ class SpectrumSimilarityFactory:
         # FIXME: Use all library spectrum peaks.
         peaks_query, peaks_library = self.matched_int_query, \
                                      self.matched_int_library
-        if topOnly:
+        if topOnly and sum(self.top_i_mask)<2:
+            return 0.0
+        elif topOnly:
             peaks_query = self.matched_int_query[self.top_i_mask]
             peaks_library = self.matched_int_library[self.top_i_mask]
 
@@ -621,7 +629,9 @@ class SpectrumSimilarityFactory:
         # FIXME: Use all library spectrum peaks.
         peaks_query, peaks_library = self.matched_int_query, \
                                      self.matched_int_library
-        if topOnly:
+        if topOnly and sum(self.top_i_mask)<2:
+            return 0.0
+        elif topOnly:
             peaks_query = self.matched_int_query[self.top_i_mask]
             peaks_library = self.matched_int_library[self.top_i_mask]
         return np.log(
