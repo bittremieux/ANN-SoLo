@@ -218,7 +218,7 @@ class SpectrumSimilarityCalculator:
         else:
             raise ValueError("Unknown axis specified")
         if arr1 is not None and arr2 is not None:
-            return ((arr1 - arr2) ** 2).sum() / len(self.mz_query)
+            return ((arr1 - arr2) ** 2).sum() / len(arr1)
         else:
             return np.inf
 
