@@ -8,7 +8,7 @@ import scipy.stats
 from ann_solo import spectrum
 
 
-class SpectrumSimilarityFactory:
+class SpectrumSimilarityCalculator:
     def __init__(
         self, ssm: spectrum.SpectrumSpectrumMatch, top: Optional[int] = None
     ):

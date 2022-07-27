@@ -19,6 +19,7 @@ from ann_solo import spectrum_similarity as sim
 from ann_solo.spectrum import SpectrumSpectrumMatch
 from ann_solo.config import config
 
+
 class CorrelationThreshold(SelectorMixin, BaseEstimator):
     """
     Feature selector that removes correlated features.
@@ -324,9 +325,9 @@ def _compute_ssm_features(
         "is_target": [],
     }
     for i, ssm in enumerate(ssms):
-        # Skip low-quality spectrum matches.
-        if len(ssm.peak_matches) <= 1:
-            continue
+        sim_calc = sim.SpectrumSimilarityCalculator(ssm)
+        sim_calc_top = sim.SpectrumSimilarityCalculator(ssm, 5)
+
         features["index"].append(i)
         features["sequence"].append(ssm.sequence)
         features["sequence_len"].append(len(ssm.sequence))
@@ -384,45 +385,48 @@ def _compute_ssm_features(
                 )
             )
         )
-        sim_factory = sim.SpectrumSimilarityFactory(ssm,5)
-        features["cosine"].append(sim_factory.cosine())
-        features["cosine_top5"].append(sim_factory.cosine(True))
-        features["n_matched_peaks"].append(sim_factory.n_matched_peaks())
-        features["frac_n_peaks_query"].append(sim_factory.frac_n_peaks_query())
-        features["frac_n_peaks_lib"].append(sim_factory.frac_n_peaks_library())
-        features["frac_int_query"].append(sim_factory.frac_intensity_query())
-        features["frac_int_lib"].append(sim_factory.frac_intensity_library())
-        features["mse_mz"].append(sim_factory.mean_squared_error("mz"))
-        features["mse_mz_top5"].append(sim_factory.mean_squared_error("mz", True))
-        features["mse_int"].append(sim_factory.mean_squared_error("intensity"))
+        features["cosine"].append(sim_calc.cosine())
+        features["cosine_top5"].append(sim_calc_top.cosine())
+        features["n_matched_peaks"].append(sim_calc.n_matched_peaks())
+        features["frac_n_peaks_query"].append(sim_calc.frac_n_peaks_query())
+        features["frac_n_peaks_lib"].append(sim_calc.frac_n_peaks_library())
+        features["frac_int_query"].append(sim_calc.frac_intensity_query())
+        features["frac_int_lib"].append(sim_calc.frac_intensity_library())
+        features["mse_mz"].append(sim_calc.mean_squared_error("mz"))
+        features["mse_mz_top5"].append(sim_calc_top.mean_squared_error("mz"))
+        features["mse_int"].append(sim_calc.mean_squared_error("intensity"))
         features["mse_int_top5"].append(
-            sim_factory.mean_squared_error("intensity", 5)
+            sim_calc_top.mean_squared_error("intensity")
         )
-        features["contrast_angle"].append(sim_factory.spectral_contrast_angle())
+        features["contrast_angle"].append(sim_calc.spectral_contrast_angle())
         features["contrast_angle_top5"].append(
-            sim_factory.spectral_contrast_angle(True)
+            sim_calc_top.spectral_contrast_angle()
         )
-        features["hypergeometric_score"].append(sim_factory.hypergeometric_score(
-                            min_mz=config.min_mz, max_mz=config.max_mz, \
-                            bin_size=config.bin_size))
-        features["kendalltau"].append(sim_factory.kendalltau())
-        features["ms_for_id_v1"].append(sim_factory.ms_for_id_v1())
-        features["ms_for_id_v2"].append(sim_factory.ms_for_id_v2())
-        features["entropy_unweighted"].append(sim_factory.entropy(False))
-        features["entropy_weighted"].append(sim_factory.entropy(True))
-        features["scribe_fragment_acc"].append(sim_factory.scribe_fragment_acc())
+        features["hypergeometric_score"].append(
+            sim_calc.hypergeometric_score(
+                min_mz=config.min_mz,
+                max_mz=config.max_mz,
+                bin_size=config.bin_size,
+            )
+        )
+        features["kendalltau"].append(sim_calc.kendalltau())
+        features["ms_for_id_v1"].append(sim_calc.ms_for_id_v1())
+        features["ms_for_id_v2"].append(sim_calc.ms_for_id_v2())
+        features["entropy_unweighted"].append(sim_calc.entropy(False))
+        features["entropy_weighted"].append(sim_calc.entropy(True))
+        features["scribe_fragment_acc"].append(sim_calc.scribe_fragment_acc())
         features["scribe_fragment_acc_top5"].append(
-            sim_factory.scribe_fragment_acc(True)
+            sim_calc_top.scribe_fragment_acc()
         )
-        features["manhattan"].append(sim_factory.manhattan())
-        features["euclidean"].append(sim_factory.euclidean())
-        features["chebyshev"].append(sim_factory.chebyshev())
-        features["pearsonr"].append(sim_factory.pearsonr())
-        features["pearsonr_top5"].append(sim_factory.pearsonr(True))
-        features["spearmanr"].append(sim_factory.spearmanr())
-        features["spearmanr_top5"].append(sim_factory.spearmanr(True))
-        features["braycurtis"].append(sim_factory.braycurtis())
-        features["canberra"].append(sim_factory.canberra())
-        features["ruzicka"].append(sim_factory.ruzicka())
+        features["manhattan"].append(sim_calc.manhattan())
+        features["euclidean"].append(sim_calc.euclidean())
+        features["chebyshev"].append(sim_calc.chebyshev())
+        features["pearsonr"].append(sim_calc.pearsonr())
+        features["pearsonr_top5"].append(sim_calc_top.pearsonr())
+        features["spearmanr"].append(sim_calc.spearmanr())
+        features["spearmanr_top5"].append(sim_calc_top.spearmanr())
+        features["braycurtis"].append(sim_calc.braycurtis())
+        features["canberra"].append(sim_calc.canberra())
+        features["ruzicka"].append(sim_calc.ruzicka())
         features["is_target"].append(not ssm.is_decoy)
     return features
