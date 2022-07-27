@@ -28,6 +28,7 @@ class SpectrumSimilarityCalculator:
         self.int_query = ssm.query_spectrum.intensity
         self.mz_library = ssm.library_spectrum.mz
         self.int_library = ssm.library_spectrum.intensity
+        self._top = top is not None
         self._recalculate_norm = False
         if len(ssm.peak_matches) > 0:
             self.matched_mz_query = self.mz_query[ssm.peak_matches[:, 0]]
@@ -45,7 +46,7 @@ class SpectrumSimilarityCalculator:
             self.unmatched_int_library = self.int_library[library_unmatched_i]
             # Filter the peak matches by the `top` highest intensity peaks in
             # the library spectrum.
-            if top is not None:
+            if self._top:
                 library_top_i = np.argpartition(self.int_library, -top)[-top:]
                 mask = np.isin(
                     ssm.peak_matches[:, 1], library_top_i, assume_unique=True
@@ -119,7 +120,8 @@ class SpectrumSimilarityCalculator:
             The fraction of shared peaks in the query spectrum.
         """
         if self.matched_mz_query is not None:
-            return len(self.matched_mz_query) / len(self.mz_query)
+            n_peaks = self.top if self.top is not None else len(self.mz_query)
+            return len(self.matched_mz_query) / n_peaks
         else:
             return 0.0
 
@@ -134,7 +136,8 @@ class SpectrumSimilarityCalculator:
             The fraction of shared peaks in the library spectrum.
         """
         if self.matched_mz_library is not None:
-            return len(self.matched_mz_library) / len(self.mz_library)
+            n_peaks = self.top if self.top is not None else len(self.mz_library)
+            return len(self.matched_mz_library) / n_peaks
         else:
             return 0.0
 
