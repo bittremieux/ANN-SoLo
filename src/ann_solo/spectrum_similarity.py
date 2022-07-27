@@ -348,11 +348,14 @@ class SpectrumSimilarityCalculator:
         """
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        return (
-            np.abs(self.matched_int_query - self.matched_int_library).sum()
-            + self.unmatched_int_query.sum()
-            + self.unmatched_int_library.sum()
-        )
+        if self.matched_int_query is not None:
+            return (
+                np.abs(self.matched_int_query - self.matched_int_library).sum()
+                + self.unmatched_int_query.sum()
+                + self.unmatched_int_library.sum()
+            )
+        else:
+            return np.inf
 
     def euclidean(self) -> float:
         """
@@ -365,11 +368,14 @@ class SpectrumSimilarityCalculator:
         """
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        return np.sqrt(
-            ((self.matched_int_query - self.matched_int_library) ** 2).sum()
-            + (self.unmatched_int_query**2).sum()
-            + (self.unmatched_int_library**2).sum()
-        )
+        if self.matched_int_query is not None:
+            return np.sqrt(
+                ((self.matched_int_query - self.matched_int_library) ** 2).sum()
+                + (self.unmatched_int_query**2).sum()
+                + (self.unmatched_int_library**2).sum()
+            )
+        else:
+            return np.inf
 
     def chebyshev(self) -> float:
         """
@@ -382,13 +388,16 @@ class SpectrumSimilarityCalculator:
         """
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        return np.maximum.reduce(
-            [
-                np.abs(self.matched_int_query - self.matched_int_library),
-                self.unmatched_int_query,
-                self.unmatched_int_library,
-            ]
-        )
+        if self.matched_int_query is not None:
+            return np.maximum.reduce(
+                [
+                    np.abs(self.matched_int_query - self.matched_int_library),
+                    self.unmatched_int_query,
+                    self.unmatched_int_library,
+                ]
+            )
+        else:
+            return np.inf
 
     def pearsonr(self) -> float:
         """
