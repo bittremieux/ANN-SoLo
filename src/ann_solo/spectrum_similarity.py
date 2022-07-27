@@ -202,7 +202,7 @@ class SpectrumSimilarityCalculator:
         float
             The spectral contrast angle between the two spectra.
         """
-        return 1 - 2 * np.arccos(self.cosine()) / np.pi
+        return 1.0 - 2 * np.arccos(np.clip(self.cosine(), 0.0, 1.0)) / np.pi
 
     def hypergeometric_score(
         self, min_mz: float, max_mz: float, fragment_mz_tol: float
