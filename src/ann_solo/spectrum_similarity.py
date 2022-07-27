@@ -119,9 +119,13 @@ class SpectrumSimilarityCalculator:
         float
             The fraction of shared peaks in the query spectrum.
         """
+        if self._top:
+            raise NotImplementedError(
+                "The fraction of shared query peaks is not defined when "
+                "filtering by the top intensity library peaks"
+            )
         if self.matched_mz_query is not None:
-            n_peaks = self.top if self.top is not None else len(self.mz_query)
-            return len(self.matched_mz_query) / n_peaks
+            return len(self.matched_mz_query) / len(self.mz_query)
         else:
             return 0.0
 
@@ -136,7 +140,12 @@ class SpectrumSimilarityCalculator:
             The fraction of shared peaks in the library spectrum.
         """
         if self.matched_mz_library is not None:
-            n_peaks = self.top if self.top is not None else len(self.mz_library)
+            if not self._top:
+                n_peaks = len(self.mz_library)
+            else:
+                n_peaks = len(self.matched_int_library) + len(
+                    self.unmatched_int_library
+                )
             return len(self.matched_mz_library) / n_peaks
         else:
             return 0.0
@@ -150,6 +159,11 @@ class SpectrumSimilarityCalculator:
         float
             The fraction of explained intensity in the query spectrum.
         """
+        if self._top:
+            raise NotImplementedError(
+                "The fraction of explained query intensity is not defined when"
+                " filtering by the top intensity library peaks"
+            )
         if self.matched_int_query is not None:
             return self.matched_int_query.sum() / self.int_query.sum()
         else:
@@ -165,7 +179,14 @@ class SpectrumSimilarityCalculator:
             The fraction of explained intensity in the library spectrum.
         """
         if self.matched_int_library is not None:
-            return self.matched_int_library.sum() / self.int_library.sum()
+            if not self._top:
+                total_int = self.int_library.sum()
+            else:
+                total_int = (
+                    self.matched_int_library.sum()
+                    + self.unmatched_int_library.sum()
+                )
+            return self.matched_int_library.sum() / total_int
         else:
             return 0.0
 
