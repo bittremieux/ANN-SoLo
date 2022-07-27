@@ -28,6 +28,7 @@ class SpectrumSimilarityCalculator:
         self.int_query = ssm.query_spectrum.intensity
         self.mz_library = ssm.library_spectrum.mz
         self.int_library = ssm.library_spectrum.intensity
+        self._recalculate_norm = False
         if len(ssm.peak_matches) > 0:
             self.matched_mz_query = self.mz_query[ssm.peak_matches[:, 0]]
             self.matched_int_query = self.int_query[ssm.peak_matches[:, 0]]
@@ -61,6 +62,7 @@ class SpectrumSimilarityCalculator:
                 self.unmatched_int_library = self.unmatched_int_library[
                     mask_unmatched
                 ]
+                self._recalculate_norm = True
         else:
             self.matched_mz_query, self.matched_int_query = None, None
             self.matched_mz_library, self.matched_int_library = None, None
@@ -80,7 +82,15 @@ class SpectrumSimilarityCalculator:
             The cosine similarity between the two spectra.
         """
         if self.matched_int_query is not None:
-            return np.dot(self.matched_int_query, self.matched_int_library)
+            if self._recalculate_norm:
+                norm = np.linalg.norm(self.matched_int_query) * np.linalg.norm(
+                    self.matched_int_library
+                )
+            else:
+                norm = 1.0
+            return (
+                np.dot(self.matched_int_query, self.matched_int_library) / norm
+            )
         else:
             return 0.0
 
@@ -370,7 +380,9 @@ class SpectrumSimilarityCalculator:
         # unmatched intensities in the query and library spectrum.
         if self.matched_int_query is not None:
             return np.sqrt(
-                ((self.matched_int_query - self.matched_int_library) ** 2).sum()
+                (
+                    (self.matched_int_query - self.matched_int_library) ** 2
+                ).sum()
                 + (self.unmatched_int_query**2).sum()
                 + (self.unmatched_int_library**2).sum()
             )
