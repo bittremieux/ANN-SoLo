@@ -233,26 +233,25 @@ class SpectrumSimilarityCalculator:
         float
             The hypergeometric score of peak matches between the two spectra.
         """
-        if self.matched_mz_library is not None:
-            n_library_peaks = len(self.mz_library)
-            n_matched_peaks = len(self.matched_mz_library)
-            n_peak_bins, _, _ = spectrum.get_dim(
-                min_mz, max_mz, fragment_mz_tol
-            )
-            return sum(
-                [
-                    (
-                        scipy.special.comb(n_library_peaks, i)
-                        * scipy.special.comb(
-                            n_peak_bins - n_library_peaks, n_library_peaks - i
-                        )
+        n_library_peaks = len(self.mz_library)
+        n_matched_peaks = (
+            len(self.matched_mz_library)
+            if self.matched_mz_library is not None
+            else 0
+        )
+        n_peak_bins, _, _ = spectrum.get_dim(min_mz, max_mz, fragment_mz_tol)
+        return sum(
+            [
+                (
+                    scipy.special.comb(n_library_peaks, i)
+                    * scipy.special.comb(
+                        n_peak_bins - n_library_peaks, n_library_peaks - i
                     )
-                    / scipy.special.comb(n_peak_bins, n_library_peaks)
-                    for i in range(n_matched_peaks + 1, n_library_peaks)
-                ]
-            )
-        else:
-            return 0.0  # FIXME
+                )
+                / scipy.special.comb(n_peak_bins, n_library_peaks)
+                for i in range(n_matched_peaks + 1, n_library_peaks)
+            ]
+        )
 
     def kendalltau(self) -> float:
         """
