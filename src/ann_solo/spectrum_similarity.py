@@ -270,12 +270,12 @@ class SpectrumSimilarityCalculator:
         float
             The Kendall-Tau score of peak matches between the two spectra.
         """
-        if self.matched_int_query is not None:
-            return scipy.stats.kendalltau(
-                self.matched_int_query, self.matched_int_library
-            )[0]
-        else:
-            return 0.0  # TODO
+        kendalltau = scipy.stats.kendalltau(
+            self.matched_int_query, self.matched_int_library
+        )[0]
+        # The Kendall Tau correlation is undefined for constant input
+        # arrays (in the degenerate case consisting of only 0 or 1 elements).
+        return kendalltau if not np.isnan(kendalltau) else -1.0
 
     def ms_for_id_v1(self) -> float:
         """
