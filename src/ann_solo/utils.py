@@ -301,7 +301,6 @@ def _compute_ssm_features(
         "cosine": [],
         "cosine_top5": [],
         "n_matched_peaks": [],
-        "n_matched_peaks_top5": [],
         "frac_n_peaks_query": [],
         "frac_n_peaks_lib": [],
         "frac_n_peaks_lib_top5": [],
@@ -401,7 +400,6 @@ def _compute_ssm_features(
         features["cosine"].append(sim_calc.cosine())
         features["cosine_top5"].append(sim_calc_top.cosine())
         features["n_matched_peaks"].append(sim_calc.n_matched_peaks())
-        features["n_matched_peaks_top5"].append(sim_calc_top.n_matched_peaks())
         features["frac_n_peaks_query"].append(sim_calc.frac_n_peaks_query())
         features["frac_n_peaks_lib"].append(sim_calc.frac_n_peaks_library())
         features["frac_n_peaks_lib_top5"].append(
