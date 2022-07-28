@@ -121,7 +121,8 @@ def score_ssms(
     #     learning.
     #   - Features are preprocessed by standardizing them, removing
     #     zero-variance features, and removing highly correlated features.
-    #   - We perform minimal tuning of TODO hyperparameters.
+    #   - We perform minimal tuning of the class weights and the random forest
+    #     tree depth.
     if model is None:
         logging.debug("Calculate q-values based on the cosine similarity")
         # Calculate q-values based on the cosine similarity.
