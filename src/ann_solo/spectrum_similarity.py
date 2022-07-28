@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 
 import numpy as np
@@ -629,19 +630,14 @@ class SpectrumSimilarityCalculator:
             The Scribe fragmentation accuracy between both spectra.
         """
         if self.matched_int_query is not None:
-            return np.log(
-                1
-                / max(
-                    0.001,  # Guard against infinity for identical spectra.
-                    np.sum(
-                        [
-                            (self.matched_int_query - self.matched_int_library)
-                            ** 2,
-                            self.unmatched_int_library**2,
-                        ]
-                    ),
-                ),
-            )
+            denominator = (
+                (self.matched_int_query - self.matched_int_library) ** 2
+            ).sum() + (self.unmatched_int_library**2).sum()
+            # Guard against divide by zero for identical spectra.
+            if not math.isclose(denominator, 0.0):
+                return np.log(1 / denominator)
+            else:
+                return 10.0
         else:
             return 0.0
 
