@@ -597,20 +597,23 @@ class SpectrumSimilarityCalculator:
         float
             The Ruzicka similarity between the two spectra.
         """
-        numerator = np.sum(
-            np.minimum(self.matched_int_query, self.matched_int_library)
-        )
-        denominator = np.sum(
-            [
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Ruzicka distance is not defined when filtering by the "
+                "top intensity library peaks"
+            )
+        elif self.matched_int_query is not None:
+            return np.sum(
+                np.minimum(self.matched_int_query, self.matched_int_library)
+            ) / (
                 np.maximum(
-                    self.matched_int_query,
-                    self.matched_int_library,
-                ),
-                self.unmatched_int_query,
-                self.unmatched_int_library,
-            ]
-        )
-        return numerator / denominator
+                    self.matched_int_query, self.matched_int_library
+                ).sum()
+                + self.unmatched_int_query.sum()
+                + self.unmatched_int_library.sum()
+            )
+        else:
+            return 0.0
 
     def scribe_fragment_acc(self) -> float:
         """
