@@ -570,21 +570,23 @@ class SpectrumSimilarityCalculator:
         float
             The Canberra distance between the two spectra.
         """
-        numerator = np.asarray(
-            [
-                (self.matched_int_query - self.matched_int_library).abs(),
-                self.unmatched_int_query.abs(),
-                self.unmatched_int_library.abs(),
-            ]
-        )
-        denominator = np.asarray(
-            [
-                self.matched_int_query.abs() + self.matched_int_library.abs(),
-                self.unmatched_int_query.abs(),
-                self.unmatched_int_library.abs(),
-            ]
-        )
-        return (numerator / denominator).sum()
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Canberra distance is not defined when filtering by the "
+                "top intensity library peaks"
+            )
+        elif self.matched_int_query is not None:
+            return (
+                np.nan_to_num(
+                    np.abs(self.matched_int_query - self.matched_int_library)
+                    / (self.matched_int_query + self.matched_int_library),
+                    copy=False,
+                ).sum()
+                + np.count_nonzero(self.unmatched_int_query)
+                + np.count_nonzero(self.unmatched_int_library)
+            )
+        else:
+            return np.inf
 
     def ruzicka(self) -> float:
         """
