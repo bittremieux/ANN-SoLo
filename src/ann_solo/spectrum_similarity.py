@@ -28,7 +28,7 @@ class SpectrumSimilarityCalculator:
         self.int_query = ssm.query_spectrum.intensity
         self.mz_library = ssm.library_spectrum.mz
         self.int_library = ssm.library_spectrum.intensity
-        self._top = top is not None
+        self._top = top
         self._recalculate_norm = False
         if len(ssm.peak_matches) > 0:
             self.matched_mz_query = self.mz_query[ssm.peak_matches[:, 0]]
@@ -46,7 +46,7 @@ class SpectrumSimilarityCalculator:
             self.unmatched_int_library = self.int_library[library_unmatched_i]
             # Filter the peak matches by the `top` highest intensity peaks in
             # the library spectrum.
-            if self._top:
+            if self._top is not None:
                 library_top_i = np.argpartition(self.int_library, -top)[-top:]
                 mask = np.isin(
                     ssm.peak_matches[:, 1], library_top_i, assume_unique=True
@@ -119,7 +119,7 @@ class SpectrumSimilarityCalculator:
         float
             The fraction of shared peaks in the query spectrum.
         """
-        if self._top:
+        if self._top is not None:
             raise NotImplementedError(
                 "The fraction of shared query peaks is not defined when "
                 "filtering by the top intensity library peaks"
@@ -140,7 +140,7 @@ class SpectrumSimilarityCalculator:
             The fraction of shared peaks in the library spectrum.
         """
         if self.matched_mz_library is not None:
-            if not self._top:
+            if self._top is None:
                 n_peaks = len(self.mz_library)
             else:
                 n_peaks = len(self.matched_int_library) + len(
@@ -179,7 +179,7 @@ class SpectrumSimilarityCalculator:
             The fraction of explained intensity in the library spectrum.
         """
         if self.matched_int_library is not None:
-            if not self._top:
+            if self._top is None:
                 total_int = self.int_library.sum()
             else:
                 total_int = (
@@ -267,7 +267,15 @@ class SpectrumSimilarityCalculator:
         float
             The hypergeometric score of peak matches between the two spectra.
         """
-        n_library_peaks = len(self.mz_library)
+        if self._top is not None:
+            if self.matched_int_library is not None:
+                n_library_peaks = len(self.matched_int_library) + len(
+                    self.unmatched_int_library
+                )
+            else:
+                n_library_peaks = self._top
+        else:
+            n_library_peaks = len(self.int_library)
         n_matched_peaks = (
             len(self.matched_mz_library)
             if self.matched_mz_library is not None
