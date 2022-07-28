@@ -346,16 +346,25 @@ class SpectrumSimilarityCalculator:
             The MSforID (v1) similarity between the two spectra.
         """
         if self.matched_int_query is not None:
-            return len(self.matched_int_query) ** 4 / (
-                len(self.mz_query)
-                * len(self.mz_library)
-                * max(
-                    np.abs(
-                        self.matched_int_query - self.matched_int_library
-                    ).sum(),
-                    np.finfo(float).eps,
-                )
-                ** 0.25
+            if self._top is None:
+                n_peaks_query = len(self.mz_query)
+                n_peaks_library = len(self.mz_library)
+            else:
+                n_peaks_query = n_peaks_library = self._top
+            # Guard against extreme values for identical spectra.
+            return min(
+                len(self.matched_int_query) ** 4 / (
+                    n_peaks_query
+                    * n_peaks_library
+                    * max(
+                        np.abs(
+                            self.matched_int_query - self.matched_int_library
+                        ).sum(),
+                        np.finfo(float).eps,
+                    )
+                    ** 0.25
+                ),
+                1000.0,
             )
         else:
             return 0.0
