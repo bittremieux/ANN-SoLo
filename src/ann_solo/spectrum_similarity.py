@@ -591,7 +591,7 @@ class SpectrumSimilarityCalculator:
 
     def ruzicka(self) -> float:
         """
-        Compute the Ruzicka similarity.
+        Get the Ruzicka similarity.
 
         Returns
         -------
@@ -618,7 +618,7 @@ class SpectrumSimilarityCalculator:
 
     def scribe_fragment_acc(self) -> float:
         """
-        Get the Scribe fragmentation accuracy between two spectra.
+        Get the Scribe fragmentation accuracy.
 
         For the original description, see:
         Searle, B. C. et al. Scribe: next-generation library searching for DDA
@@ -627,7 +627,7 @@ class SpectrumSimilarityCalculator:
         Returns
         -------
         float
-            The Scribe fragmentation accuracy between both spectra.
+            The Scribe fragmentation accuracy between the two spectra.
         """
         if self.matched_int_query is not None:
             denominator = (
@@ -643,7 +643,7 @@ class SpectrumSimilarityCalculator:
 
     def entropy(self, weighted: bool = False) -> float:
         """
-        Get the entropy between.
+        Get the spectral entropy.
 
         For the original description, see:
         Li, Y. et al. Spectral entropy outperforms MS/MS dot product similarity
@@ -658,25 +658,37 @@ class SpectrumSimilarityCalculator:
         Returns
         -------
         float
-            The entropy between the two spectra.
+            The spectral entropy similarity between the two spectra.
         """
-        # Entropy of the individual spectra.
-        query_entropy = _spectrum_entropy(self.int_query, weighted)
-        library_entropy = _spectrum_entropy(self.int_library, weighted)
+        if self._top is not None:
+            raise NotImplementedError(
+                "The spectral entropy is not defined when filtering by the "
+                "top intensity library peaks"
+            )
+        elif self.matched_int_query is not None:
+            # Entropy of the individual spectra.
+            query_entropy = _spectrum_entropy(self.int_query, weighted)
+            library_entropy = _spectrum_entropy(self.int_library, weighted)
+            # Entropy of the merged spectrum.
+            int_merged = (
+                np.hstack(
+                    [
+                        # Element-wise summed intensities of the matched peaks.
+                        self.matched_int_query + self.matched_int_library,
+                        # Intensities of the unmatched query and library peaks.
+                        self.unmatched_int_query,
+                        self.unmatched_int_library,
+                    ]
+                )
+                / 2
+            )
+            merged_entropy = _spectrum_entropy(int_merged, weighted)
 
-        # Entropy of the merged spectra.
-        int_merged = np.hstack(
-            [
-                # Element-wise summed intensities of the matched peaks.
-                self.matched_int_query + self.matched_int_library,
-                # Intensities of the unmatched query and library peaks.
-                self.unmatched_int_query,
-                self.unmatched_int_library,
-            ]
-        )
-        merged_entropy = _spectrum_entropy(int_merged, weighted)
-
-        return 2 * merged_entropy - query_entropy - library_entropy
+            return 1 - (
+                2 * merged_entropy - query_entropy - library_entropy
+            ) / np.log(4)
+        else:
+            return 0.0
 
 
 def _spectrum_entropy(
