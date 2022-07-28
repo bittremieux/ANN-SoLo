@@ -124,7 +124,7 @@ class SpectrumSimilarityCalculator:
                 "The fraction of shared query peaks is not defined when "
                 "filtering by the top intensity library peaks"
             )
-        if self.matched_mz_query is not None:
+        elif self.matched_mz_query is not None:
             return len(self.matched_mz_query) / len(self.mz_query)
         else:
             return 0.0
@@ -164,7 +164,7 @@ class SpectrumSimilarityCalculator:
                 "The fraction of explained query intensity is not defined when"
                 " filtering by the top intensity library peaks"
             )
-        if self.matched_int_query is not None:
+        elif self.matched_int_query is not None:
             return self.matched_int_query.sum() / self.int_query.sum()
         else:
             return 0.0
@@ -353,7 +353,8 @@ class SpectrumSimilarityCalculator:
                 n_peaks_query = n_peaks_library = self._top
             # Guard against extreme values for identical spectra.
             return min(
-                len(self.matched_int_query) ** 4 / (
+                len(self.matched_int_query) ** 4
+                / (
                     n_peaks_query
                     * n_peaks_library
                     * max(
@@ -385,7 +386,12 @@ class SpectrumSimilarityCalculator:
         float
             The MSforID (v2) similarity between the two spectra.
         """
-        if self.matched_int_query is not None:
+        if self._top is not None:
+            raise NotImplementedError(
+                "The MSforID (v2) similarity is not defined when filtering"
+                " by the top intensity library peaks"
+            )
+        elif self.matched_int_query is not None:
             return (
                 len(self.matched_int_query) ** 4
                 * (self.int_query.sum() + 2 * self.int_library.sum()) ** 1.25
