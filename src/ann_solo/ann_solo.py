@@ -2,6 +2,10 @@ import logging
 import sys
 from typing import List, Union
 
+# Initialize all random seeds before importing any packages.
+from ann_solo import rndm
+rndm.set_seeds()
+
 from ann_solo import spectral_library
 from ann_solo import writer
 from ann_solo.config import config
