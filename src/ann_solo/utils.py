@@ -294,10 +294,13 @@ def _compute_ssm_features(
         "cosine": [],
         "cosine_top5": [],
         "n_matched_peaks": [],
+        "n_matched_peaks_top5": [],
         "frac_n_peaks_query": [],
         "frac_n_peaks_lib": [],
+        "frac_n_peaks_lib_top5": [],
         "frac_int_query": [],
         "frac_int_lib": [],
+        "frac_int_lib_top5": [],
         "mse_mz": [],
         "mse_mz_top5": [],
         "mse_int": [],
@@ -388,10 +391,17 @@ def _compute_ssm_features(
         features["cosine"].append(sim_calc.cosine())
         features["cosine_top5"].append(sim_calc_top.cosine())
         features["n_matched_peaks"].append(sim_calc.n_matched_peaks())
+        features["n_matched_peaks_top5"].append(sim_calc_top.n_matched_peaks())
         features["frac_n_peaks_query"].append(sim_calc.frac_n_peaks_query())
         features["frac_n_peaks_lib"].append(sim_calc.frac_n_peaks_library())
+        features["frac_n_peaks_lib_top5"].append(
+            sim_calc_top.frac_n_peaks_library()
+        )
         features["frac_int_query"].append(sim_calc.frac_intensity_query())
         features["frac_int_lib"].append(sim_calc.frac_intensity_library())
+        features["frac_int_lib_top5"].append(
+            sim_calc_top.frac_intensity_library()
+        )
         features["mse_mz"].append(sim_calc.mean_squared_error("mz"))
         features["mse_mz_top5"].append(sim_calc_top.mean_squared_error("mz"))
         features["mse_int"].append(sim_calc.mean_squared_error("intensity"))
@@ -406,7 +416,7 @@ def _compute_ssm_features(
             sim_calc.hypergeometric_score(
                 min_mz=config.min_mz,
                 max_mz=config.max_mz,
-                bin_size=config.bin_size,
+                fragment_mz_tol=config.bin_size,
             )
         )
         features["kendalltau"].append(sim_calc.kendalltau())
