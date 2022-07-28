@@ -541,21 +541,25 @@ class SpectrumSimilarityCalculator:
         float
             The Bray-Curtis distance between the two spectra.
         """
-        numerator = np.sum(
-            [
-                (self.matched_int_query - self.matched_int_library).abs(),
-                self.unmatched_int_query.abs(),
-                self.unmatched_int_library.abs(),
-            ]
-        )
-        denominator = np.sum(
-            [
-                (self.matched_int_query + self.matched_int_library).abs(),
-                self.unmatched_int_query.abs(),
-                self.unmatched_int_library.abs(),
-            ]
-        )
-        return numerator / denominator
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Bray-Curtis distance is not defined when filtering by "
+                "the top intensity library peaks"
+            )
+        elif self.matched_int_query is not None:
+            unmatched_int_query_sum = self.unmatched_int_query.sum()
+            unmatched_int_library_sum = self.unmatched_int_library.sum()
+            return (
+                np.abs(self.matched_int_query - self.matched_int_library).sum()
+                + unmatched_int_query_sum
+                + unmatched_int_library_sum
+            ) / (
+                np.abs(self.matched_int_query + self.matched_int_library).sum()
+                + unmatched_int_query_sum
+                + unmatched_int_library_sum
+            )
+        else:
+            return 1.0
 
     def canberra(self) -> float:
         """
