@@ -265,7 +265,8 @@ class SpectrumSimilarityCalculator:
         Returns
         -------
         float
-            The hypergeometric score of peak matches between the two spectra.
+            The negative logarithm of the hypergeometric score of peak matches
+            between the two spectra.
         """
         if self._top is not None:
             if self.matched_int_library is not None:
@@ -282,17 +283,26 @@ class SpectrumSimilarityCalculator:
             else 0
         )
         n_peak_bins, _, _ = spectrum.get_dim(min_mz, max_mz, fragment_mz_tol)
-        return sum(
-            [
-                (
-                    scipy.special.comb(n_library_peaks, i)
-                    * scipy.special.comb(
-                        n_peak_bins - n_library_peaks, n_library_peaks - i
-                    )
+        # Guard against infinity for identical spectra.
+        return min(
+            -np.log(
+                sum(
+                    [
+                        (
+                            scipy.special.comb(n_library_peaks, i)
+                            * scipy.special.comb(
+                                n_peak_bins - n_library_peaks,
+                                n_library_peaks - i,
+                            )
+                        )
+                        / scipy.special.comb(n_peak_bins, n_library_peaks)
+                        for i in range(
+                            n_matched_peaks + 1, n_library_peaks + 1
+                        )
+                    ]
                 )
-                / scipy.special.comb(n_peak_bins, n_library_peaks)
-                for i in range(n_matched_peaks + 1, n_library_peaks)
-            ]
+            ),
+            100.0,
         )
 
     def kendalltau(self) -> float:
