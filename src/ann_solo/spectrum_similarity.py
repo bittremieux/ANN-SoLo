@@ -458,13 +458,17 @@ class SpectrumSimilarityCalculator:
         """
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        if self.matched_int_query is not None:
-            return np.maximum.reduce(
-                [
-                    np.abs(self.matched_int_query - self.matched_int_library),
-                    self.unmatched_int_query,
-                    self.unmatched_int_library,
-                ]
+        elif self.matched_int_query is not None:
+            return max(
+                np.abs(
+                    self.matched_int_query - self.matched_int_library
+                ).max(),
+                self.unmatched_int_query.max()
+                if len(self.unmatched_int_query) > 0
+                else 0.0,
+                self.unmatched_int_library.max()
+                if len(self.unmatched_int_library) > 0
+                else 0.0,
             )
         else:
             return np.inf
