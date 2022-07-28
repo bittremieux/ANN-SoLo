@@ -102,6 +102,12 @@ def score_ssms(
     )
     # Create a Dataset with SSM features.
     features = pd.DataFrame(_compute_ssm_features(ssms))
+    # Remove features with invalid values (NaN or infinity).
+    columns_numeric = features.select_dtypes(include=np.number).columns
+    columns_invalid = columns_numeric[
+        ~np.isfinite(features[columns_numeric].values).all(axis=0)
+    ]
+    features.drop(columns=columns_invalid, inplace=True)
     features["group"] = _get_ssm_groups(ssms, min_group_size) if grouped else 0
     dataset = mokapot.dataset.LinearPsmDataset(
         features,
