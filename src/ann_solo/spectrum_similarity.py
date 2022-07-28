@@ -414,9 +414,14 @@ class SpectrumSimilarityCalculator:
         float
             The Manhattan distance between the two spectra.
         """
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Manhattan distance is not defined when filtering by the "
+                "top intensity library peaks"
+            )
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        if self.matched_int_query is not None:
+        elif self.matched_int_query is not None:
             return (
                 np.abs(self.matched_int_query - self.matched_int_library).sum()
                 + self.unmatched_int_query.sum()
@@ -434,9 +439,14 @@ class SpectrumSimilarityCalculator:
         float
             The Euclidean distance between the two spectra.
         """
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Euclidean distance is not defined when filtering by the "
+                "top intensity library peaks"
+            )
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
-        if self.matched_int_query is not None:
+        elif self.matched_int_query is not None:
             return np.sqrt(
                 (
                     (self.matched_int_query - self.matched_int_library) ** 2
@@ -456,6 +466,11 @@ class SpectrumSimilarityCalculator:
         float
             The Chebyshev distance between the two spectra.
         """
+        if self._top is not None:
+            raise NotImplementedError(
+                "The Chebyshev distance is not defined when filtering by the "
+                "top intensity library peaks"
+            )
         # Distance between the intensities of matching peaks, as well as the
         # unmatched intensities in the query and library spectrum.
         elif self.matched_int_query is not None:
