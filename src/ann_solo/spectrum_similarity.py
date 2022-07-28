@@ -1,4 +1,5 @@
 import math
+import warnings
 from typing import Optional
 
 import numpy as np
@@ -508,7 +509,12 @@ class SpectrumSimilarityCalculator:
                 *self.matched_int_library,
                 *self.unmatched_int_library,
             ]
-            return scipy.stats.pearsonr(int_query, int_library)[0]
+            with warnings.catch_warnings():
+                warnings.simplefilter(
+                    "ignore", scipy.stats.PearsonRConstantInputWarning
+                )
+                corr = scipy.stats.pearsonr(int_query, int_library)[0]
+            return corr if not np.isnan(corr) else 0.0
         else:
             return 0.0
 
@@ -530,7 +536,12 @@ class SpectrumSimilarityCalculator:
                 *self.matched_int_library,
                 *self.unmatched_int_library,
             ]
-            return scipy.stats.spearmanr(int_query, int_library)[0]
+            with warnings.catch_warnings():
+                warnings.simplefilter(
+                    "ignore", scipy.stats.SpearmanRConstantInputWarning
+                )
+                corr = scipy.stats.spearmanr(int_query, int_library)[0]
+            return corr if not np.isnan(corr) else 0.0
         else:
             return 0.0
 
