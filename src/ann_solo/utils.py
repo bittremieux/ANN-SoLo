@@ -335,6 +335,9 @@ def _compute_ssm_features(
         "is_target": [],
     }
     for i, ssm in enumerate(ssms):
+        if len(ssm.peak_matches) == 0:
+            continue
+
         sim_calc = sim.SpectrumSimilarityCalculator(ssm)
         sim_calc_top = sim.SpectrumSimilarityCalculator(ssm, 5)
 
