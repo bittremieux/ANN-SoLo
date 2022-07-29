@@ -146,6 +146,7 @@ class SpectralLibrary:
                                   ['charge'][charge]['id']), config.hash_len),
                              np.float32)
             for charge in charges}
+
         i = {charge: 0 for charge in charge_vectors.keys()}
         for lib_spectrum, _ in tqdm.tqdm(
                 self._library_reader.get_all_spectra(),
