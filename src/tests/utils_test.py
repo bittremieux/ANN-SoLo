@@ -8,7 +8,7 @@ from ann_solo import utils
 
 
 @pytest.fixture
-def ssms_list_without_rescore():
+def ssms_set_without_rescore():
     # MS2PIP (HCD v20210416) simulated spectrum of HPYLEDR/2.
     mz = np.asarray(
         [
@@ -39,16 +39,18 @@ def ssms_list_without_rescore():
             0.01661951,  # y3
             0.05734070,  # y4
             0.22102276,  # y5
-            0.77388125,  # y6
+            0.17388125,  # y6
         ]
     )
     peak_matches = np.asarray([(i, i) for i in range(len(mz))])
+    intensity /= np.linalg.norm(intensity)
     spec1 = sus.MsmsSpectrum("HPYLEDR", 465.227, 2, mz, intensity)
     intensity2 = np.copy(intensity)
     mz2 = np.copy(mz)
     ssms = []
     for index,value in enumerate(intensity2):
-        intensity2[index] = value + index * 0.02
+        intensity2[index] = value + index * 0.03
+        intensity2 /= np.linalg.norm(intensity2)
         spec2 = sus.MsmsSpectrum(
             "HPYLEDR", 465.227, 2, mz2, intensity2
         )
@@ -61,13 +63,13 @@ def ssms_list_without_rescore():
 
     return utils.score_ssms(
             ssms,
-            0.01,
+            0.33,
             None
         )
 
 
 def test_score_ssms(
-        ssms_list_without_rescore,
+        ssms_set_without_rescore,
 ):
     #This function tests mainly the confidence assignment module
     #Integrated within the rescoring module
@@ -86,6 +88,7 @@ def test_score_ssms(
         0.71,
         0.86
     ]
-    q_value_calculated = [ssm.q for ssm in ssms_list_without_rescore]
+    q_value_calculated = [np.around(ssm.q,2) for ssm in
+                          ssms_set_without_rescore]
     assert q_value_calculated == q_value_expected
 
