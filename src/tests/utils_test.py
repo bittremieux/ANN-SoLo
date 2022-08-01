@@ -53,6 +53,7 @@ def ssms_list_without_rescore():
             "HPYLEDR", 465.227, 2, mz2, intensity2
         )
         ssm = spectrum.SpectrumSpectrumMatch(spec1, spec2, peak_matches)
+        ssm.library_spectrum.peptide = "HPYLEDR"
         ssm.library_spectrum.is_decoy = False
         if index in [3, 4, 8, 9, 11]:
             ssm.library_spectrum.is_decoy = True
