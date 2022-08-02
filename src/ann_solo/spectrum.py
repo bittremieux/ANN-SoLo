@@ -19,7 +19,7 @@ def _check_spectrum_valid(spectrum_mz: np.ndarray, min_peaks: int,
     Parameters
     ----------
     spectrum_mz : np.ndarray
-        M/z peaks of the sspectrum whose quality is checked.
+        M/z peaks of the spectrum whose quality is checked.
     min_peaks : int
         The minimum number of peaks for a spectrum to be valid.
     min_mz_range : float

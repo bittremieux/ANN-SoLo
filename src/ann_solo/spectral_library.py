@@ -103,8 +103,9 @@ class SpectralLibrary:
                            self._library_reader.spec_info['charge'].items()
                            if len(charge_info['id']) >= config.num_list]
             for charge in sorted(ann_charges):
-                self._ann_filenames[charge] = \
+                self._ann_filenames[charge] = (
                     f'{base_filename}_{charge}.idxann'
+                )
                 if (not verify_file_existence or
                         not os.path.isfile(self._ann_filenames[charge])):
                     create_ann_charges.append(charge)
