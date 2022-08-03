@@ -1,4 +1,4 @@
-import pytest
+import unittest.mock
 
 import numpy as np
 import spectrum_utils.spectrum as sus
@@ -7,8 +7,10 @@ from ann_solo import spectrum
 from ann_solo import utils
 
 
-@pytest.fixture
-def ssms_set_without_rescore():
+def test_score_ssms():
+    # This function tests mainly the confidence assignment module integrated
+    # within the rescoring module which invokes the
+    # SpectrumSimilarityCalculator module.
     # MS2PIP (HCD v20210416) simulated spectrum of HPYLEDR/2.
     mz = np.asarray(
         [
@@ -39,56 +41,40 @@ def ssms_set_without_rescore():
             0.01661951,  # y3
             0.05734070,  # y4
             0.22102276,  # y5
-            0.17388125,  # y6
+            0.77388125,  # y6
         ]
     )
     peak_matches = np.asarray([(i, i) for i in range(len(mz))])
     intensity /= np.linalg.norm(intensity)
     spec1 = sus.MsmsSpectrum("HPYLEDR", 465.227, 2, mz, intensity)
-    intensity2 = np.copy(intensity)
-    mz2 = np.copy(mz)
     ssms = []
-    for index,value in enumerate(intensity2):
-        intensity2[index] = value + index * 0.03
-        intensity2 /= np.linalg.norm(intensity2)
-        spec2 = sus.MsmsSpectrum(
-            "HPYLEDR", 465.227, 2, mz2, intensity2
-        )
-        ssm = spectrum.SpectrumSpectrumMatch(spec1, spec2, peak_matches)
-        ssm.library_spectrum.peptide = "HPYLEDR"
-        ssm.library_spectrum.is_decoy = False
-        if index in [3, 4, 8, 9, 11]:
-            ssm.library_spectrum.is_decoy = True
-        ssms.append(ssm)
+    for i in range(12):
+        intensity_new = np.copy(intensity)
+        intensity_new[-1] *= 1 + i / 100
+        intensity_new /= np.linalg.norm(intensity_new)
+        spec2 = sus.MsmsSpectrum("HPYLEDR", 465.227, 2, mz, intensity_new)
+        spec2.peptide = "HPYLEDR"
+        spec2.is_decoy = i in [3, 4, 8, 9, 11]
+        ssms.append(spectrum.SpectrumSpectrumMatch(spec1, spec2, peak_matches))
 
-    return utils.score_ssms(
-            ssms,
-            0.33,
-            None
-        )
-
-
-def test_score_ssms(
-        ssms_set_without_rescore,
-):
-    #This function tests mainly the confidence assignment module
-    #Integrated within the rescoring module
-    #Which invokes the SpectrumSimilarityCalculator module
-    q_value_expected = [
-        0.33,
-        0.33,
-        0.33,
-        0.6,
-        0.6,
-        0.6,
-        0.6,
-        0.66,
-        0.66,
-        0.71,
-        0.71,
-        0.86
+    # Target SSMs get actual q-values, decoy SSMs get NaN q-value.
+    q_values = [
+        1 / 3,
+        1 / 3,
+        1 / 3,
+        np.nan,
+        np.nan,
+        1 / 2,
+        1 / 2,
+        1 / 2,
+        np.nan,
+        np.nan,
+        5 / 7,
+        np.nan,
     ]
-    q_value_calculated = [np.around(ssm.q,2) for ssm in
-                          ssms_set_without_rescore]
-    assert q_value_calculated == q_value_expected
-
+    with unittest.mock.patch(
+        "ann_solo.config.config._namespace",
+        {"min_mz": 11, "max_mz": 2010, "bin_size": 0.04},
+    ) as _:
+        q_values_calc = [ssm.q for ssm in utils.score_ssms(ssms, 0.33, None)]
+    np.testing.assert_array_equal(q_values, q_values_calc)
