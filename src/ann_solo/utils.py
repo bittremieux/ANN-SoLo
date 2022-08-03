@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterator, List, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 import mokapot
 import numpy as np
@@ -69,7 +69,7 @@ class CorrelationThreshold(SelectorMixin, BaseEstimator):
 def score_ssms(
     ssms: List[SpectrumSpectrumMatch],
     fdr: float,
-    model: str,
+    model: Optional[str],
     grouped: bool = False,
     min_group_size: int = 100,
 ) -> List[SpectrumSpectrumMatch]:
@@ -82,7 +82,7 @@ def score_ssms(
         SSMs to be scored.
     fdr : float
         The minimum FDR threshold to accept target SSMs.
-    model : str
+    model : Optional[str]
         The type of machine learning model to use. Can be "rf" for a random
         forest classifier, "svm" for a Percolator-like linear SVM, or `None`
         to disable semi-supervised learning.
