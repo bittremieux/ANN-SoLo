@@ -103,7 +103,9 @@ class SpectralLibrary:
                            self._library_reader.spec_info['charge'].items()
                            if len(charge_info['id']) >= config.num_list]
             for charge in sorted(ann_charges):
-                self._ann_filenames[charge] = f'{base_filename}_{charge}.idxann'
+                self._ann_filenames[charge] = (
+                    f'{base_filename}_{charge}.idxann'
+                )
                 if (not verify_file_existence or
                         not os.path.isfile(self._ann_filenames[charge])):
                     create_ann_charges.append(charge)
@@ -172,7 +174,9 @@ class SpectralLibrary:
             ann_index = faiss.IndexIVFFlat(quantizer, config.hash_len,
                                            config.num_list,
                                            faiss.METRIC_INNER_PRODUCT)
+            # noinspection PyArgumentList
             ann_index.train(vectors)
+            # noinspection PyArgumentList
             ann_index.add(vectors)
             faiss.write_index(ann_index, self._ann_filenames[charge])
 
@@ -205,8 +209,7 @@ class SpectralLibrary:
         logging.info('Process file %s', query_filename)
 
         # Read all spectra in the query file and
-        # split based on their precursor charge.
-        logging.debug('Read all query spectra')
+        # split based on their precursor charge
         query_spectra = collections.defaultdict(list)
         for query_spectrum in tqdm.tqdm(
                 reader.read_mgf(query_filename), desc='Query spectra read',
@@ -226,25 +229,35 @@ class SpectralLibrary:
                      .append(query_spectrum_charge))
 
         # Identify all query spectra.
-        logging.debug('Process all query spectra')
         identifications = {}
+        do_cascade_open = (
+            config.precursor_tolerance_mass_open is not None and
+            config.precursor_tolerance_mode_open is not None
+        )
         # Cascade level 1: standard search.
+        n_spectra_identified = 0
         for ssm in self._search_cascade(query_spectra, 'std'):
-            identifications[ssm.query_identifier] = ssm
+            # Only retain confidently identified spectra (below FDR threshold)
+            # if we're doing a cascade (open) search.
+            if not do_cascade_open or ssm.q < config.fdr:
+                identifications[ssm.query_identifier] = ssm
+                n_spectra_identified += ssm.q < config.fdr
         logging.info('%d spectra identified after the standard search',
-                     len(identifications))
-        if (config.precursor_tolerance_mass_open is not None and
-                config.precursor_tolerance_mode_open is not None):
+                     n_spectra_identified)
+        if do_cascade_open:
             # Collect the remaining query spectra for the second cascade level.
             for charge, query_spectra_charge in query_spectra.items():
                 query_spectra[charge] = [
                     spectrum for spectrum in query_spectra_charge
                     if spectrum.identifier not in identifications]
             # Cascade level 2: open search.
+            # No FDR filtering necessary here to have an entry for each query
+            # spectrum in the output.
             for ssm in self._search_cascade(query_spectra, 'open'):
                 identifications[ssm.query_identifier] = ssm
+                n_spectra_identified += ssm.q < config.fdr
             logging.info('%d spectra identified after the open search',
-                         len(identifications))
+                         n_spectra_identified)
 
         return list(identifications.values())
 
@@ -270,20 +283,23 @@ class SpectralLibrary:
             An iterator of spectrum-spectrum matches that are below the FDR
             threshold (specified in the config).
         """
+        num_spectra = sum([len(q) for q in query_spectra.values()])
+
         if mode == 'std':
-            logging.debug('Identify the query spectra using a standard search '
+            logging.debug('Process %d query spectra using a standard search '
                           '(Δm = %s %s)',
+                          num_spectra,
                           config.precursor_tolerance_mass,
                           config.precursor_tolerance_mode)
         elif mode == 'open':
-            logging.debug('Identify the query spectra using an open search '
+            logging.debug('Process %d query spectra using an open search '
                           '(Δm = %s %s)',
+                          num_spectra,
                           config.precursor_tolerance_mass_open,
                           config.precursor_tolerance_mode_open)
 
         ssms = {}
         batch_size = config.batch_size
-        num_spectra = sum([len(q) for q in query_spectra.values()])
         with tqdm.tqdm(desc='Query spectra processed', total=num_spectra,
                        leave=False, unit='spectra', smoothing=0.1) as pbar:
             for charge, query_spectra_charge in query_spectra.items():
@@ -304,15 +320,14 @@ class SpectralLibrary:
                             ssms[ssm.query_identifier] = ssm
                         pbar.update(1)
         # Store the SSMs below the FDR threshold.
-        logging.debug('Filter the spectrum—spectrum matches on FDR '
-                      '(threshold = %s)', config.fdr)
-        if mode == 'std':
-            return utils.rescore_matches(ssms.values(), config.fdr)
-        elif mode == 'open':
-            return utils.group_rescore(ssms.values(), config.fdr,
-                                       config.fdr_tolerance_mass,
-                                       config.fdr_tolerance_mode,
-                                       config.fdr_min_group_size)
+        logging.info('Filter the spectrum—spectrum matches on FDR '
+                     '(threshold = %s)', config.fdr)
+        return utils.score_ssms(
+            list(ssms.values()),
+            config.fdr,
+            config.model if config.model != "none" else None,
+            mode == "open"
+        )
 
     def _search_batch(self, query_spectra: List[MsmsSpectrum],
                       charge: int, mode: str)\
@@ -346,13 +361,17 @@ class SpectralLibrary:
                     query_spectra, charge, mode)):
             # Find the best match candidate.
             if library_candidates:
-                library_match, score, _ = spectrum_match.get_best_match(
-                    query_spectrum, library_candidates,
-                    config.fragment_mz_tolerance,
-                    config.allow_peak_shifts)
+                library_match, _, peak_matches = \
+                    spectrum_match.get_best_match(
+                        query_spectrum, library_candidates,
+                        config.fragment_mz_tolerance,
+                        config.allow_peak_shifts
+                    )
                 yield SpectrumSpectrumMatch(
-                    query_spectrum, library_match, score,
-                    num_candidates=len(library_candidates))
+                    query_spectrum,
+                    library_match,
+                    peak_matches=np.asarray(peak_matches),
+                )
 
     def _get_library_candidates(self, query_spectra: List[MsmsSpectrum],
                                 charge: int, mode: str)\
@@ -424,6 +443,7 @@ class SpectralLibrary:
                     query_spectrum, config.min_mz, config.max_mz,
                     config.bin_size, config.hash_len, True, query_vectors[i])
             mask = np.zeros_like(candidate_filters)
+            # noinspection PyArgumentList
             for mask_i, ann_filter in zip(mask, ann_index.search(
                     query_vectors, self._num_candidates)[1]):
                 mask_i[ann_filter[ann_filter != -1]] = True

@@ -1,5 +1,6 @@
 import functools
 import math
+from typing import List, Optional
 
 import mmh3
 import numba as nb
@@ -17,8 +18,13 @@ def _check_spectrum_valid(spectrum_mz: np.ndarray, min_peaks: int,
 
     Parameters
     ----------
-    spectrum : np.ndarray
-        M/z peaks of the sspectrum whose quality is checked.
+    spectrum_mz : np.ndarray
+        M/z peaks of the spectrum whose quality is checked.
+    min_peaks : int
+        The minimum number of peaks for a spectrum to be valid.
+    min_mz_range : float
+        The minimum mass range (m/z difference between the highest and lowest
+        peak) for a spectrum to be valid.
 
     Returns
     -------
@@ -214,16 +220,19 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
 
 class SpectrumSpectrumMatch:
 
-    def __init__(self, query_spectrum: MsmsSpectrum,
-                 library_spectrum: MsmsSpectrum = None,
-                 search_engine_score: float = math.nan,
-                 q: float = math.nan,
-                 num_candidates: int = 0):
+    def __init__(
+            self,
+            query_spectrum: MsmsSpectrum,
+            library_spectrum: MsmsSpectrum = None,
+            peak_matches: Optional[np.ndarray] = None,
+            search_engine_score: float = math.nan,
+            q: float = math.nan,
+    ):
         self.query_spectrum = query_spectrum
         self.library_spectrum = library_spectrum
+        self.peak_matches = peak_matches
         self.search_engine_score = search_engine_score
         self.q = q
-        self.num_candidates = num_candidates
 
     @property
     def sequence(self):

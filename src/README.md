@@ -14,7 +14,7 @@ Install
 
 See the [wiki](https://github.com/bittremieux/ANN-SoLo/wiki) for detailed instructions on how to install and run ANN-SoLo.
 
-ANN-SoLo requires Python 3.6 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems with an NVIDIA CUDA-enabled GPU device, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
+ANN-SoLo requires Python 3.7 or higher. The GPU-powered version of ANN-SoLo can be used on Linux systems with an NVIDIA CUDA-enabled GPU device, while the CPU-only version supports both the Linux and OSX platforms. Please refer to the Faiss installation instructions linked below for more information on OS and GPU support.
 
 ### Installation requirements
 

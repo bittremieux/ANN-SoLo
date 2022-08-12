@@ -1,5 +1,10 @@
 import logging
+import sys
 from typing import List, Union
+
+# Initialize all random seeds before importing any packages.
+from ann_solo import rndm
+rndm.set_seeds()
 
 from ann_solo import spectral_library
 from ann_solo import writer
@@ -51,10 +56,21 @@ def ann_solo(spectral_library_filename: str, query_filename: str,
 
 
 def main(args: Union[str, List[str]] = None) -> int:
-    # Initialize logging.
-    logging.basicConfig(format='{asctime} [{levelname}/{processName}] '
-                               '{module}.{funcName} : {message}',
-                        style='{', level=logging.DEBUG)
+    # Configure logging.
+    logging.captureWarnings(True)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(
+        '{asctime} {levelname} [{name}/{processName}] {module}.{funcName} : '
+        '{message}', style='{'))
+    root.addHandler(handler)
+    # Disable dependency non-critical log messages.
+    logging.getLogger('faiss').setLevel(logging.WARNING)
+    logging.getLogger('mokapot').setLevel(logging.WARNING)
+    logging.getLogger('numba').setLevel(logging.WARNING)
+    logging.getLogger('numexpr').setLevel(logging.WARNING)
 
     # Load the configuration.
     config.parse(args)

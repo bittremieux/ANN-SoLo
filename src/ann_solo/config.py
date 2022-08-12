@@ -152,18 +152,15 @@ class Config:
             '--fdr', default=0.01, type=float,
             help='FDR threshold to accept identifications during the cascade '
                  'search (default: %(default)s)')
-
+        # Machine learning model to use for SSM scoring.
         self._parser.add_argument(
-            '--fdr_tolerance_mass', default=0.1, type=float,
-            help='mass difference bin width for the group FDR calculation '
-                 'during the second cascade level (default: %(default)s Da)')
+            '--model', default="rf", type=str, choices=["rf", "svm", "none"],
+            help='machine learning model for spectrum match scoring: "none" '
+                 'for no semi-supervised learning, "svm" for a Percolator-like'
+                 ' linear SVM, "rf" for random forest (default: %(default)s)')
+        # Minimum group size for sub-group FDR for open search results.
         self._parser.add_argument(
-            '--fdr_tolerance_mode', default='Da', type=str,
-            choices=['Da', 'ppm'],
-            help='mass difference bin unit for the group FDR calculation '
-                 'during the second cascade level (default: %(default)s)')
-        self._parser.add_argument(
-            '--fdr_min_group_size', default=20, type=int,
+            '--fdr_min_group_size', default=100, type=int,
             help='minimum group size for the group FDR calculation during the '
                  'second cascade level (default: %(default)s)')
 

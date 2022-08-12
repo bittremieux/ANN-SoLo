@@ -100,6 +100,7 @@ setuptools.setup(
         'joblib',
         'matplotlib',
         'mmh3',
+        'mokapot>=v0.8.3',
         'numba>=0.41',
         'numexpr',
         'numpy',
