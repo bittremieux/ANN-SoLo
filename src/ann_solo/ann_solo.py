@@ -74,7 +74,6 @@ def main(args: Union[str, List[str]] = None) -> int:
 
     # Load the configuration.
     config.parse(args)
-
     # Perform the search.
     spec_lib = spectral_library.SpectralLibrary(
         config.spectral_library_filename)

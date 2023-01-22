@@ -2,21 +2,26 @@ import collections
 import logging
 import os
 import pickle
+import gzip
+import zipfile
 from functools import lru_cache
 from typing import Iterator
 from typing import List
-from typing import Tuple
+from typing import Tuple, Dict, IO, Iterator, Sequence, Union
+import io
 
 import joblib
 import numpy as np
 import pandas as pd
 import tqdm
-from pyteomics import mgf
+from lxml.etree import LxmlError
+from pyteomics import mgf, mzml, mzxml
 from spectrum_utils.spectrum import MsmsSpectrum
+import lzma
 
 from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
-
+from ann_solo.config import config
 
 class SpectralLibraryReader:
     """
@@ -157,6 +162,7 @@ class SpectralLibraryReader:
 
     def open(self) -> None:
         self._parser = SplibParser(self._filename.encode())
+        print(self._parser)
 
     def close(self) -> None:
         if self._parser is not None:
@@ -259,6 +265,200 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
         raise FileNotFoundError(f'File {filename} does not exist')
 
 
+
+
+def read_mzml(source: Union[IO, str], scan_nrs: Sequence[int] = None) \
+        -> Iterator[MsmsSpectrum]:
+    """
+    Get the MS/MS spectra from the given mzML file, optionally filtering by
+    scan number.
+
+    Parameters
+    ----------
+    source : Union[IO, str]
+        The mzML source (file name or open file object) from which the spectra
+        are read.
+    scan_nrs : Sequence[int]
+        Only read spectra with the given scan numbers. If `None`, no filtering
+        on scan number is performed.
+
+    Returns
+    -------
+    Iterator[MsmsSpectrum]
+        An iterator over the requested spectra in the given file.
+    """
+    with mzml.MzML(source) as f_in:
+        # Iterate over a subset of spectra filtered by scan number.
+        if scan_nrs is not None:
+            f_in.build_id_cache()
+
+            def spectrum_it():
+                for scan_nr in scan_nrs:
+                    yield f_in.get_by_id(
+                        f'controllerType=0 controllerNumber=1 scan={scan_nr}')
+        # Or iterate over all MS/MS spectra.
+        else:
+            def spectrum_it():
+                for spectrum_dict in f_in:
+                    if int(spectrum_dict.get('ms level', -1)) == 2:
+                        yield spectrum_dict
+
+        try:
+            for i, spectrum in enumerate(spectrum_it()):
+                try:
+                    parsed_spectrum = _parse_spectrum_mzml(spectrum)
+                    parsed_spectrum.index = i
+                    parsed_spectrum.is_processed = False
+                    yield parsed_spectrum
+                except ValueError as e:
+                    logger.warning(f'Failed to read spectrum %s: %s',
+                                   spectrum['id'], e)
+        except LxmlError as e:
+            logger.warning('Failed to read file %s: %s', source, e)
+
+
+def _parse_spectrum_mzml(spectrum_dict: Dict) -> MsmsSpectrum:
+    """
+    Parse the Pyteomics spectrum dict.
+
+    Parameters
+    ----------
+    spectrum_dict : Dict
+        The Pyteomics spectrum dict to be parsed.
+
+    Returns
+    -------
+    MsmsSpectrum
+        The parsed spectrum.
+
+    Raises
+    ------
+    ValueError: The spectrum can't be parsed correctly:
+        - Unknown scan number.
+        - Not an MS/MS spectrum.
+        - Unknown precursor charge.
+    """
+
+    spectrum_id = spectrum_dict['id']
+
+    if 'scan=' in spectrum_id:
+        scan_nr = int(spectrum_id[spectrum_id.find('scan=') + len('scan='):])
+    elif 'index=' in spectrum_id:
+        scan_nr = int(spectrum_id[spectrum_id.find('index=') + len('index='):])
+    else:
+        raise ValueError(f'Failed to parse scan/index number')
+
+    if int(spectrum_dict.get('ms level', -1)) != 2:
+        raise ValueError(f'Unsupported MS level {spectrum_dict["ms level"]}')
+
+
+    mz_array = spectrum_dict['m/z array']
+    intensity_array = spectrum_dict['intensity array']
+    retention_time = spectrum_dict['scanList']['scan'][0]['scan start time']
+
+    precursor = spectrum_dict['precursorList']['precursor'][0]
+    precursor_ion = precursor['selectedIonList']['selectedIon'][0]
+    precursor_mz = precursor_ion['selected ion m/z']
+    if 'charge state' in precursor_ion:
+        precursor_charge = int(precursor_ion['charge state'])
+    elif 'possible charge state' in precursor_ion:
+        precursor_charge = int(precursor_ion['possible charge state'])
+    else:
+        raise ValueError('Unknown precursor charge')
+    spectrum = MsmsSpectrum(str(scan_nr), precursor_mz, precursor_charge,
+                            mz_array, intensity_array, None, retention_time)
+
+    return spectrum
+
+def read_mzxml(source: Union[IO, str], scan_nrs: Sequence[int] = None)\
+        -> Iterator[MsmsSpectrum]:
+    """
+    Get the MS/MS spectra from the given mzXML file, optionally filtering by
+    scan number.
+
+    Parameters
+    ----------
+    source : Union[IO, str]
+        The mzXML source (file name or open file object) from which the spectra
+        are read.
+    scan_nrs : Sequence[int]
+        Only read spectra with the given scan numbers. If `None`, no filtering
+        on scan number is performed.
+
+    Returns
+    -------
+    Iterator[MsmsSpectrum]
+        An iterator over the requested spectra in the given file.
+    """
+    with mzxml.MzXML(source) as f_in:
+        # Iterate over a subset of spectra filtered by scan number.
+        if scan_nrs is not None:
+            f_in.build_id_cache()
+
+            def spectrum_it():
+                for scan_nr in scan_nrs:
+                    yield f_in.get_by_id(str(scan_nr))
+        # Or iterate over all MS/MS spectra.
+        else:
+            def spectrum_it():
+                for spectrum_dict in f_in:
+                    if int(spectrum_dict.get('msLevel', -1)) == 2:
+                        yield spectrum_dict
+
+        try:
+            for i, spectrum in enumerate(spectrum_it()):
+                try:
+                    parsed_spectrum = _parse_spectrum_mzxml(spectrum)
+                    parsed_spectrum.index = i
+                    parsed_spectrum.is_processed = False
+                    yield parsed_spectrum
+                except ValueError as e:
+                    logger.warning(f'Failed to read spectrum %s: %s',
+                                   spectrum['id'], e)
+        except LxmlError as e:
+            logger.warning('Failed to read file %s: %s', source, e)
+
+
+def _parse_spectrum_mzxml(spectrum_dict: Dict) -> MsmsSpectrum:
+    """
+    Parse the Pyteomics spectrum dict.
+
+    Parameters
+    ----------
+    spectrum_dict : Dict
+        The Pyteomics spectrum dict to be parsed.
+
+    Returns
+    -------
+    MsmsSpectrum
+        The parsed spectrum.
+
+    Raises
+    ------
+    ValueError: The spectrum can't be parsed correctly:
+        - Not an MS/MS spectrum.
+        - Unknown precursor charge.
+    """
+    scan_nr = int(spectrum_dict['id'])
+
+    if int(spectrum_dict.get('msLevel', -1)) != 2:
+        raise ValueError(f'Unsupported MS level {spectrum_dict["msLevel"]}')
+
+    mz_array = spectrum_dict['m/z array']
+    intensity_array = spectrum_dict['intensity array']
+    retention_time = spectrum_dict['retentionTime']
+
+    precursor_mz = spectrum_dict['precursorMz'][0]['precursorMz']
+    if 'precursorCharge' in spectrum_dict['precursorMz'][0]:
+        precursor_charge = spectrum_dict['precursorMz'][0]['precursorCharge']
+    else:
+        raise ValueError('Unknown precursor charge')
+
+    spectrum = MsmsSpectrum(str(scan_nr), precursor_mz, precursor_charge,
+                            mz_array, intensity_array, None, retention_time)
+
+    return spectrum
+
 def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     """
     Read all spectra from the given mgf file.
@@ -274,7 +474,7 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
         An iterator of spectra in the given mgf file.
     """
     # Test if the given file is an mzML file.
-    verify_extension(['.mgf'], filename)
+    #verify_extension(['.mgf'], filename)
 
     # Get all query spectra.
     for i, mgf_spectrum in enumerate(mgf.read(filename)):
@@ -295,6 +495,78 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
         spectrum.is_processed = False
 
         yield spectrum
+
+
+def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Read all spectra from the given mgf, mzml, or mzxml file.
+
+    Parameters
+    ----------
+    filename: str
+        The mgf file name from which to read the spectra.
+
+    Returns
+    -------
+    Iterator[Spectrum]
+        An iterator of spectra in the given mgf file.
+    """
+    verify_extension(['.mgf', '.mzml', '.mzxml'],
+                     filename)
+
+    _, ext = os.path.splitext(os.path.basename(filename))
+
+    if ext == '.mgf':
+        return read_mgf(filename)
+    elif ext == '.mzml':
+        return read_mzml(filename)
+    elif ext == '.mzxml':
+        return read_mzxml(filename)
+
+##WIP: Support for compressed query files
+def read_query(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Assess the query file format, whether compressed or not, and read its
+    content according to its extension.
+
+    Parameters
+    ----------
+    filename: str
+        The query file name from which to read the spectra.
+
+    Returns
+    -------
+    Iterator[Spectrum]
+        An iterator of spectra in the given mgf file.
+    """
+    verify_extension(['.mgf','.mzml','.mzxml','.zip','.gz','.xz'],
+                     filename)
+
+    _, ext = os.path.splitext(os.path.basename(filename))
+
+    if ext.lower() == '.gz':
+        with gzip.open(filename, 'rb') as gz_file:
+            gz_file_content = gz_file.read()
+            # create a file-like object from the content
+            file = io.StringIO(gz_file_content.decode())
+            return read_query_file(file)
+    elif ext.lower() == '.zip':
+        with zipfile.ZipFile(filename, 'r') as zip_file:
+            zip_file_content = zip_file.read(zip_file.namelist()[0])
+            # create a file-like object from the content
+            file = io.StringIO(zip_file_content.decode())
+            #print(file)
+            return read_query_file(file)
+    elif ext.lower() == '.xz':
+        with lzma.open(filename, 'rb') as xz_file:
+            xz_file_content = xz_file.read()
+            # create a file-like object from the content
+            file = io.StringIO(xz_file_content.decode())
+            return read_query_file(file)
+    else:
+        return read_query_file(filename)
+
+
 
 
 def read_mztab_ssms(filename: str) -> pd.DataFrame:
