@@ -1,14 +1,13 @@
 import collections
+import io
+import gzip
 import logging
+import lzma
 import os
 import pickle
-import gzip
 import zipfile
 from functools import lru_cache
-from typing import Iterator
-from typing import List
-from typing import Tuple, Dict, IO, Iterator, Sequence, Union
-import io
+from typing import List, Tuple, Dict, IO, Iterator, Sequence, Union
 
 import joblib
 import numpy as np
@@ -17,7 +16,6 @@ import tqdm
 from lxml.etree import LxmlError
 from pyteomics import mgf, mzml, mzxml
 from spectrum_utils.spectrum import MsmsSpectrum
-import lzma
 
 from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
@@ -267,20 +265,15 @@ def verify_extension(supported_extensions: List[str], filename: str) -> None:
 
 
 
-def read_mzml(source: Union[IO, str], scan_nrs: Sequence[int] = None) \
-        -> Iterator[MsmsSpectrum]:
+def read_mzml(source: Union[IO, str]) -> Iterator[MsmsSpectrum]:
     """
-    Get the MS/MS spectra from the given mzML file, optionally filtering by
-    scan number.
+    Get the MS/MS spectra from the given mzML file.
 
     Parameters
     ----------
     source : Union[IO, str]
         The mzML source (file name or open file object) from which the spectra
         are read.
-    scan_nrs : Sequence[int]
-        Only read spectra with the given scan numbers. If `None`, no filtering
-        on scan number is performed.
 
     Returns
     -------
@@ -288,20 +281,10 @@ def read_mzml(source: Union[IO, str], scan_nrs: Sequence[int] = None) \
         An iterator over the requested spectra in the given file.
     """
     with mzml.MzML(source) as f_in:
-        # Iterate over a subset of spectra filtered by scan number.
-        if scan_nrs is not None:
-            f_in.build_id_cache()
-
-            def spectrum_it():
-                for scan_nr in scan_nrs:
-                    yield f_in.get_by_id(
-                        f'controllerType=0 controllerNumber=1 scan={scan_nr}')
-        # Or iterate over all MS/MS spectra.
-        else:
-            def spectrum_it():
-                for spectrum_dict in f_in:
-                    if int(spectrum_dict.get('ms level', -1)) == 2:
-                        yield spectrum_dict
+        def spectrum_it():
+            for spectrum_dict in f_in:
+                if int(spectrum_dict.get('ms level', -1)) == 2:
+                    yield spectrum_dict
 
         try:
             for i, spectrum in enumerate(spectrum_it()):
@@ -370,20 +353,15 @@ def _parse_spectrum_mzml(spectrum_dict: Dict) -> MsmsSpectrum:
 
     return spectrum
 
-def read_mzxml(source: Union[IO, str], scan_nrs: Sequence[int] = None)\
-        -> Iterator[MsmsSpectrum]:
+def read_mzxml(source: Union[IO, str]) -> Iterator[MsmsSpectrum]:
     """
-    Get the MS/MS spectra from the given mzXML file, optionally filtering by
-    scan number.
+    Get the MS/MS spectra from the given mzXML file.
 
     Parameters
     ----------
     source : Union[IO, str]
         The mzXML source (file name or open file object) from which the spectra
         are read.
-    scan_nrs : Sequence[int]
-        Only read spectra with the given scan numbers. If `None`, no filtering
-        on scan number is performed.
 
     Returns
     -------
@@ -391,19 +369,10 @@ def read_mzxml(source: Union[IO, str], scan_nrs: Sequence[int] = None)\
         An iterator over the requested spectra in the given file.
     """
     with mzxml.MzXML(source) as f_in:
-        # Iterate over a subset of spectra filtered by scan number.
-        if scan_nrs is not None:
-            f_in.build_id_cache()
-
-            def spectrum_it():
-                for scan_nr in scan_nrs:
-                    yield f_in.get_by_id(str(scan_nr))
-        # Or iterate over all MS/MS spectra.
-        else:
-            def spectrum_it():
-                for spectrum_dict in f_in:
-                    if int(spectrum_dict.get('msLevel', -1)) == 2:
-                        yield spectrum_dict
+        def spectrum_it():
+            for spectrum_dict in f_in:
+                if int(spectrum_dict.get('msLevel', -1)) == 2:
+                    yield spectrum_dict
 
         try:
             for i, spectrum in enumerate(spectrum_it()):
@@ -473,8 +442,6 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     Iterator[Spectrum]
         An iterator of spectra in the given mgf file.
     """
-    # Test if the given file is an mzML file.
-    #verify_extension(['.mgf'], filename)
 
     # Get all query spectra.
     for i, mgf_spectrum in enumerate(mgf.read(filename)):
@@ -504,7 +471,7 @@ def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
     Parameters
     ----------
     filename: str
-        The mgf file name from which to read the spectra.
+        The peak file name from which to read the spectra.
 
     Returns
     -------
