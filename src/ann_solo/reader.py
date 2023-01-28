@@ -1,11 +1,7 @@
 import collections
-import io
-import gzip
 import logging
-import lzma
 import os
 import pickle
-import zipfile
 from functools import lru_cache
 from typing import List, Tuple, Dict, IO, Iterator, Sequence, Union
 
@@ -489,52 +485,6 @@ def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
         return read_mzml(filename)
     elif ext == '.mzxml':
         return read_mzxml(filename)
-
-##WIP: Support for compressed query files
-def read_query(filename: str) -> Iterator[MsmsSpectrum]:
-    """
-    Assess the query file format, whether compressed or not, and read its
-    content according to its extension.
-
-    Parameters
-    ----------
-    filename: str
-        The query file name from which to read the spectra.
-
-    Returns
-    -------
-    Iterator[Spectrum]
-        An iterator of spectra in the given mgf file.
-    """
-    verify_extension(['.mgf','.mzml','.mzxml','.zip','.gz','.xz'],
-                     filename)
-
-    _, ext = os.path.splitext(os.path.basename(filename))
-
-    if ext.lower() == '.gz':
-        with gzip.open(filename, 'rb') as gz_file:
-            gz_file_content = gz_file.read()
-            # create a file-like object from the content
-            file = io.StringIO(gz_file_content.decode())
-            return read_query_file(file)
-    elif ext.lower() == '.zip':
-        with zipfile.ZipFile(filename, 'r') as zip_file:
-            zip_file_content = zip_file.read(zip_file.namelist()[0])
-            # create a file-like object from the content
-            file = io.StringIO(zip_file_content.decode())
-            #print(file)
-            return read_query_file(file)
-    elif ext.lower() == '.xz':
-        with lzma.open(filename, 'rb') as xz_file:
-            xz_file_content = xz_file.read()
-            # create a file-like object from the content
-            file = io.StringIO(xz_file_content.decode())
-            return read_query_file(file)
-    else:
-        return read_query_file(filename)
-
-
-
 
 def read_mztab_ssms(filename: str) -> pd.DataFrame:
     """
