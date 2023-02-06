@@ -184,9 +184,9 @@ def _create_mzml(peptides, mzml_file, random_state=42):
 
 
 def test_read_mgf(mgf_small):
-    spectra = reader.read_mgf(mgf_small)
+    spectra = [spectrum for spectrum in reader.read_mgf(mgf_small)]
     assert len(spectra) == 3
 
 def test_read_mzml(mzml_small):
-    spectra = reader.read_mzml(mzml_small)
+    spectra = [spectrum for spectrum in reader.read_mzml(mzml_small)]
     assert len(spectra) == 3
