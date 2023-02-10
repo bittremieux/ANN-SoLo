@@ -107,7 +107,7 @@ setuptools.setup(
         'pandas',
         'pyteomics',
         'scipy',
-        'spectrum_utils>=0.3.0',
+        'spectrum_utils>=0.3.0, <0.4a0',
         'tqdm'],
     setup_requires=[
         'Cython',
