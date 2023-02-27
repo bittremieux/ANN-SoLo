@@ -3,7 +3,7 @@ import logging
 import os
 import pickle
 from functools import lru_cache
-from typing import List, Tuple, Dict, IO, Iterator, Sequence, Union
+from typing import List, Tuple, Dict, IO, Iterator, Union
 
 import joblib
 import numpy as np
@@ -156,7 +156,6 @@ class SpectralLibraryReader:
 
     def open(self) -> None:
         self._parser = SplibParser(self._filename.encode())
-        print(self._parser)
 
     def close(self) -> None:
         if self._parser is not None:
@@ -277,21 +276,17 @@ def read_mzml(source: Union[IO, str]) -> Iterator[MsmsSpectrum]:
         An iterator over the requested spectra in the given file.
     """
     with mzml.MzML(source) as f_in:
-        def spectrum_it():
-            for spectrum_dict in f_in:
-                if int(spectrum_dict.get('ms level', -1)) == 2:
-                    yield spectrum_dict
-
         try:
-            for i, spectrum in enumerate(spectrum_it()):
-                try:
-                    parsed_spectrum = _parse_spectrum_mzml(spectrum)
-                    parsed_spectrum.index = i
-                    parsed_spectrum.is_processed = False
-                    yield parsed_spectrum
-                except ValueError as e:
-                    logger.warning(f'Failed to read spectrum %s: %s',
-                                   spectrum['id'], e)
+            for i, spectrum in enumerate(f_in):
+                if int(spectrum.get('ms level', -1)) == 2:
+                    try:
+                        parsed_spectrum = _parse_spectrum_mzml(spectrum)
+                        parsed_spectrum.index = i
+                        parsed_spectrum.is_processed = False
+                        yield parsed_spectrum
+                    except ValueError as e:
+                        logger.warning(f'Failed to read spectrum %s: %s',
+                                       spectrum['id'], e)
         except LxmlError as e:
             logger.warning('Failed to read file %s: %s', source, e)
 
@@ -343,7 +338,7 @@ def _parse_spectrum_mzml(spectrum_dict: Dict) -> MsmsSpectrum:
     elif 'possible charge state' in precursor_ion:
         precursor_charge = int(precursor_ion['possible charge state'])
     else:
-        raise ValueError('Unknown precursor charge')
+        precursor_charge = None
     spectrum = MsmsSpectrum(str(scan_nr), precursor_mz, precursor_charge,
                             mz_array, intensity_array, None, retention_time)
 
@@ -365,21 +360,17 @@ def read_mzxml(source: Union[IO, str]) -> Iterator[MsmsSpectrum]:
         An iterator over the requested spectra in the given file.
     """
     with mzxml.MzXML(source) as f_in:
-        def spectrum_it():
-            for spectrum_dict in f_in:
-                if int(spectrum_dict.get('msLevel', -1)) == 2:
-                    yield spectrum_dict
-
         try:
-            for i, spectrum in enumerate(spectrum_it()):
-                try:
-                    parsed_spectrum = _parse_spectrum_mzxml(spectrum)
-                    parsed_spectrum.index = i
-                    parsed_spectrum.is_processed = False
-                    yield parsed_spectrum
-                except ValueError as e:
-                    logger.warning(f'Failed to read spectrum %s: %s',
-                                   spectrum['id'], e)
+            for i, spectrum in enumerate(f_in):
+                if int(spectrum.get('msLevel', -1)) == 2:
+                    try:
+                        parsed_spectrum = _parse_spectrum_mzxml(spectrum)
+                        parsed_spectrum.index = i
+                        parsed_spectrum.is_processed = False
+                        yield parsed_spectrum
+                    except ValueError as e:
+                        logger.warning(f'Failed to read spectrum %s: %s',
+                                       spectrum['id'], e)
         except LxmlError as e:
             logger.warning('Failed to read file %s: %s', source, e)
 
@@ -417,7 +408,7 @@ def _parse_spectrum_mzxml(spectrum_dict: Dict) -> MsmsSpectrum:
     if 'precursorCharge' in spectrum_dict['precursorMz'][0]:
         precursor_charge = spectrum_dict['precursorMz'][0]['precursorCharge']
     else:
-        raise ValueError('Unknown precursor charge')
+        precursor_charge = None
 
     spectrum = MsmsSpectrum(str(scan_nr), precursor_mz, precursor_charge,
                             mz_array, intensity_array, None, retention_time)
