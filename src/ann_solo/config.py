@@ -51,8 +51,11 @@ class Config:
         self._parser.add_argument(
             'spectral_library_filename', help='spectral library file '
                                               '(supported formats: splib)')
+
         self._parser.add_argument(
-            'query_filename', help='query file (supported formats: mgf)')
+            'query_filename', help='query file (supported formats: mgf, '
+                                   'mzml, mzxml)')
+
         self._parser.add_argument(
             'out_filename',
             help='name of the mzTab output file containing the search results')
