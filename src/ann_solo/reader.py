@@ -5,6 +5,8 @@ import pickle
 from functools import lru_cache
 from typing import List, Tuple, Dict, IO, Iterator, Union
 
+
+import h5py
 import joblib
 import numpy as np
 import pandas as pd
@@ -17,9 +19,11 @@ from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
 from ann_solo.config import config
 
+
+
 class SpectralLibraryReader:
     """
-    Read spectra from a SpectraST spectral library .splib file.
+    Read spectra from a SpectraST spectral library file.
     """
 
     _supported_extensions = ['.splib']
@@ -56,6 +60,7 @@ class SpectralLibraryReader:
         self._filename = filename
         self._config_hash = config_hash
         self._parser = None
+        self._spectra_library_store = None
         do_create = False
 
         # Test if the given spectral library file is in a supported format.
@@ -66,11 +71,14 @@ class SpectralLibraryReader:
         # Verify that the configuration file
         # corresponding to this spectral library is present.
         config_filename = self._get_config_filename()
-        if not os.path.isfile(config_filename):
+        store_filename = self._get_store_filename()
+
+        if not os.path.isfile(config_filename) or not os.path.isfile(store_filename):
             # If not we should recreate this file
             # prior to using the spectral library.
             do_create = True
-            logging.warning('Missing spectral library configuration file')
+            logging.warning('Missing spectral library store or configuration '
+                            'file')
         else:
             # Load the configuration file.
             config_lib_filename, self.spec_info, load_hash =\
@@ -92,6 +100,10 @@ class SpectralLibraryReader:
         if do_create:
             self._create_config()
 
+        # Open the Spectra Library Store
+        self._spectra_library_store = SpectraLibraryStore(self._get_store_filename())
+        self._spectra_library_store.open_store_to_read()
+
     def _get_config_filename(self) -> str:
         """
         Gets the configuration file name for the spectral library with the
@@ -107,6 +119,22 @@ class SpectralLibraryReader:
                     f'{self._config_hash[:7]}.spcfg')
         else:
             return f'{os.path.splitext(self._filename)[0]}.spcfg'
+
+    def _get_store_filename(self) -> str:
+        """
+        Gets the spectra library store file name for the spectral library
+        with the current configuration.
+
+        Returns
+        -------
+        str
+            The configuration file name (.spcfg file).
+        """
+        if self._config_hash is not None:
+            return (f'{os.path.splitext(self._filename)[0]}_'
+                    f'{self._config_hash[:7]}.hdf5')
+        else:
+            return f'{os.path.splitext(self._filename)[0]}.hdf5'
 
     def _create_config(self) -> None:
         """
@@ -126,24 +154,26 @@ class SpectralLibraryReader:
         # Read all the spectra in the spectral library.
         temp_info = collections.defaultdict(
             lambda: {'id': [], 'precursor_mz': []})
-        offsets = {}
+        #offsets = {}
         with self as lib_reader:
-            for spectrum, offset in tqdm.tqdm(lib_reader.get_all_spectra(),
-                                              desc='Library spectra read',
-                                              unit='spectra'):
-                # Store the spectrum information for easy retrieval.
-                info_charge = temp_info[spectrum.precursor_charge]
-                info_charge['id'].append(spectrum.identifier)
-                info_charge['precursor_mz'].append(spectrum.precursor_mz)
-                offsets[spectrum.identifier] = offset
+            with SpectraLibraryStore(self._get_store_filename()) as spectraStore:
+                for spectrum in tqdm.tqdm(
+                        lib_reader.read_library_file(),
+                        desc='Library spectra read', unit='spectra'):
+                    # Store the spectrum information for easy retrieval.
+                    info_charge = temp_info[spectrum.precursor_charge]
+                    info_charge['id'].append(spectrum.identifier)
+                    info_charge['precursor_mz'].append(spectrum.precursor_mz)
+                    #offsets[spectrum.identifier] = offset
+                    spectraStore.write_spectrum_to_library(spectrum)
         self.spec_info = {
             'charge': {
                 charge: {
                     'id': np.asarray(charge_info['id'], np.uint32),
                     'precursor_mz': np.asarray(charge_info['precursor_mz'],
                                                np.float32)
-                } for charge, charge_info in temp_info.items()},
-            'offset': offsets}
+                } for charge, charge_info in temp_info.items()}
+        }
 
         # Store the configuration.
         config_filename = self._get_config_filename()
@@ -169,11 +199,11 @@ class SpectralLibraryReader:
         self.close()
 
     @lru_cache(maxsize=None)
-    def get_spectrum(self, spec_id: int, process_peaks: bool = False)\
+    def read_spectrum(self, spec_id: int, process_peaks: bool = False)\
             -> MsmsSpectrum:
         """
         Read the spectrum with the specified identifier from the spectral
-        library file.
+        library store.
 
         Parameters
         ----------
@@ -186,39 +216,57 @@ class SpectralLibraryReader:
         Returns
         -------
         Spectrum
-            The spectrum from the spectral library file with the specified
+            The spectrum from the spectral library store with the specified
             identifier.
         """
-        spectrum = self._parser.read_spectrum(
-            self.spec_info['offset'][spec_id])[0]
+        spectrum = self._spectra_library_store.read_spectrum_from_library(
+                                                spec_id)
         spectrum.is_processed = False
         if process_peaks:
-            process_spectrum(spectrum, True)
+            return process_spectrum(spectrum, True)
 
         return spectrum
 
-    def get_all_spectra(self) -> Iterator[Tuple[MsmsSpectrum, int]]:
-        """
-        Generates all spectra from the spectral library file.
 
-        For each individual spectrum a tuple consisting of the spectrum and
-        some additional information as a nested tuple (containing on the type
-        of spectral library file) are returned.
+    def read_all_spectra(self) -> Iterator[Tuple[MsmsSpectrum, int]]:
+        """
+        Traverse all spectra from the spectral library store.
 
         Returns
         -------
         Iterator[Tuple[Spectrum, int]]
-            An iterator of all spectra along with their offset in the spectral
-            library file.
+            An iterator of all spectra in the spectral library hdf5 store.
         """
-        self._parser.seek_first_spectrum()
-        try:
-            while True:
-                spectrum, offset = self._parser.read_spectrum()
-                spectrum.is_processed = False
-                yield spectrum, offset
-        except StopIteration:
-            return
+
+        for spec_id in self._spectra_library_store.get_all_spectra_ids():
+            yield self.read_spectrum(spec_id)
+
+    def read_library_file(self) -> Iterator[MsmsSpectrum]:
+        """
+        Read all spectra from the splib library file.
+
+        Returns
+        -------
+        Iterator[Spectrum]
+            An iterator of spectra in the given library file.
+        """
+        verify_extension(['.splib'],self._filename)
+
+        _, ext = os.path.splitext(os.path.basename(self._filename))
+
+        if ext == '.splib':
+            self._parser.seek_first_spectrum()
+            try:
+                while True:
+                    spectrum, _ = self._parser.read_spectrum()
+                    spectrum.is_processed = False
+                    yield spectrum
+            except StopIteration:
+                return
+        elif ext == '.sptxt':
+            return None
+        elif ext == '.mgf':
+            return None
 
     def get_version(self) -> str:
         """
@@ -230,6 +278,65 @@ class SpectralLibraryReader:
             A string representation of the spectral library version.
         """
         return 'null'
+
+
+
+class SpectraLibraryStore:
+    """
+        Class for efficient store retrieved spectra library file.
+    """
+    def __init__(self, file_path) -> None:
+        self.file_path = file_path
+        self.hdf5_store = None
+
+    def open_store_to_read(self) -> None:
+        self.hdf5_store = h5py.File(self.file_path, 'r')
+
+    def open_store_to_write(self) -> None:
+        self.hdf5_store = h5py.File(self.file_path, 'w')
+
+    def close_store(self) -> None:
+        if self.hdf5_store is not None:
+            self.hdf5_store.close()
+            self.hdf5_store = None
+
+    def get_all_spectra_ids(self):
+        for spec_id in self.hdf5_store.keys():
+            yield spec_id
+
+    def write_spectrum_to_library(self, spectrum):
+        # Create a new group under the same key
+        group = self.hdf5_store.create_group(f'{spectrum.identifier}')
+
+        group.create_dataset('peptide', data=spectrum.peptide)
+        group.create_dataset('precursor_charge',
+                             data=spectrum.precursor_charge)
+        group.create_dataset('precursor_mz', data=spectrum.precursor_mz)
+        group.create_dataset('is_decoy', data=spectrum.is_decoy)
+        group.create_dataset('mz', data=spectrum.mz)
+        group.create_dataset('intensity', data=spectrum.intensity)
+
+        self.hdf5_store.flush()
+
+    def read_spectrum_from_library(self, spec_id):
+        spectrum_specs = self.hdf5_store[f'{spec_id}']
+
+        spectrum = MsmsSpectrum(spec_id,
+                            spectrum_specs['precursor_mz'][()],
+                            spectrum_specs['precursor_charge'][()],
+                            spectrum_specs['mz'][()],
+                            spectrum_specs['intensity'][()],
+                            is_decoy=spectrum_specs['is_decoy'][()])
+        spectrum.peptide = spectrum_specs['peptide'][()].decode('utf-8')
+
+        return spectrum
+
+    def __enter__(self) -> 'SpectraLibraryStore':
+        self.open_store_to_write()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close_store()
 
 
 def verify_extension(supported_extensions: List[str], filename: str) -> None:
