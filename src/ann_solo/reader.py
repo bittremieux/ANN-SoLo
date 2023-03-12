@@ -212,7 +212,7 @@ class SpectralLibraryReader:
             self.close()
 
     @lru_cache(maxsize=None)
-    def read_spectrum(self, spec_id: int, process_peaks: bool = False)\
+    def read_spectrum(self, spec_id: str, process_peaks: bool = False)\
             -> MsmsSpectrum:
         """
         Read the spectrum with the specified identifier from the spectral
@@ -220,7 +220,7 @@ class SpectralLibraryReader:
 
         Parameters
         ----------
-        spec_id : int
+        spec_id : string
             The identifier of the spectrum in the spectral library file.
         process_peaks : bool, optional
             Flag whether to process the spectrum's peaks or not
@@ -416,28 +416,65 @@ class SpectralLibraryReader:
 
 class SpectraLibraryStore:
     """
-        Class for efficient store retrieved spectra library file.
+        Class to efficiently store and retrieve spectra from a library file.
     """
-    def __init__(self, file_path) -> None:
+    def __init__(self, file_path: str) -> None:
+        """
+        Initialize the spectral library store.
+
+        Parameters
+        ----------
+        filepath : str
+            The file path of the spectral library store.
+
+        """
         self.file_path = file_path
         self.hdf5_store = None
 
     def open_store_to_read(self) -> None:
+        """
+        Open the hdf5 spectral library store for read purposes.
+        """
         self.hdf5_store = h5py.File(self.file_path, 'r')
 
     def open_store_to_write(self) -> None:
+        """
+        Open the hdf5 spectral library store for write purposes.
+        """
         self.hdf5_store = h5py.File(self.file_path, 'w')
 
     def close_store(self) -> None:
+        """
+        Close the hdf5 spectral library store after write/read is done.
+        """
         if self.hdf5_store is not None:
             self.hdf5_store.close()
             self.hdf5_store = None
 
-    def get_all_spectra_ids(self):
+    def get_all_spectra_ids(self) -> Iterator[str]:
+        """
+        Close the hdf5 spectral library store after write/read is done.
+
+        Returns
+        -------
+        Iterator[str]
+            An iterator of the keys/ids of spectra in the library store.
+
+        """
         for spec_id in self.hdf5_store.keys():
             yield spec_id
 
-    def write_spectrum_to_library(self, spectrum):
+    def write_spectrum_to_library(self, spectrum : MsmsSpectrum) -> None:
+        """
+        Gets an Msmsspectrum object, reads attributes, and stores it in the
+        spectral library store for future retrieval.
+
+        Parameters
+        ----------
+        spectrum : MsmsSpectrum
+            The MsmsSpectrum object.
+
+        """
         # Create a new group under the same key
         group = self.hdf5_store.create_group(f'{spectrum.identifier}')
 
@@ -451,7 +488,21 @@ class SpectraLibraryStore:
 
         self.hdf5_store.flush()
 
-    def read_spectrum_from_library(self, spec_id):
+    def read_spectrum_from_library(self, spec_id : str)-> MsmsSpectrum:
+        """
+        Gets a library spectrum id and returns the corresponding spectrum as
+        an Msmsspectrum object.
+
+        Parameters
+        ----------
+        spec_id : string
+            A library spectrum id.
+
+        Returns
+        -------
+        MsmsSpectrum
+            An MsmsSpectrum object.
+        """
         spectrum_specs = self.hdf5_store[f'{spec_id}']
 
         spectrum = MsmsSpectrum(spec_id,
