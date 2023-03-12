@@ -281,7 +281,8 @@ class SpectralLibraryReader:
             for spectrum in self.parse_sptxt():
                 yield spectrum
         elif ext == '.mgf':
-            return None
+            for spectrum in read_mgf(self._filename):
+                yield spectrum
 
     def get_version(self) -> str:
         """
@@ -686,6 +687,12 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
                                 retention_time=retention_time)
         spectrum.index = i
         spectrum.is_processed = False
+
+        if 'seq' in mgf_spectrum['params']:
+            spectrum.peptide = mgf_spectrum['params']['seq']
+
+        if 'decoy' in mgf_spectrum['params']:
+            spectrum.is_decoy = mgf_spectrum['params']['decoy']
 
         yield spectrum
 
