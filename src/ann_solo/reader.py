@@ -670,31 +670,34 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
         An iterator of spectra in the given mgf file.
     """
 
-    # Get all query spectra.
-    for i, mgf_spectrum in enumerate(mgf.read(filename)):
-        # Create spectrum.
-        identifier = mgf_spectrum['params']['title']
-        precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
-        retention_time = float(mgf_spectrum['params']['rtinseconds'])
-        if 'charge' in mgf_spectrum['params']:
-            precursor_charge = int(mgf_spectrum['params']['charge'][0])
-        else:
-            precursor_charge = None
+    # Get all spectra.
+    with open(filename, 'rb') as file:
+        # memory-map the file
+        mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+        for i, mgf_spectrum in enumerate(mgf.read(mmapped_file, use_index=True)):
+            # Create spectrum.
+            identifier = mgf_spectrum['params']['title']
+            precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
+            retention_time = float(mgf_spectrum['params']['rtinseconds'])
+            if 'charge' in mgf_spectrum['params']:
+                precursor_charge = int(mgf_spectrum['params']['charge'][0])
+            else:
+                precursor_charge = None
 
-        spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
-                                mgf_spectrum['m/z array'],
-                                mgf_spectrum['intensity array'],
-                                retention_time=retention_time)
-        spectrum.index = i
-        spectrum.is_processed = False
+            spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+                                    mgf_spectrum['m/z array'],
+                                    mgf_spectrum['intensity array'],
+                                    retention_time=retention_time)
+            spectrum.index = i
+            spectrum.is_processed = False
 
-        if 'seq' in mgf_spectrum['params']:
-            spectrum.peptide = mgf_spectrum['params']['seq']
+            if 'seq' in mgf_spectrum['params']:
+                spectrum.peptide = mgf_spectrum['params']['seq']
 
-        if 'decoy' in mgf_spectrum['params']:
-            spectrum.is_decoy = mgf_spectrum['params']['decoy']
+            if 'decoy' in mgf_spectrum['params']:
+                spectrum.is_decoy = mgf_spectrum['params']['decoy']
 
-        yield spectrum
+            yield spectrum
 
 
 def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
