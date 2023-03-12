@@ -1,13 +1,18 @@
+import io
+import mmap
+from multiprocessing import cpu_count
 import collections
 import logging
-import os
 import pickle
 from functools import lru_cache
+import os
+import re
 from typing import List, Tuple, Dict, IO, Iterator, Union
 
 
 import h5py
-import joblib
+import joblib import Parallel, delayed
+from nltk.tokenize import RegexpTokenizer
 import numpy as np
 import pandas as pd
 import tqdm
@@ -192,11 +197,19 @@ class SpectralLibraryReader:
             del self._parser
 
     def __enter__(self) -> 'SpectralLibraryReader':
-        self.open()
+        verify_extension(['.splib','.sptxt','.mgf'], self._filename)
+        _, ext = os.path.splitext(os.path.basename(self._filename))
+
+        if ext == '.splib':
+            self.open()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        self.close()
+        verify_extension(['.splib', '.sptxt', '.mgf'], self._filename)
+        _, ext = os.path.splitext(os.path.basename(self._filename))
+
+        if ext == '.splib':
+            self.close()
 
     @lru_cache(maxsize=None)
     def read_spectrum(self, spec_id: int, process_peaks: bool = False)\
@@ -228,7 +241,7 @@ class SpectralLibraryReader:
         return spectrum
 
 
-    def read_all_spectra(self) -> Iterator[Tuple[MsmsSpectrum, int]]:
+    def read_all_spectra(self) -> Iterator[MsmsSpectrum]:
         """
         Traverse all spectra from the spectral library store.
 
@@ -241,6 +254,7 @@ class SpectralLibraryReader:
         for spec_id in self._spectra_library_store.get_all_spectra_ids():
             yield self.read_spectrum(spec_id)
 
+
     def read_library_file(self) -> Iterator[MsmsSpectrum]:
         """
         Read all spectra from the splib library file.
@@ -250,7 +264,7 @@ class SpectralLibraryReader:
         Iterator[Spectrum]
             An iterator of spectra in the given library file.
         """
-        verify_extension(['.splib'],self._filename)
+        verify_extension(['.splib', '.sptxt', '.mgf'], self._filename)
 
         _, ext = os.path.splitext(os.path.basename(self._filename))
 
@@ -264,7 +278,8 @@ class SpectralLibraryReader:
             except StopIteration:
                 return
         elif ext == '.sptxt':
-            return None
+            for spectrum in self.parse_sptxt():
+                yield spectrum
         elif ext == '.mgf':
             return None
 
@@ -278,6 +293,123 @@ class SpectralLibraryReader:
             A string representation of the spectral library version.
         """
         return 'null'
+
+    def _parse_sptxt_spectrum(self, raw_spectrum: str, identifier: int = None)
+        -> MsmsSpectrum:
+        """
+        Takes a raw spectrum data retrieved from an sptxt file and
+        parses it to a structured object of type MsmsSpectrum.
+
+        Parameters
+        ----------
+        raw_spectrum : string
+            The spectrum in a raw format.
+        identifier : int
+            Incremented identifier of the spectrum in the library.
+
+        Returns
+        -------
+        MsmsSpectrum
+            An MsmsSpectrum object.
+        """
+        # Create a reference variable for Class RegexpTokenizer
+        # that split raw spectrum in two chunks: metadata & spectrum
+        spectrum_tk = RegexpTokenizer('Num\s?Peaks:\s?[0-9]+\n', gaps=True,
+                                      flags=re.IGNORECASE)
+        spectrum_tokens = spectrum_tk.tokenize(raw_spectrum)
+        spectrum_metadata = spectrum_tokens[0]
+        spectrum = spectrum_tokens[1]
+        ##Retrieve identifier if there is one
+        LibID = re.search('LibID:\s?[0-9]+', spectrum_metadata, re.IGNORECASE)
+        if LibID:
+            identifier = re.search('[0-9]+.', LibID.group(0)).group(0)
+        # Check if decoy
+        decoy = True if re.search('decoy', spectrum_metadata,
+                                  re.IGNORECASE) else False
+        ##Retrieve peptide & charge
+        peptide_Charge = spectrum_metadata.split('\n', 1)[0].split('/')
+        peptide = peptide_Charge[0].strip()
+        charge = int(peptide_Charge[1].strip())
+        ##Retrieve precurssor mass
+        perMZ = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
+                          re.IGNORECASE)
+        if perMZ:
+            perMZ = re.search('[0-9]+.[0-9]+', perMZ.group(0))
+        else:
+            perMZ = re.search('Parent=\s?[0-9]+.[0-9]+', spectrum_metadata,
+                              re.IGNORECASE)
+            perMZ = re.search('[0-9]+.[0-9]+', perMZ.group(0))
+        ##Retrieve MZ & Intensities
+        file = io.StringIO(spectrum)
+        MZ_Intensity = pd.read_csv(file, sep="\t", header=None)
+
+        spectrum = MsmsSpectrum(identifier, perMZ.group(0), charge,
+                                MZ_Intensity[0].to_numpy(copy=True),
+                                MZ_Intensity[1].to_numpy(copy=True),
+                                is_decoy=decoy)
+        spectrum.peptide = peptide
+
+        return spectrum
+
+    # For parallel processing
+    def _parse_batch_sptxt_spectra(self, raw_spectra: List[str], ids: List[
+        int]) -> Iterator[MsmsSpectrum]:
+        """
+        Takes a list of  raw spectra data retrieved from an sptxt file and
+        parses it to a structured object of type MsmsSpectrum.
+
+        Parameters
+        ----------
+        raw_spectrum : List[string]
+            The spectrum in a raw format.
+        identifier : List[int]
+            Incremented identifier of the spectrum in the library.
+
+        Returns
+        -------
+        Iterator[MsmsSpectrum]
+            An iterator of spectra in the given library file.
+        """
+        for spectrum in list(Parallel(n_jobs=cpu_count())(
+                delayed(_parse_sptxt_spectrum)(raw_spectrum, id) for
+                raw_spectrum, id in zip(raw_spectra, ids))):
+            yield spectrum
+
+    def parse_sptxt(self) -> Iterator[MsmsSpectrum]:
+        """
+        Open the sptxt spectra library file and parses it
+        to read all spectra.
+
+        Returns
+        -------
+        Iterator[MsmsSpectrum]
+            An iterator of spectra in the given library file.
+
+        """
+        with open(self._filename, 'rb') as file:
+            # Create a reference variable for Class RegexpTokenizer
+            tk = RegexpTokenizer('Name:\s?', gaps=True, flags=re.IGNORECASE)
+            mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+            raw_spectra_list = []
+            for i, raw_spec in enumerate(
+                    tk.tokenize(mmapped_file.read().decode('utf-8')), 1):
+                if i % cpu_count():
+                    raw_spectra_list.append(raw_spec)
+                    continue
+                else:
+                    for spectrum in _parse_batch_sptxt_spectra(
+                            raw_spectra_list,
+                            list(range(i + 1 - cpu_count(), i + 1))):
+                        yield spectrum
+                    raw_spectra_list = []
+            if not raw_spectra_list:
+                for spectrum in _parse_batch_sptxt_spectra(raw_spectra_list,
+                                                           list(range(
+                                                                   i + 1 - len(
+                                                                           raw_spectra_list),
+                                                                   i + 1))):
+                    yield spectrum
+
 
 
 
