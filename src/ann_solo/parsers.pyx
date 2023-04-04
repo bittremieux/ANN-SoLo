@@ -15,6 +15,8 @@ from spectrum_utils.spectrum import MsmsSpectrum
 from spectrum_utils.spectrum import PeptideFragmentAnnotation
 
 
+
+
 cdef extern from 'sys/mman.h' nogil:
     void *mmap(void *addr, size_t length, int prot, int flags, int fildes,
                off_t off)
@@ -162,6 +164,7 @@ cdef (string, int, int) parse_annotation(string raw) nogil:
     cdef char ion_type = raw.at(0)
     cdef int ion_index = -1
     cdef int charge = -1
+
     # Discard peaks that don't correspond to typical ion types.
     if ion_type == b'a' or ion_type == b'b' or ion_type == b'y':
         # The ion index is the subsequent numeric part.

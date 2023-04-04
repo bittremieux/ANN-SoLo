@@ -63,14 +63,6 @@ class SpectralLibrary:
         try:
             self._library_reader = reader.SpectralLibraryReader(
                 filename, self._get_hyperparameter_hash())
-            #self._library_reader.open()
-            #Library reader.open , should be changed with open read mode
-            #library and instantiate the self._spectra_library_store = None
-            #attribute. Later, modify the getspectrum and get_all_spectra
-            #calls to read directly from the store  in this current file
-
-            #Instead of the open, just open it directly in the
-            #_library_reader
 
         except FileNotFoundError as e:
             logging.error(e)
@@ -304,7 +296,6 @@ class SpectralLibrary:
                           num_spectra,
                           config.precursor_tolerance_mass_open,
                           config.precursor_tolerance_mode_open)
-
         ssms = {}
         batch_size = config.batch_size
         with tqdm.tqdm(desc='Query spectra processed', total=num_spectra,

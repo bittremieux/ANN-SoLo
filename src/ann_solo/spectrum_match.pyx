@@ -91,7 +91,6 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
         query_spec = new Spectrum(
             query.precursor_mz, query.precursor_charge, len(query.mz),
             &mz[0], &intensity[0], &charge[0])
-
         with nogil:
             query_matcher = new SpectrumMatcher()
             result = query_matcher.dot(query_spec, candidates_vec,
@@ -99,7 +98,6 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
             candidate_index = result.getCandidateIndex()
             score = result.getScore()
             peak_matches = result.getPeakMatches()[0]
-
         return (candidates[candidate_index], score,
                 [peak_matches[i] for i in range(peak_matches.size())])
     finally:
