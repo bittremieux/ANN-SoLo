@@ -1,10 +1,10 @@
 import io
 import mmap
-from multiprocessing import cpu_count
 import collections
 import logging
 import pickle
 import os
+import psutil
 import re
 from functools import lru_cache
 from typing import List, Tuple, Dict, IO, Iterator, Union
@@ -13,7 +13,6 @@ from typing import List, Tuple, Dict, IO, Iterator, Union
 import h5py
 import joblib
 from joblib import Parallel, delayed
-from nltk.tokenize import RegexpTokenizer
 import numpy as np
 import pandas as pd
 import tqdm
@@ -299,6 +298,41 @@ class SpectralLibraryReader:
         """
         return 'null'
 
+    def _parse_fragment_annotation(self, mz: float,
+                                   annotation: str) -> PeptideFragmentAnnotation:
+        """
+        Takes an ion peak anotaion line and parse to retrieve: ion_type,
+        ion_index, and charge.
+
+        Parameters
+        ----------
+        mz : float
+            The m/z mass.
+        annotation : str
+            Raw annotation line.
+
+        Returns
+        -------
+        PeptideFragmentAnnotation
+            An PeptideFragmentAnnotation object.
+        """
+        ion_type = annotation[0]
+        if ion_type == 'a' or ion_type == 'b' or ion_type == 'y':
+            index_charge = annotation[1:].split('/', 1)[0].split('^')
+            ion_index = re.search(r'^\d+', index_charge[0])
+            if len(index_charge) == 1:
+                charge, ion_index = (
+                1 if ion_index.group(0) == index_charge[0] else -1,
+                int(ion_index.group(0))) if ion_index else (-1. - 1)
+            else:
+                charge = re.search(r'^\d+', index_charge[1])
+                charge, ion_index = int(
+                    charge.group(0)) if charge else -1, int(
+                    ion_index.group(0)) if ion_index else -1
+            return PeptideFragmentAnnotation(charge, mz, ion_type, ion_index)
+        else:
+            return None
+
     def _parse_sptxt_spectrum(self, raw_spectrum: str, identifier: int =
     None) -> MsmsSpectrum:
         """
@@ -317,23 +351,23 @@ class SpectralLibraryReader:
         MsmsSpectrum
             An MsmsSpectrum object.
         """
-        # Create a reference variable for Class RegexpTokenizer
-        # that split raw spectrum in two chunks: metadata & spectrum
-        spectrum_tk = RegexpTokenizer('Num\s?Peaks:\s?[0-9]+\n', gaps=True,
-                                      flags=re.IGNORECASE)
-        spectrum_tokens = spectrum_tk.tokenize(raw_spectrum)
-        spectrum_metadata = spectrum_tokens[0]
-        spectrum = spectrum_tokens[1]
+        # Split raw spectrum in two chunks: metadata & spectrum
+        raw_spectrum_tokens = re.split('Num\s?Peaks:\s?[0-9]+\n',
+                                       raw_spectrum.strip(),
+                                       flags=re.IGNORECASE)
+        spectrum_metadata = raw_spectrum_tokens[0]
+        spectrum = raw_spectrum_tokens[1]
         ##Retrieve identifier if there is one
         LibID = re.search('LibID:\s?[0-9]+', spectrum_metadata, re.IGNORECASE)
         if LibID:
-            identifier = re.search('[0-9]+.', LibID.group(0)).group(0)
+            LibID = re.search('[0-9]+.', LibID.group(0))
+        identifier = LibID.group(0) if LibID else identifier
         # Check if decoy
         decoy = True if re.search('decoy', spectrum_metadata,
                                   re.IGNORECASE) else False
         ##Retrieve peptide & charge
         peptide_Charge = spectrum_metadata.split('\n', 1)[0].split('/')
-        peptide = peptide_Charge[0].strip()
+        peptide = peptide_Charge[0].split(' ')[-1].strip()
         charge = int(peptide_Charge[1].strip())
         ##Retrieve precurssor mass
         perMZ = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
@@ -346,12 +380,20 @@ class SpectralLibraryReader:
             perMZ = re.search('[0-9]+.[0-9]+', perMZ.group(0))
         ##Retrieve MZ & Intensities
         file = io.StringIO(spectrum)
-        MZ_Intensity = pd.read_csv(file, sep="\t", header=None)
+        MZ_Intensity_annot = pd.read_csv(file, sep="\t", header=None)
 
+        if MZ_Intensity_annot.shape[1] > 2:
+            annotation = [_parse_fragment_annotation(mz, annotation)
+                          for mz, annotation in
+                          zip(MZ_Intensity_annot[0], MZ_Intensity_annot[2])]
+        else:
+            annotation = [None] * len(MZ_Intensity_annot[0])
         spectrum = MsmsSpectrum(identifier, perMZ.group(0), charge,
-                                MZ_Intensity[0].to_numpy(copy=True),
-                                MZ_Intensity[1].to_numpy(copy=True),
+                                MZ_Intensity_annot[0].to_numpy(copy=True),
+                                MZ_Intensity_annot[1].to_numpy(copy=True),
+                                annotation,
                                 is_decoy=decoy)
+
         spectrum.peptide = peptide
 
         return spectrum
@@ -375,7 +417,8 @@ class SpectralLibraryReader:
         Iterator[MsmsSpectrum]
             An iterator of spectra in the given library file.
         """
-        for spectrum in list(Parallel(n_jobs=cpu_count())(
+        num_threads = len(psutil.Process().cpu_affinity())
+        for spectrum in list(Parallel(n_jobs=num_threads)(
                 delayed(_parse_sptxt_spectrum)(raw_spectrum, id) for
                 raw_spectrum, id in zip(raw_spectra, ids))):
             yield spectrum
@@ -391,28 +434,32 @@ class SpectralLibraryReader:
             An iterator of spectra in the given library file.
 
         """
-        with open(self._filename, 'rb') as file:
-            # Create a reference variable for Class RegexpTokenizer
-            tk = RegexpTokenizer('Name:\s?', gaps=True, flags=re.IGNORECASE)
+        num_threads = len(psutil.Process().cpu_affinity())
+        with open(filename, 'rb') as file:
             mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
             raw_spectra_list = []
-            for i, raw_spec in enumerate(
-                    tk.tokenize(mmapped_file.read().decode('utf-8')), 1):
-                if i % cpu_count():
-                    raw_spectra_list.append(raw_spec)
+            for i, raw_spec in enumerate(re.finditer(
+                    b'(?<![a-zA-Z])Name:\s?(?:(?!((?<![a-zA-Z])Name:\s?)).|\n)*',
+                        mmapped_file.read(),
+                        re.IGNORECASE),
+                    1):
+                raw_spectra_list.append(
+                    '\n'.join(raw_spec.group(0).decode('utf-8').splitlines()))
+                if i % num_threads:
                     continue
                 else:
                     for spectrum in _parse_batch_sptxt_spectra(
                             raw_spectra_list,
-                            list(range(i + 1 - cpu_count(), i + 1))):
+                            list(range(i + 1 - num_threads, i + 1))):
                         yield spectrum
                     raw_spectra_list = []
             if not raw_spectra_list:
-                for spectrum in _parse_batch_sptxt_spectra(raw_spectra_list,
-                                                           list(range(
-                                                                   i + 1 - len(
-                                                                           raw_spectra_list),
-                                                                   i + 1))):
+                for spectrum in \
+                    _parse_batch_sptxt_spectra(raw_spectra_list,
+                                            list(range(
+                                                i + 1 - len(raw_spectra_list),
+                                                i + 1))
+                                            ):
                     yield spectrum
 
 
