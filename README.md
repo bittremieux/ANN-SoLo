@@ -17,6 +17,8 @@ If you use ANN-SoLo in your work, please cite the following publications:
 
 - Wout Bittremieux, Kris Laukens, William Stafford Noble. **Extremely Fast and Accurate Open Modification Spectral Library Searching of High-Resolution Mass Spectra Using Feature Hashing and Graphics Processing Units.** _Journal of Proteome Research_ (2019). [doi:10.1021/acs.jproteome.9b00291](https://doi.org/10.1021/acs.jproteome.9b00291)
 
+- Issar Arab, William E. Fondrie, Kris Laukens, and Wout Bittremieux. **Semisupervised Machine Learning for Sensitive Open Modification Spectral Library Searching.** _Journal of Proteome Research_ (2023). [doi:10.1021/acs.jproteome.2c00616](https://doi.org/10.1021/acs.jproteome.2c00616)
+
 Running ANN-SoLo
 ----------------
 
