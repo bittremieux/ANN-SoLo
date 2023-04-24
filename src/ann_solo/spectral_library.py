@@ -207,7 +207,6 @@ class SpectralLibrary:
             (specified in the config).
         """
         logging.info('Process file %s', query_filename)
-
         # Read all spectra in the query file and
         # split based on their precursor charge
         query_spectra = collections.defaultdict(list)
@@ -227,7 +226,6 @@ class SpectralLibrary:
                 if process_spectrum(query_spectrum_charge, False).is_valid:
                     (query_spectra[query_spectrum_charge.precursor_charge]
                      .append(query_spectrum_charge))
-
         # Identify all query spectra.
         identifications = {}
         do_cascade_open = (

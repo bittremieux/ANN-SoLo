@@ -76,7 +76,6 @@ def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
 
     min_peaks = config.min_peaks
     min_mz_range = config.min_mz_range
-
     spectrum = spectrum.set_mz_range(config.min_mz, config.max_mz)
     if not _check_spectrum_valid(spectrum.mz, min_peaks, min_mz_range):
         spectrum.is_valid = False
@@ -88,7 +87,6 @@ def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
             spectrum.is_valid = False
             spectrum.is_processed = True
             return spectrum
-
     if config.remove_precursor:
         spectrum = spectrum.remove_precursor_peak(
             config.remove_precursor_tolerance, 'Da', 2)
@@ -96,7 +94,6 @@ def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
             spectrum.is_valid = False
             spectrum.is_processed = True
             return spectrum
-
     spectrum = spectrum.filter_intensity(
         config.min_intensity, (config.max_peaks_used_library if is_library else
                                config.max_peaks_used))
@@ -104,7 +101,6 @@ def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
         spectrum.is_valid = False
         spectrum.is_processed = True
         return spectrum
-
     scaling = config.scaling
     if scaling == 'sqrt':
         scaling = 'root'
@@ -113,7 +109,7 @@ def process_spectrum(spectrum: MsmsSpectrum, is_library: bool) -> MsmsSpectrum:
             scaling, max_rank=(config.max_peaks_used_library if is_library else
                                config.max_peaks_used))
 
-    spectrum.intensity = _norm_intensity(spectrum.intensity)
+    spectrum._intensity = _norm_intensity(spectrum.intensity)
 
     # Set a flag to indicate that the spectrum has been processed to avoid
     # reprocessing of library spectra for multiple queries.

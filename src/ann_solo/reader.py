@@ -1,36 +1,33 @@
+import collections
 import io
 import mmap
-import collections
 import logging
-import pickle
 import os
-import psutil
+import pickle
 import re
+import uuid
 from functools import lru_cache
-from typing import List, Tuple, Dict, IO, Iterator, Union
+from typing import Dict, IO, Iterator, List, Tuple, Union
 
 
 import h5py
 import joblib
-from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import tqdm
 from lxml.etree import LxmlError
 from pyteomics import mgf, mzml, mzxml
 from spectrum_utils.spectrum import MsmsSpectrum
-from spectrum_utils.spectrum import PeptideFragmentAnnotation
+from spectrum_utils.fragment_annotation import FragmentAnnotation
 
 from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
-
-from ann_solo.config import config
 
 
 
 class SpectralLibraryReader:
     """
-    Read spectra from a SpectraST spectral library file.
+    Read spectra from a spectral library file.
     """
 
     _supported_extensions = ['.splib','.sptxt','.mgf']
@@ -68,7 +65,6 @@ class SpectralLibraryReader:
         self._config_hash = config_hash
         self._parser = None
         self._spectral_library_store = None
-        self._num_threads = len(psutil.Process().cpu_affinity())
         do_create = False
 
         # Test if the given spectral library file is in a supported format.
@@ -109,7 +105,7 @@ class SpectralLibraryReader:
             self._create_config()
 
         # Open the Spectral Library Store
-        self._spectral_library_store = SpectraLibraryStore(
+        self._spectral_library_store = SpectralLibraryStore(
             self._get_store_filename())
         self._spectral_library_store.open_store('r')
 
@@ -137,7 +133,7 @@ class SpectralLibraryReader:
         Returns
         -------
         str
-            The configuration file name (.spcfg file).
+            The spectral library file name (.hdf5 file).
         """
         if self._config_hash is not None:
             return (f'{os.path.splitext(self._filename)[0]}_'
@@ -165,7 +161,7 @@ class SpectralLibraryReader:
         temp_info = collections.defaultdict(
             lambda: {'id': [], 'precursor_mz': []})
         with self as lib_reader:
-            with SpectraLibraryStore(self._get_store_filename()) as spectraStore:
+            with SpectralLibraryStore(self._get_store_filename()) as spectraStore:
                 for spectrum in tqdm.tqdm(
                         lib_reader.read_library_file(),
                         desc='Library spectra read', unit='spectra'):
@@ -241,7 +237,6 @@ class SpectralLibraryReader:
         spectrum.is_processed = False
         if process_peaks:
             return process_spectrum(spectrum, True)
-
         return spectrum
 
 
@@ -251,7 +246,7 @@ class SpectralLibraryReader:
 
         Returns
         -------
-        Iterator[Tuple[Spectrum, int]]
+        Iterator[MsmsSpectrum]
             An iterator of all spectra in the spectral library hdf5 store.
         """
 
@@ -282,7 +277,7 @@ class SpectralLibraryReader:
             except StopIteration:
                 return
         elif ext == '.sptxt':
-            for spectrum in self.parse_sptxt():
+            for spectrum in self.read_sptxt():
                 yield spectrum
         elif ext == '.mgf':
             for spectrum in read_mgf(self._filename):
@@ -299,53 +294,52 @@ class SpectralLibraryReader:
         """
         return 'null'
 
-    def _parse_fragment_annotation(self, mz: float,
-                                   annotation: str) -> PeptideFragmentAnnotation:
+    def _parse_fragment_annotation(self, annotation: str) -> \
+            FragmentAnnotation:
         """
         Takes an ion peak anotaion line and parse to retrieve: ion_type,
         ion_index, and charge.
 
         Parameters
         ----------
-        mz : float
-            The m/z mass.
         annotation : str
             Raw annotation line.
 
         Returns
         -------
-        PeptideFragmentAnnotation
-            An PeptideFragmentAnnotation object.
+        FragmentAnnotation
+            An FragmentAnnotation object.
         """
         ion_type = annotation[0]
-        if ion_type == 'a' or ion_type == 'b' or ion_type == 'y':
+        if ion_type in 'aby':
             index_charge = annotation[1:].split('/', 1)[0].split('^')
             ion_index = re.search(r'^\d+', index_charge[0])
             if len(index_charge) == 1:
                 charge, ion_index = (
                 1 if ion_index.group(0) == index_charge[0] else -1,
-                int(ion_index.group(0))) if ion_index else (-1. - 1)
+                int(ion_index.group(0)))
             else:
                 charge = re.search(r'^\d+', index_charge[1])
                 charge, ion_index = int(
                     charge.group(0)) if charge else -1, int(
-                    ion_index.group(0)) if ion_index else -1
-            return PeptideFragmentAnnotation(charge, mz, ion_type, ion_index)
+                    ion_index.group(0)) if ion_index else 1
+            return FragmentAnnotation(str(ion_type)+str(ion_index),
+                                      charge=abs(charge))
         else:
             return None
 
-    def _parse_sptxt_spectrum(self, raw_spectrum: str, identifier: int =
-    None) -> MsmsSpectrum:
+    def _parse_sptxt_spectrum(self, identifier: int, raw_spectrum: str)\
+            -> MsmsSpectrum:
         """
         Takes a raw spectrum data retrieved from an sptxt file and
         parses it to a structured object of type MsmsSpectrum.
 
         Parameters
         ----------
-        raw_spectrum : string
-            The spectrum in a raw format.
         identifier : int
             Incremented identifier of the spectrum in the library.
+        raw_spectrum : string
+            The spectrum in a raw format.
 
         Returns
         -------
@@ -366,32 +360,32 @@ class SpectralLibraryReader:
         peptide = peptide_Charge[0].split(' ')[-1].strip()
         charge = int(peptide_Charge[1].strip())
         ##Retrieve precurssor mass
-        perMZ = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
+        precursor_mz = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
                           re.IGNORECASE)
-        if perMZ:
-            perMZ = re.search('[0-9]+.[0-9]+', perMZ.group(0))
+        if precursor_mz:
+            precursor_mz = re.search('[0-9]+.[0-9]+', precursor_mz.group(0))
         else:
-            perMZ = re.search('Parent=\s?[0-9]+.[0-9]+', spectrum_metadata,
+            precursor_mz = re.search('Parent=\s?[0-9]+.[0-9]+', spectrum_metadata,
                               re.IGNORECASE)
-            perMZ = re.search('[0-9]+.[0-9]+', perMZ.group(0))
+            precursor_mz = re.search('[0-9]+.[0-9]+', precursor_mz.group(0))
         ##Retrieve MZ & Intensities
         file = io.StringIO(spectrum)
-        MZ_Intensity_annot = pd.read_csv(file, sep="\t", header=None)
+        mz_intensity_annotation = pd.read_csv(file, sep="\t", header=None)
 
-        if MZ_Intensity_annot.shape[1] > 2:
-            annotation = [self._parse_fragment_annotation(mz, annotation)
+        if mz_intensity_annotation.shape[1] > 2:
+            annotation = [self._parse_fragment_annotation(annotation)
                           for mz, annotation in
-                          zip(MZ_Intensity_annot[0], MZ_Intensity_annot[2])]
+                          zip(mz_intensity_annotation[0], mz_intensity_annotation[2])]
         else:
-            annotation = [None] * len(MZ_Intensity_annot[0])
-        spectrum = MsmsSpectrum(identifier, perMZ.group(0), charge,
-                                MZ_Intensity_annot[0].to_numpy(copy=True),
-                                MZ_Intensity_annot[1].to_numpy(copy=True),
-                                annotation,
-                                is_decoy=decoy)
+            annotation = [None] * len(mz_intensity_annotation[0])
+        spectrum = MsmsSpectrum(str(identifier), float(precursor_mz.group(0)),
+                                charge,
+                                mz_intensity_annotation[0].to_numpy(copy=True),
+                                mz_intensity_annotation[1].to_numpy(copy=True))
 
         spectrum.peptide = peptide
-
+        spectrum.is_decoy = decoy
+        spectrum._annotation = annotation
         return spectrum
 
     # For parallel processing
@@ -413,15 +407,37 @@ class SpectralLibraryReader:
         Iterator[MsmsSpectrum]
             An iterator of spectra in the given library file.
         """
-        for spectrum in list(Parallel(n_jobs=self._num_threads)(
-                delayed(self._parse_sptxt_spectrum)(raw_spectrum, id) for
-                raw_spectrum, id in zip(raw_spectra, ids))):
+        for spectrum in list(joblib.Parallel(n_jobs=-1)(
+                joblib.delayed(self._parse_sptxt_spectrum)(raw_spectrum,
+                id)  for raw_spectrum, id in zip(raw_spectra, ids))):
             yield spectrum
 
-    def parse_sptxt(self) -> Iterator[MsmsSpectrum]:
+    def _parse_sptxt(self) -> Iterator[Tuple[int,str]]:
         """
         Open the sptxt spectra library file and parses it
         to read all spectra.
+
+        Returns
+        -------
+        Iterator[Tuple[int,str]]
+            An iterator of tuples of (id, spectrum) in the given library file,
+            where spectrum is in its raw text format.
+
+        """
+        with open(self._filename, 'rb') as file:
+            mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+            for id, raw_spectrum in tqdm.tqdm(enumerate(re.finditer(
+                            b'(?<![a-zA-Z])Name:\s?(?:(?!((?<![a-zA-Z])Name:\s?)).|\n)*',
+                            mmapped_file.read(),
+                            re.IGNORECASE),
+                        1), desc='SpectraST file parse',
+                        unit='spectra'):
+                    yield (id,'\n'.join(raw_spectrum.group(0).decode(
+                        'utf-8').splitlines()))
+
+    def read_sptxt(self) -> Iterator[MsmsSpectrum]:
+        """
+        Open read spectra from SpectraST spectra library.
 
         Returns
         -------
@@ -429,37 +445,19 @@ class SpectralLibraryReader:
             An iterator of spectra in the given library file.
 
         """
-        with open(self._filename, 'rb') as file:
-            mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
-            raw_spectra_list = []
-            for i, raw_spec in enumerate(re.finditer(
-                    b'(?<![a-zA-Z])Name:\s?(?:(?!((?<![a-zA-Z])Name:\s?)).|\n)*',
-                        mmapped_file.read(),
-                        re.IGNORECASE),
-                    1):
-                raw_spectra_list.append(
-                    '\n'.join(raw_spec.group(0).decode('utf-8').splitlines()))
-                if i % self._num_threads:
-                    continue
-                else:
-                    for spectrum in self._parse_batch_sptxt_spectra(
-                            raw_spectra_list,
-                            list(range(i + 1 - self._num_threads, i + 1))):
-                        yield spectrum
-                    raw_spectra_list = []
-            if not raw_spectra_list:
-                for spectrum in \
-                    self._parse_batch_sptxt_spectra(raw_spectra_list,
-                                            list(range(
-                                                i + 1 - len(raw_spectra_list),
-                                                i + 1))
-                                            ):
-                    yield spectrum
+        # TODO: Use all logical units in the system (-1)
+        for spectrum in joblib.Parallel(n_jobs=1,
+                                        backend='multiprocessing')(
+                joblib.delayed(
+                    self._parse_sptxt_spectrum
+                )(id, raw_spectrum) for id, raw_spectrum in
+                self._parse_sptxt()):
+
+            yield spectrum
 
 
 
-
-class SpectraLibraryStore:
+class SpectralLibraryStore:
     """
         Class to efficiently store and retrieve spectra from a library file.
     """
@@ -485,8 +483,7 @@ class SpectraLibraryStore:
         mode : str
             The mode (r/w) by which to open the  spectral library store.
         """
-        self.hdf5_store = h5py.File(self.file_path,
-                                    'r' if mode == 'r' else 'w')
+        self.hdf5_store = h5py.File(self.file_path, mode)
 
     def close_store(self) -> None:
         """
@@ -521,7 +518,7 @@ class SpectraLibraryStore:
 
         """
         # Create a new group under the same key
-        group = self.hdf5_store.create_group(f'{spectrum.identifier}')
+        group = self.hdf5_store.create_group(str(spectrum.identifier))
 
         group.create_dataset('peptide', data=spectrum.peptide)
         group.create_dataset('precursor_charge',
@@ -531,12 +528,11 @@ class SpectraLibraryStore:
         group.create_dataset('mz', data=spectrum.mz)
         group.create_dataset('intensity', data=spectrum.intensity)
         # Encode annotation
-        annotation = np.array([[annotation.charge,
-                              annotation.calc_mz,
-                              _encode_ion_type(annotation.ion_type),
-                              annotation.ion_index]
+        annotation = np.array([[_encode_ion_type(annotation.ion_type[0]),
+                                int(annotation.ion_type[1:]),
+                                annotation.charge]
                              if annotation is not None
-                             else [0, 0, 0, 0]
+                             else [0, 0, 0]
                              for annotation in spectrum.annotation])
 
         group.create_dataset('annotation', data=annotation)
@@ -558,30 +554,27 @@ class SpectraLibraryStore:
         MsmsSpectrum
             An MsmsSpectrum object.
         """
-        spectrum_specs = self.hdf5_store[f'{spec_id}']
-
+        spectrum_specs = self.hdf5_store[str(spec_id)]
         # Decode annotation
-        annotation = [PeptideFragmentAnnotation(annotation[0].astype(np.int),
-                                                annotation[1],
-                                                _decode_ion_type(annotation[2]),
-                                                annotation[3].astype(np.int))
-                       if not np.all(annotation==0)
+        annotation = [FragmentAnnotation(_decode_ion_type(annotation[2])+
+                                         str(annotation[1]),
+                                         charge=annotation[2].astype(np.int))
+                       if np.count_nonzero(annotation)
                        else None
                        for annotation in spectrum_specs['annotation'][()]]
-
-        spectrum = MsmsSpectrum(spec_id,
+        spectrum = MsmsSpectrum(str(spec_id),
                             spectrum_specs['precursor_mz'][()],
                             spectrum_specs['precursor_charge'][()],
                             spectrum_specs['mz'][()],
-                            spectrum_specs['intensity'][()],
-                            annotation,
-                            is_decoy=spectrum_specs['is_decoy'][()])
+                            spectrum_specs['intensity'][()])
 
         spectrum.peptide = spectrum_specs['peptide'][()].decode('utf-8')
+        spectrum._annotation = annotation
+        spectrum.is_decoy = spectrum_specs['is_decoy'][()]
 
         return spectrum
 
-    def __enter__(self) -> 'SpectraLibraryStore':
+    def __enter__(self) -> 'SpectralLibraryStore':
         self.open_store('w')
         return self
 
@@ -842,9 +835,7 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
 
             if 'seq' in mgf_spectrum['params']:
                 spectrum.peptide = mgf_spectrum['params']['seq']
-                spectrum.annotation = [None] * len(mgf_spectrum['m/z array'])
-
-
+                spectrum._annotation = [None] * len(mgf_spectrum['m/z array'])
 
             yield spectrum
 
