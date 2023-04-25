@@ -5,7 +5,6 @@ import logging
 import os
 import pickle
 import re
-import uuid
 from functools import lru_cache
 from typing import Dict, IO, Iterator, List, Tuple, Union
 
@@ -387,30 +386,6 @@ class SpectralLibraryReader:
         spectrum.is_decoy = decoy
         spectrum._annotation = annotation
         return spectrum
-
-    # For parallel processing
-    def _parse_batch_sptxt_spectra(self, raw_spectra: List[str], ids: List[
-        int]) -> Iterator[MsmsSpectrum]:
-        """
-        Takes a list of  raw spectra data retrieved from an sptxt file and
-        parses it to a structured object of type MsmsSpectrum.
-
-        Parameters
-        ----------
-        raw_spectrum : List[string]
-            The spectrum in a raw format.
-        identifier : List[int]
-            Incremented identifier of the spectrum in the library.
-
-        Returns
-        -------
-        Iterator[MsmsSpectrum]
-            An iterator of spectra in the given library file.
-        """
-        for spectrum in list(joblib.Parallel(n_jobs=-1)(
-                joblib.delayed(self._parse_sptxt_spectrum)(raw_spectrum,
-                id)  for raw_spectrum, id in zip(raw_spectra, ids))):
-            yield spectrum
 
     def _parse_sptxt(self) -> Iterator[Tuple[int,str]]:
         """
