@@ -350,8 +350,9 @@ class SpectralLibraryReader:
         peptide = parser.parse(peptide)
         for shift, modification in enumerate(modifications):
             idx, aa, modification_name = modification.split(',')
-            peptide = peptide[:int(idx) + shift + 1] + [
-                modification_name] + peptide[int(idx) + shift + 1:]
+            peptide = peptide[:int(idx) + shift + 1] + \
+                      ['['+modification_name+']'] + \
+                      peptide[int(idx) + shift + 1:]
         return ''.join(peptide)
 
     def _parse_sptxt_spectrum(self, identifier: int, raw_spectrum: str)\
