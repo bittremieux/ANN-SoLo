@@ -7,7 +7,7 @@ import pickle
 import re
 from functools import lru_cache
 from typing import Dict, IO, Iterator, List, Tuple, Union
-
+from re import Match
 
 import h5py
 import joblib
@@ -329,7 +329,7 @@ class SpectralLibraryReader:
         else:
             return None
 
-    def _peptide_to_proforma(self, peptide: str, modifications: List[str]) \
+    def _sptxt_seq_to_proforma(self, peptide: str, modifications: List[str]) \
             -> str:
         """
         Takes a peptide and a list of modifications to return a modified
@@ -418,7 +418,7 @@ class SpectralLibraryReader:
                                 mz_intensity_annotation[0].to_numpy(copy=True),
                                 mz_intensity_annotation[1].to_numpy(copy=True))
 
-        spectrum.peptide = self._peptide_to_proforma(peptide,modifications)
+        spectrum.peptide = self._sptxt_seq_to_proforma(peptide,modifications)
         spectrum.is_decoy = decoy
         spectrum._annotation = annotation
 
@@ -805,6 +805,61 @@ def _parse_spectrum_mzxml(spectrum_dict: Dict) -> MsmsSpectrum:
 
     return spectrum
 
+
+def _leading_substitute_pattern(match: Match) -> str:
+    """
+    Takes a match object as its argument and returns the replacement string.
+
+    Parameters
+    ----------
+    match : Match
+        Match object in the input string according to the pattern.
+
+    Returns
+    -------
+    str
+        Modified string.
+    """
+    if match.group(1) and match.group(2):
+        return '[{}]?[{}]-{:s}'.format(match.group(1), match.group(2),
+                                       match.group(3))
+    elif match.group(1):
+        return '[{}]-{}'.format(match.group(1), match.group(3))
+    else:
+        return match.group(0)
+
+
+def _mgf_seq_to_proforma(peptide: str) -> str:
+    """
+    Takes a peptide in mgf format to return a modified peptide in its ProForma
+    format.
+
+    Parameters
+    ----------
+    peptide : str
+        Peptide sequence in its mgf format.
+
+    Returns
+    -------
+    str
+        Modified mgf peptide in its ProForma format.
+    """
+    # Handle modifications with an observed experimental mass
+    within_modification_pattern = r'([A-Z])([+-]?\d+\.\d+)'
+    substitute_pattern = r'\1[\2]'
+    formated_sequence = re.sub(within_modification_pattern,
+                                   substitute_pattern, peptide)
+
+    # Handle N-terminal or Unlocalized modifications
+    leading_modification_pattern = r'([+-]?[\d.]+)([+-]?[\d.]+)?([A-Za-z]+)'
+
+    # Handle leading modifications
+    formated_sequence = re.sub(leading_modification_pattern,
+                                   _leading_substitute_pattern,
+                                   formated_sequence)
+
+    return formated_sequence
+
 def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     """
     Read all spectra from the given mgf file.
@@ -824,7 +879,8 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     with open(filename, 'rb') as file:
         for i, mgf_spectrum in enumerate(mgf.MGF(file)):
             # Create spectrum.
-            identifier = mgf_spectrum['params']['title' if 'title' in  mgf_spectrum['params'] else 'scan']
+            identifier = mgf_spectrum['params'][
+                'title' if 'title' in mgf_spectrum['params'] else 'scan']
 
             precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
             retention_time = float(mgf_spectrum['params']['rtinseconds']) if\
@@ -844,7 +900,8 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
                 else False
 
             if 'seq' in mgf_spectrum['params']:
-                spectrum.peptide = mgf_spectrum['params']['seq']
+                spectrum.peptide = _mgf_seq_to_proforma(mgf_spectrum[
+                                                            'params']['seq'])
                 spectrum._annotation = [None] * len(mgf_spectrum['m/z array'])
 
             yield spectrum
