@@ -235,7 +235,9 @@ class SpectralLibraryReader:
                                                 spec_id)
         spectrum.is_processed = False
         if process_peaks:
-            return process_spectrum(spectrum, True)
+            annotation = spectrum.annotation
+            spectrum = process_spectrum(spectrum, True)
+            spectrum._annotation = annotation
         return spectrum
 
 
@@ -327,6 +329,31 @@ class SpectralLibraryReader:
         else:
             return None
 
+    def _peptide_to_proforma(self, peptide: str, modifications: List[str]) \
+            -> str:
+        """
+        Takes a peptide and a list of modifications to return a modified
+        peptide in its ProForma format.
+
+        Parameters
+        ----------
+        peptide : str
+            Peptide sequence in its non-modified format.
+        modifications: List[str]
+            A list of modifications.
+
+        Returns
+        -------
+        str
+            Modified peptide in its ProForma format.
+        """
+        peptide = parser.parse(peptide)
+        for shift, modification in enumerate(modifications):
+            idx, aa, modification_name = modification.split(',')
+            peptide = peptide[:int(idx) + shift + 1] + [
+                modification_name] + peptide[int(idx) + shift + 1:]
+        return ''.join(peptide)
+
     def _parse_sptxt_spectrum(self, identifier: int, raw_spectrum: str)\
             -> MsmsSpectrum:
         """
@@ -354,11 +381,11 @@ class SpectralLibraryReader:
         # Check if decoy
         decoy = True if re.search('decoy', spectrum_metadata,
                                   re.IGNORECASE) else False
-        ##Retrieve peptide & charge
+        # Retrieve peptide & charge
         peptide_Charge = spectrum_metadata.split('\n', 1)[0].split('/')
         peptide = peptide_Charge[0].split(' ')[-1].strip()
         charge = int(peptide_Charge[1].strip())
-        ##Retrieve precurssor mass
+        # Retrieve precurssor mass
         precursor_mz = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
                           re.IGNORECASE)
         if precursor_mz:
@@ -367,7 +394,15 @@ class SpectralLibraryReader:
             precursor_mz = re.search('Parent=\s?[0-9]+.[0-9]+', spectrum_metadata,
                               re.IGNORECASE)
             precursor_mz = re.search('[0-9]+.[0-9]+', precursor_mz.group(0))
-        ##Retrieve MZ & Intensities
+        # Retrieve modifications
+        modifications = re.search('Mods=.+?(?=[\s\n])',
+                                 spectrum_metadata,
+                                 re.IGNORECASE)
+        if modifications:
+            modifications = str(modifications.group(0)).split('/')[1:]
+        else:
+            modifications = None
+        # Retrieve MZ & Intensities
         file = io.StringIO(spectrum)
         mz_intensity_annotation = pd.read_csv(file, sep="\t", header=None)
 
@@ -382,9 +417,10 @@ class SpectralLibraryReader:
                                 mz_intensity_annotation[0].to_numpy(copy=True),
                                 mz_intensity_annotation[1].to_numpy(copy=True))
 
-        spectrum.peptide = peptide
+        spectrum.peptide = self._peptide_to_proforma(peptide,modifications)
         spectrum.is_decoy = decoy
         spectrum._annotation = annotation
+
         return spectrum
 
     def _parse_sptxt(self) -> Iterator[Tuple[int,str]]:
@@ -427,7 +463,6 @@ class SpectralLibraryReader:
                     self._parse_sptxt_spectrum
                 )(id, raw_spectrum) for id, raw_spectrum in
                 self._parse_sptxt()):
-
             yield spectrum
 
 
@@ -786,11 +821,10 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
 
     # Get all spectra.
     with open(filename, 'rb') as file:
-        # memory-map the file
-        mmapped_file = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
-        for i, mgf_spectrum in enumerate(mgf.read(mmapped_file, use_index=True)):
+        for i, mgf_spectrum in enumerate(mgf.MGF(file)):
             # Create spectrum.
-            identifier = mgf_spectrum['params']['title']
+            identifier = mgf_spectrum['params']['title' if 'title' in  mgf_spectrum['params'] else 'scan']
+
             precursor_mz = float(mgf_spectrum['params']['pepmass'][0])
             retention_time = float(mgf_spectrum['params']['rtinseconds']) if\
                 'rtinseconds' in mgf_spectrum['params'] else None
