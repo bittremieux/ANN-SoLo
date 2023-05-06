@@ -7,7 +7,6 @@ import pickle
 import re
 from functools import lru_cache
 from typing import Dict, IO, Iterator, List, Tuple, Union
-from re import Match
 
 import h5py
 import joblib
@@ -806,7 +805,7 @@ def _parse_spectrum_mzxml(spectrum_dict: Dict) -> MsmsSpectrum:
     return spectrum
 
 
-def _leading_substitute_pattern(match: Match) -> str:
+def _leading_substitute_pattern(match: re.Match) -> str:
     """
     Takes a match object as its argument and returns the replacement string.
 
@@ -876,8 +875,8 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     """
 
     # Get all spectra.
-    with open(filename, 'rb') as file:
-        for i, mgf_spectrum in enumerate(mgf.MGF(file)):
+    with mgf.MGF(filename) as file:
+        for i, mgf_spectrum in enumerate(file, 1):
             # Create spectrum.
             identifier = mgf_spectrum['params'][
                 'title' if 'title' in mgf_spectrum['params'] else 'scan']
