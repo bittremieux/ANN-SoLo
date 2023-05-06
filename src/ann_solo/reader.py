@@ -966,3 +966,162 @@ def read_mztab_ssms(filename: str) -> pd.DataFrame:
     ssms.df_name = os.path.splitext(os.path.basename(filename))[0]
 
     return ssms
+
+
+def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'],
+             max_similarity: float = 0.7) -> Tuple[str, Dict[int, int]]:
+    """
+    Shuffles a peptide sequence randomly by keeping the number of tryptic
+    termini and missed internal cleavages (K,R,P). The shuffled sequence has
+    to be at least 70% dissimilar than the original sequence.
+
+    Parameters
+    ----------
+    peptide_sequence: str
+        The peptide sequence to shuffle.
+    excluded_residues: List[str]
+        The list of amino acids to maintain the tryptic property.
+
+    Returns
+    -------
+    Tuple[str, Dict[int, int]]
+        A tuple, where the first returned value is the shuffled sequence
+        and the second is the mapping indecies of the shuffle.
+    """
+    # Parse peptide
+    seq_original = parser.parse(peptide_sequence)
+    # Create a list of the indices of the residuess that should not be shuffled
+    indices_to_exclude = [i for i, elem in enumerate(seq_original[:-1]) if
+                          elem in excluded_residues] + [len(seq_original) - 1]
+
+    # Best permutation values
+    best_similarity, best_shuffled, best_permutation = 1, '', []
+    for i in range(10):
+        # Shuffle the elements of original sequence, but exclude the
+        # elements at the specified indices
+        seq_shuffled = np.array(seq_original)
+        random_permutation = np.random.permutation(
+            [i for i in range(len(seq_shuffled)) if
+             i not in indices_to_exclude])
+        random_permutation = random_permutation.tolist()
+        full_permutation = [
+            random_permutation.pop(0) if i not in indices_to_exclude else i for
+            i in range(len(seq_shuffled))]
+        seq_shuffled = seq_shuffled[full_permutation]
+        # Compute the similarity between seq_shuffled and seq_originalusing
+        #  edit distance
+        edit_distance = sum(
+            1 for x in ndiff(seq_shuffled.tolist(), seq_original) if
+            x[0] != ' ')
+        similarity = 1 - (edit_distance / len(seq_original))
+        # Check if similarity is below the specified threshold
+        if similarity <= max_similarity:
+            return ''.join(seq_shuffled), {i: full_permutation[i] for i in
+                                           range(len(seq_original))}
+        elif similarity < best_similarity:
+            best_similarity, best_shuffled, best_permutation = similarity, ''.join(
+                seq_shuffled), full_permutation
+    return best_shuffled, {i: full_permutation[i] for i in
+                           range(len(seq_original))}
+
+
+## Create annotation mapping for reposition support
+def _shuffle_annotation_mapping(sequence_mapping: Dict[int, int]) -> Dict[str,str]:
+    """
+    Create a mapping datastructure of the new annotations that the
+    repositioned peaks will have.
+
+    Parameters
+    ----------
+    sequence_mapping: Dict[int, int]
+        A dictionary mapping the old postions to the new postions of the
+        amino acids in the sequence.
+
+    Returns
+    -------
+    Dict[str,str]
+        A dictionary mapping the old annotations of peaks with their new
+        annotations based on the shuffled sequence.
+    """
+    annotation_mapping = {}
+    sequence_len = len(sequence_mapping)
+    for i in range(1, sequence_len):
+        old_p, new_p = i - 1, sequence_mapping[i - 1]
+        if new_p == sequence_len - 1:
+            annotation_mapping[f"b{i}"] = None
+            annotation_mapping[f"y{sequence_len-i}"] = None
+        elif old_p == new_p:
+            annotation_mapping[f"b{i}"] = f"b{i}"
+            annotation_mapping[f"y{sequence_len-i}"] = f"y{sequence_len-i}"
+        else:
+            annotation_mapping[f"b{i}"] = f"b{new_p + 1}"
+            annotation_mapping[
+                f"y{sequence_len-i}"] = f"y{sequence_len-(new_p+1)}"
+    return annotation_mapping
+
+
+def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
+    """
+    Creates a decoy spectrum from a real spectrum.
+
+    Parameters
+    ----------
+    spectrum: MsmsSpectrum
+        Real spectrum.
+
+    Returns
+    -------
+    MsmsSpectrum
+        Decoy spectrum.
+    """
+    # annotate original spectrum
+    spectrum.annotate_proforma(spectrum.peptide, 10, "ppm", "by")
+    # parse original spectrum
+    parsed_sequence = proforma.parse(spectrum.proforma)
+    shuffled_sequence, shuffled_sequence_mapping = _shuffle(
+        parsed_sequence[0].sequence)
+    # Get the fragment annotations mapping dictionary
+    shuffled_annotation_mapping = _shuffle_annotation_mapping(
+        shuffled_sequence_mapping)
+    # Constract decoy proteoform
+    for modification in parsed_sequence[0].modifications:
+        setattr(modification, 'position',
+                shuffled_sequence_mapping[modification.position])
+    decoy_proforma = proforma.Proteoform(shuffled_sequence,
+                                         parsed_sequence[0].modifications)
+
+    # Get theoretical fragment M/Z of the shuffled sequence
+    decoy_theoretical_fragments = {str(ion_type): mz for ion_type, mz in
+                                   fragment_annotation.get_theoretical_fragments(
+                                       decoy_proforma)}
+    # Reposition peaks
+    mz_shuffled, intensity_shuffled, annotation_shuffled = np.zeros_like(
+        spectrum.mz), np.zeros_like(spectrum.intensity), np.full_like(
+        spectrum.annotation, None, object)
+    for i in range(len(spectrum.mz)):
+        # Peak not annotated. Keep it at the same position.
+        if str(spectrum.annotation[i]) == '?':
+            intensity_shuffled[i] = spectrum.intensity[i]
+            mz_shuffled[i] = spectrum.mz[i]
+        # Peak annotated. Move it to the new position.
+        else:
+            intensity_shuffled[i] = spectrum.intensity[i]
+            annotation_shuffled[i] = shuffled_annotation_mapping[
+                spectrum.annotation[i][0].ion_type]
+            mz_shuffled[i] = decoy_theoretical_fragments[
+                annotation_shuffled[i]]
+    # Reorder the arrays based on the sorted mz array
+    reordered_arrays = zip(
+        *sorted(zip(mz_shuffled, intensity_shuffled, annotation_shuffled)))
+    mz_shuffled, intensity_shuffled, annotation_shuffled = map(list,
+                                                               reordered_arrays)
+    # Create a new `MsmsSpectrum` from the shuffled peaks
+    decoy_spectrum = MsmsSpectrum("DECOY_" + spectrum.identifier,
+                                  spectrum.precursor_mz,
+                                  spectrum.precursor_charge, mz_shuffled,
+                                  intensity_shuffled)
+    decoy_spectrum.proforma = decoy_proforma
+    decoy_spectrum.peptide = decoy_proforma.sequence
+    decoy_spectrum._annotation = annotation_shuffled
+
+    return decoy_spectrum
