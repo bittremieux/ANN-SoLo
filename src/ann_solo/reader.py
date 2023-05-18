@@ -1016,12 +1016,12 @@ def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'
         similarity = 1 - (edit_distance / len(seq_original))
         # Check if similarity is below the specified threshold
         if similarity <= max_similarity:
-            return ''.join(seq_shuffled), {i: full_permutation[i] for i in
+            return ''.join(seq_shuffled), {full_permutation[i]: i  for i in
                                            range(len(seq_original))}
         elif similarity < best_similarity:
             best_similarity, best_shuffled, best_permutation = similarity, ''.join(
                 seq_shuffled), full_permutation
-    return best_shuffled, {i: full_permutation[i] for i in
+    return best_shuffled, {full_permutation[i]: i  for i in
                            range(len(seq_original))}
 
 
