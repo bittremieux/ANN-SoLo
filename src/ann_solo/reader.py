@@ -14,10 +14,12 @@ import numpy as np
 import pandas as pd
 import tqdm
 from lxml.etree import LxmlError
-from pyteomics import mgf, mzml, mzxml
+from pyteomics import mgf, mzml, mzxml, parser
 from spectrum_utils.spectrum import MsmsSpectrum
 from spectrum_utils.fragment_annotation import FragmentAnnotation
 
+from ann_solo.config import config
+from ann_solo.decoy_generator import shuffle_and_reposition
 from ann_solo.parsers import SplibParser
 from ann_solo.spectrum import process_spectrum
 
@@ -60,6 +62,7 @@ class SpectralLibraryReader:
             correspond to the runtime settings.
         """
         self._filename = filename
+        _, self._filename_ext = os.path.splitext(os.path.basename(filename))
         self._config_hash = config_hash
         self._parser = None
         self._spectral_library_store = None
@@ -159,20 +162,30 @@ class SpectralLibraryReader:
         temp_info = collections.defaultdict(
             lambda: {'id': [], 'precursor_mz': []})
         with self as lib_reader:
-            with SpectralLibraryStore(self._get_store_filename()) as spectraStore:
+            with SpectralLibraryStore(self._get_store_filename()) as \
+                    spectra_store:
                 for spectrum in tqdm.tqdm(
                         lib_reader.read_library_file(),
                         desc='Library spectra read', unit='spectra'):
-
+                    if config.ad:
+                        # Store the decoy information for easy retrieval.
+                        decoy_spectrum = shuffle_and_reposition(spectrum,
+                                                                config.fragment_tol_mass,
+                                                                config.fragment_tol_mode)
+                        info_charge = temp_info[decoy_spectrum.precursor_charge]
+                        info_charge['id'].append(decoy_spectrum.identifier)
+                        info_charge['precursor_mz'].append(
+                            decoy_spectrum.precursor_mz)
+                        spectra_store.write_spectrum_to_library(decoy_spectrum)
                     # Store the spectrum information for easy retrieval.
                     info_charge = temp_info[spectrum.precursor_charge]
                     info_charge['id'].append(spectrum.identifier)
                     info_charge['precursor_mz'].append(spectrum.precursor_mz)
-                    spectraStore.write_spectrum_to_library(spectrum)
+                    spectra_store.write_spectrum_to_library(spectrum)
         self.spec_info = {
             'charge': {
                 charge: {
-                    'id': np.asarray(charge_info['id'], np.uint32),
+                    'id': np.asarray(charge_info['id']),
                     'precursor_mz': np.asarray(charge_info['precursor_mz'],
                                                np.float32)
                 } for charge, charge_info in temp_info.items()}
@@ -195,18 +208,12 @@ class SpectralLibraryReader:
             del self._parser
 
     def __enter__(self) -> 'SpectralLibraryReader':
-        verify_extension(['.splib','.sptxt','.mgf'], self._filename)
-        _, ext = os.path.splitext(os.path.basename(self._filename))
-
-        if ext == '.splib':
+        if self._filename_ext == '.splib':
             self.open()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        verify_extension(['.splib', '.sptxt', '.mgf'], self._filename)
-        _, ext = os.path.splitext(os.path.basename(self._filename))
-
-        if ext == '.splib':
+        if self._filename_ext == '.splib':
             self.close()
 
     @lru_cache(maxsize=None)
@@ -249,7 +256,6 @@ class SpectralLibraryReader:
         Iterator[MsmsSpectrum]
             An iterator of all spectra in the spectral library hdf5 store.
         """
-
         for spec_id in self._spectral_library_store.get_all_spectra_ids():
             yield self.read_spectrum(spec_id)
 
@@ -263,11 +269,8 @@ class SpectralLibraryReader:
         Iterator[Spectrum]
             An iterator of spectra in the given library file.
         """
-        verify_extension(['.splib', '.sptxt', '.mgf'], self._filename)
 
-        _, ext = os.path.splitext(os.path.basename(self._filename))
-
-        if ext == '.splib':
+        if self._filename_ext == '.splib':
             self._parser.seek_first_spectrum()
             try:
                 while True:
@@ -276,12 +279,11 @@ class SpectralLibraryReader:
                     yield spectrum
             except StopIteration:
                 return
-        elif ext == '.sptxt':
-            for spectrum in self.read_sptxt():
-                yield spectrum
-        elif ext == '.mgf':
-            for spectrum in read_mgf(self._filename):
-                yield spectrum
+        elif self._filename_ext == '.sptxt':
+            yield from self.read_sptxt()
+        elif self._filename_ext == '.mgf':
+            yield from read_mgf(self._filename)
+
 
     def get_version(self) -> str:
         """
@@ -311,7 +313,7 @@ class SpectralLibraryReader:
             An FragmentAnnotation object.
         """
         ion_type = annotation[0]
-        if ion_type in 'aby':
+        if ion_type in 'abyp':
             index_charge = annotation[1:].split('/', 1)[0].split('^')
             ion_index = re.search(r'^\d+', index_charge[0])
             if len(index_charge) == 1:
@@ -349,9 +351,7 @@ class SpectralLibraryReader:
         peptide = parser.parse(peptide)
         for shift, modification in enumerate(modifications):
             idx, aa, modification_name = modification.split(',')
-            peptide = peptide[:int(idx) + shift + 1] + \
-                      ['['+modification_name+']'] + \
-                      peptide[int(idx) + shift + 1:]
+            peptide.insert(int(idx) + shift + 1, '[' + modification_name + ']')
         return ''.join(peptide)
 
     def _parse_sptxt_spectrum(self, identifier: int, raw_spectrum: str)\
@@ -382,9 +382,9 @@ class SpectralLibraryReader:
         decoy = True if re.search('decoy', spectrum_metadata,
                                   re.IGNORECASE) else False
         # Retrieve peptide & charge
-        peptide_Charge = spectrum_metadata.split('\n', 1)[0].split('/')
-        peptide = peptide_Charge[0].split(' ')[-1].strip()
-        charge = int(peptide_Charge[1].strip())
+        peptide_charge = spectrum_metadata.split('\n', 1)[0].split('/')
+        peptide = peptide_charge[0].split(' ')[-1].strip()
+        charge = int(peptide_charge[1].strip())
         # Retrieve precurssor mass
         precursor_mz = re.search('PrecursorMZ:\s?[0-9]+.[0-9]+', spectrum_metadata,
                           re.IGNORECASE)
@@ -402,20 +402,23 @@ class SpectralLibraryReader:
             modifications = str(modifications.group(0)).split('/')[1:]
         else:
             modifications = None
-        # Retrieve MZ & Intensities
-        file = io.StringIO(spectrum)
-        mz_intensity_annotation = pd.read_csv(file, sep="\t", header=None)
+        # Retrieve m/z, intensity, and annotation
+        file = io.StringIO(spectrum.strip())
+        mz_intensity_annotation = np.loadtxt(file, delimiter='\t',
+                                             dtype=str, usecols=(0, 1, 2))
+
 
         if mz_intensity_annotation.shape[1] > 2:
             annotation = [self._parse_fragment_annotation(annotation)
                           for mz, annotation in
-                          zip(mz_intensity_annotation[0], mz_intensity_annotation[2])]
+                          zip(mz_intensity_annotation[:, 0].astype(float),
+                              mz_intensity_annotation[:, 2].astype(str))]
         else:
             annotation = [None] * len(mz_intensity_annotation[0])
         spectrum = MsmsSpectrum(str(identifier), float(precursor_mz.group(0)),
                                 charge,
-                                mz_intensity_annotation[0].to_numpy(copy=True),
-                                mz_intensity_annotation[1].to_numpy(copy=True))
+                                mz_intensity_annotation[:, 0].astype(float),
+                                mz_intensity_annotation[:, 1].astype(float))
 
         spectrum.peptide = self._sptxt_seq_to_proforma(peptide,modifications)
         spectrum.is_decoy = decoy
@@ -443,8 +446,8 @@ class SpectralLibraryReader:
                             re.IGNORECASE),
                         1), desc='SpectraST file parse',
                         unit='spectra'):
-                    yield (id,'\n'.join(raw_spectrum.group(0).decode(
-                        'utf-8').splitlines()))
+                yield (id,'\n'.join(raw_spectrum.group(0).decode(
+                    'utf-8').splitlines()))
 
     def read_sptxt(self) -> Iterator[MsmsSpectrum]:
         """
@@ -539,7 +542,8 @@ class SpectralLibraryStore:
         group.create_dataset('intensity', data=spectrum.intensity)
         # Encode annotation
         annotation = np.array([[_encode_ion_type(annotation.ion_type[0]),
-                                int(annotation.ion_type[1:]),
+                                0 if annotation.ion_type[0] in 'p' else int(
+                                    annotation.ion_type[1:]),
                                 annotation.charge]
                              if annotation is not None
                              else [0, 0, 0]
@@ -566,9 +570,9 @@ class SpectralLibraryStore:
         """
         spectrum_specs = self.hdf5_store[str(spec_id)]
         # Decode annotation
-        annotation = [FragmentAnnotation(_decode_ion_type(annotation[2])+
-                                         str(annotation[1]),
-                                         charge=annotation[2].astype(np.int))
+        annotation = [FragmentAnnotation(_decode_ion_type(annotation[0])+
+                                         str(annotation[1]) if annotation[0] else '',
+                                         charge=annotation[2].astype(int))
                        if np.count_nonzero(annotation)
                        else None
                        for annotation in spectrum_specs['annotation'][()]]
@@ -603,7 +607,8 @@ def _encode_ion_type(ion: str) -> int:
         The encoding digit of the ion type based on the map, else return 0.
 
     """
-    ion_type_map = {'a': 1, 'b': 2, 'y': 3}
+    ion_type_map = {'a': 1, 'b': 2, 'c': 3, 'x': 4, 'y': 5, 'z': 6, 'I': 7,
+                    'm': 8, 'p': 9, 'r': 10}
     return ion_type_map.get(ion, 0)
 
 def _decode_ion_type(ion_encoding: int) -> str:
@@ -618,7 +623,8 @@ def _decode_ion_type(ion_encoding: int) -> str:
         The encoding digit of the ion type based on the map, else return 0.
 
     """
-    ion_type_reverse_map = {1: 'a', 2: 'b', 3: 'y'}
+    ion_type_reverse_map = {1: 'a', 2: 'b', 3: 'c', 4: 'x', 5: 'y', 6: 'z',
+                            7: 'I', 8: 'm', 9: 'p', 10: 'r'}
     return ion_type_reverse_map.get(ion_encoding, '_')
 
 def verify_extension(supported_extensions: List[str], filename: str) -> None:
@@ -701,7 +707,6 @@ def _parse_spectrum_mzml(spectrum_dict: Dict) -> MsmsSpectrum:
         - Not an MS/MS spectrum.
         - Unknown precursor charge.
     """
-
     spectrum_id = spectrum_dict['id']
 
     if 'scan=' in spectrum_id:
@@ -830,13 +835,13 @@ def _leading_substitute_pattern(match: re.Match) -> str:
 
 def _mgf_seq_to_proforma(peptide: str) -> str:
     """
-    Takes a peptide in mgf format to return a modified peptide in its ProForma
-    format.
+    Takes a peptide in MassIVE-KB spectral library format to return a
+    modified peptide in its ProForma format.
 
     Parameters
     ----------
     peptide : str
-        Peptide sequence in its mgf format.
+        Peptide sequence in its MassIVE-KB spectral library format.
 
     Returns
     -------
@@ -873,7 +878,6 @@ def read_mgf(filename: str) -> Iterator[MsmsSpectrum]:
     Iterator[Spectrum]
         An iterator of spectra in the given mgf file.
     """
-
     # Get all spectra.
     with mgf.MGF(filename) as file:
         for i, mgf_spectrum in enumerate(file, 1):
@@ -966,162 +970,3 @@ def read_mztab_ssms(filename: str) -> pd.DataFrame:
     ssms.df_name = os.path.splitext(os.path.basename(filename))[0]
 
     return ssms
-
-
-def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'],
-             max_similarity: float = 0.7) -> Tuple[str, Dict[int, int]]:
-    """
-    Shuffles a peptide sequence randomly by keeping the number of tryptic
-    termini and missed internal cleavages (K,R,P). The shuffled sequence has
-    to be at least 70% dissimilar than the original sequence.
-
-    Parameters
-    ----------
-    peptide_sequence: str
-        The peptide sequence to shuffle.
-    excluded_residues: List[str]
-        The list of amino acids to maintain the tryptic property.
-
-    Returns
-    -------
-    Tuple[str, Dict[int, int]]
-        A tuple, where the first returned value is the shuffled sequence
-        and the second is the mapping indecies of the shuffle.
-    """
-    # Parse peptide
-    seq_original = parser.parse(peptide_sequence)
-    # Create a list of the indices of the residuess that should not be shuffled
-    indices_to_exclude = [i for i, elem in enumerate(seq_original[:-1]) if
-                          elem in excluded_residues] + [len(seq_original) - 1]
-
-    # Best permutation values
-    best_similarity, best_shuffled, best_permutation = 1, '', []
-    for i in range(10):
-        # Shuffle the elements of original sequence, but exclude the
-        # elements at the specified indices
-        seq_shuffled = np.array(seq_original)
-        random_permutation = np.random.permutation(
-            [i for i in range(len(seq_shuffled)) if
-             i not in indices_to_exclude])
-        random_permutation = random_permutation.tolist()
-        full_permutation = [
-            random_permutation.pop(0) if i not in indices_to_exclude else i for
-            i in range(len(seq_shuffled))]
-        seq_shuffled = seq_shuffled[full_permutation]
-        # Compute the similarity between seq_shuffled and seq_originalusing
-        #  edit distance
-        edit_distance = sum(
-            1 for x in ndiff(seq_shuffled.tolist(), seq_original) if
-            x[0] != ' ')
-        similarity = 1 - (edit_distance / len(seq_original))
-        # Check if similarity is below the specified threshold
-        if similarity <= max_similarity:
-            return ''.join(seq_shuffled), {full_permutation[i]: i  for i in
-                                           range(len(seq_original))}
-        elif similarity < best_similarity:
-            best_similarity, best_shuffled, best_permutation = similarity, ''.join(
-                seq_shuffled), full_permutation
-    return best_shuffled, {full_permutation[i]: i  for i in
-                           range(len(seq_original))}
-
-
-## Create annotation mapping for reposition support
-def _shuffle_annotation_mapping(sequence_mapping: Dict[int, int]) -> Dict[str,str]:
-    """
-    Create a mapping datastructure of the new annotations that the
-    repositioned peaks will have.
-
-    Parameters
-    ----------
-    sequence_mapping: Dict[int, int]
-        A dictionary mapping the old postions to the new postions of the
-        amino acids in the sequence.
-
-    Returns
-    -------
-    Dict[str,str]
-        A dictionary mapping the old annotations of peaks with their new
-        annotations based on the shuffled sequence.
-    """
-    annotation_mapping = {}
-    sequence_len = len(sequence_mapping)
-    for i in range(1, sequence_len):
-        old_p, new_p = i - 1, sequence_mapping[i - 1]
-        if new_p == sequence_len - 1:
-            annotation_mapping[f"b{i}"] = None
-            annotation_mapping[f"y{sequence_len-i}"] = None
-        elif old_p == new_p:
-            annotation_mapping[f"b{i}"] = f"b{i}"
-            annotation_mapping[f"y{sequence_len-i}"] = f"y{sequence_len-i}"
-        else:
-            annotation_mapping[f"b{i}"] = f"b{new_p + 1}"
-            annotation_mapping[
-                f"y{sequence_len-i}"] = f"y{sequence_len-(new_p+1)}"
-    return annotation_mapping
-
-
-def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
-    """
-    Creates a decoy spectrum from a real spectrum.
-
-    Parameters
-    ----------
-    spectrum: MsmsSpectrum
-        Real spectrum.
-
-    Returns
-    -------
-    MsmsSpectrum
-        Decoy spectrum.
-    """
-    # annotate original spectrum
-    spectrum.annotate_proforma(spectrum.peptide, 10, "ppm", "by")
-    # parse original spectrum
-    parsed_sequence = proforma.parse(spectrum.proforma)
-    shuffled_sequence, shuffled_sequence_mapping = _shuffle(
-        parsed_sequence[0].sequence)
-    # Get the fragment annotations mapping dictionary
-    shuffled_annotation_mapping = _shuffle_annotation_mapping(
-        shuffled_sequence_mapping)
-    # Constract decoy proteoform
-    for modification in parsed_sequence[0].modifications:
-        setattr(modification, 'position',
-                shuffled_sequence_mapping[modification.position])
-    decoy_proforma = proforma.Proteoform(shuffled_sequence,
-                                         parsed_sequence[0].modifications)
-
-    # Get theoretical fragment M/Z of the shuffled sequence
-    decoy_theoretical_fragments = {str(ion_type): mz for ion_type, mz in
-                                   fragment_annotation.get_theoretical_fragments(
-                                       decoy_proforma)}
-    # Reposition peaks
-    mz_shuffled, intensity_shuffled, annotation_shuffled = np.zeros_like(
-        spectrum.mz), np.zeros_like(spectrum.intensity), np.full_like(
-        spectrum.annotation, None, object)
-    for i in range(len(spectrum.mz)):
-        # Peak not annotated. Keep it at the same position.
-        if str(spectrum.annotation[i]) == '?':
-            intensity_shuffled[i] = spectrum.intensity[i]
-            mz_shuffled[i] = spectrum.mz[i]
-        # Peak annotated. Move it to the new position.
-        else:
-            intensity_shuffled[i] = spectrum.intensity[i]
-            annotation_shuffled[i] = shuffled_annotation_mapping[
-                spectrum.annotation[i][0].ion_type]
-            mz_shuffled[i] = decoy_theoretical_fragments[
-                annotation_shuffled[i]]
-    # Reorder the arrays based on the sorted mz array
-    reordered_arrays = zip(
-        *sorted(zip(mz_shuffled, intensity_shuffled, annotation_shuffled)))
-    mz_shuffled, intensity_shuffled, annotation_shuffled = map(list,
-                                                               reordered_arrays)
-    # Create a new `MsmsSpectrum` from the shuffled peaks
-    decoy_spectrum = MsmsSpectrum("DECOY_" + spectrum.identifier,
-                                  spectrum.precursor_mz,
-                                  spectrum.precursor_charge, mz_shuffled,
-                                  intensity_shuffled)
-    decoy_spectrum.proforma = decoy_proforma
-    decoy_spectrum.peptide = decoy_proforma.sequence
-    decoy_spectrum._annotation = annotation_shuffled
-
-    return decoy_spectrum

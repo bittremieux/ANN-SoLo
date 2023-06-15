@@ -145,7 +145,8 @@ cdef class SplibParser:
                 str(ion_index),charge=charge )
         annotation.clear()
 
-        spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+        spectrum = MsmsSpectrum(str(identifier), precursor_mz,
+                                precursor_charge,
                                 np.asarray(<np.float32_t[:num_peaks]> mz),
                                 np.asarray(<np.float32_t[:num_peaks]>
                                            intensity))

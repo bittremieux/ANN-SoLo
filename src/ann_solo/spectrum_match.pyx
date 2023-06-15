@@ -6,6 +6,7 @@ cimport numpy as np
 from libcpp cimport bool as bool_t
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
+from libc.stdio cimport printf, stdout, fprintf
 
 
 cdef extern from 'SpectrumMatch.h' namespace 'ann_solo' nogil:
@@ -77,15 +78,14 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
                 for index, annotation in enumerate(candidate.annotation):
                     if annotation is not None:
                         candidate.charge[index] = annotation.charge
-            mz = candidate.mz
-            intensity = candidate.intensity
+            mz = candidate.mz.astype(np.float32)
+            intensity = candidate.intensity.astype(np.float32)
             charge = candidate.charge
             candidates_vec.push_back(new Spectrum(
                 candidate.precursor_mz, candidate.precursor_charge,
                 len(candidate.mz), &mz[0], &intensity[0], &charge[0]))
-
-        mz = query.mz
-        intensity = query.intensity
+        mz = query.mz.astype(np.float32)
+        intensity = query.intensity.astype(np.float32)
         query.charge = np.zeros_like(query.mz, dtype=np.uint8)
         charge = query.charge
         query_spec = new Spectrum(
