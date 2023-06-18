@@ -169,9 +169,7 @@ class SpectralLibraryReader:
                         desc='Library spectra read', unit='spectra'):
                     if config.ad:
                         # Store the decoy information for easy retrieval.
-                        decoy_spectrum = shuffle_and_reposition(spectrum,
-                                                                config.fragment_tol_mass,
-                                                                config.fragment_tol_mode)
+                        decoy_spectrum = shuffle_and_reposition(spectrum)
                         info_charge = temp_info[decoy_spectrum.precursor_charge]
                         info_charge['id'].append(decoy_spectrum.identifier)
                         info_charge['precursor_mz'].append(

@@ -6,7 +6,7 @@ from pyteomics import parser
 from spectrum_utils import fragment_annotation, proforma
 from spectrum_utils.spectrum import MsmsSpectrum
 
-
+from ann_solo.config import config
 
 def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'],
              max_similarity: float = 0.7) -> Tuple[str, Dict[int, int]]:
@@ -91,8 +91,7 @@ def _decoy_seq_to_proforma(decoy_spectrum: MsmsSpectrum) -> str:
         return ''.join(peptide)
 
 
-def shuffle_and_reposition(spectrum: MsmsSpectrum, fragment_tol_mass: float = 10,
-                           fragment_tol_mode: str = 'ppm',) -> MsmsSpectrum:
+def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     """
     Creates a decoy spectrum from a real spectrum.
 
@@ -100,19 +99,14 @@ def shuffle_and_reposition(spectrum: MsmsSpectrum, fragment_tol_mass: float = 10
     ----------
     spectrum: MsmsSpectrum
         Real spectrum.
-    fragment_tol_mass : float
-        Fragment mass tolerance to match spectrum peaks against theoretical
-        peaks.
-    fragment_tol_mode : {'Da', 'ppm'}
-        Fragment mass tolerance unit. Either 'Da' or 'ppm'.
     Returns
     -------
     MsmsSpectrum
         Decoy spectrum.
     """
     # annotate original spectrum
-    spectrum.annotate_proforma(spectrum.peptide, fragment_tol_mass,
-                               fragment_tol_mode, "aby",
+    spectrum.annotate_proforma(spectrum.peptide, config.fragment_tol_mass,
+                               config.fragment_tol_mode, "aby",
                                neutral_losses=True)
     # parse original spectrum
     parsed_sequence = proforma.parse(spectrum.proforma)
