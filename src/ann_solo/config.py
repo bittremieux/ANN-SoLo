@@ -217,17 +217,13 @@ class Config:
 
         # Add decoys.
         self._parser.add_argument(
-            '-ad', action='store_true',
+            '--add_decoys', action='store_true',
             help="generate decoys of the spectral library ")
 
         self._parser.add_argument(
             '--fragment_tol_mode', type=str, choices=['Da', 'ppm'], default='ppm',
             help='Fragment mass tolerance unit. Either (options: %(choices)s)')
 
-        self._parser.add_argument(
-            '--fragment_tol_mass', default=10, type=int,
-            help='Fragment mass tolerance to match spectrum peaks against '
-                 'theoretical peaks. (default: %(default)s)')
 
         # Filled in 'parse', contains the specified settings.
         self._namespace = None

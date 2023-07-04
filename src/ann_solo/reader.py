@@ -167,7 +167,7 @@ class SpectralLibraryReader:
                 for spectrum in tqdm.tqdm(
                         lib_reader.read_library_file(),
                         desc='Library spectra read', unit='spectra'):
-                    if config.ad:
+                    if config.add_decoys:
                         # Store the decoy information for easy retrieval.
                         decoy_spectrum = shuffle_and_reposition(spectrum)
                         info_charge = temp_info[decoy_spectrum.precursor_charge]

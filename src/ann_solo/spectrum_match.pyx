@@ -6,7 +6,6 @@ cimport numpy as np
 from libcpp cimport bool as bool_t
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
-from libc.stdio cimport printf, stdout, fprintf
 
 
 cdef extern from 'SpectrumMatch.h' namespace 'ann_solo' nogil:

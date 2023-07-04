@@ -2,7 +2,6 @@ from difflib import ndiff
 from typing import List, Tuple, Dict
 
 import numpy as np
-from pyteomics import parser
 from spectrum_utils import fragment_annotation, proforma
 from spectrum_utils.spectrum import MsmsSpectrum
 
@@ -29,7 +28,7 @@ def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'
         and the second is the mapping indecies of the shuffle.
     """
     # Parse peptide
-    seq_original = parser.parse(peptide_sequence)
+    seq_original = list(peptide_sequence)
     # Create a list of the indices of the residuess that should not be shuffled
     indices_to_exclude = [i for i, elem in enumerate(seq_original[:-1]) if
                           elem in excluded_residues] + [len(seq_original) - 1]
@@ -62,7 +61,7 @@ def _shuffle(peptide_sequence: str, excluded_residues: List[str] =['K', 'R', 'P'
         elif similarity < best_similarity:
             best_similarity, best_shuffled, best_permutation = similarity, ''.join(
                 seq_shuffled), full_permutation
-    return best_shuffled, {full_permutation[i]:i  for i in
+    return best_shuffled, {best_permutation[i]:i  for i in
                            range(len(seq_original))}
 
 def _decoy_seq_to_proforma(decoy_spectrum: MsmsSpectrum) -> str:
@@ -83,7 +82,7 @@ def _decoy_seq_to_proforma(decoy_spectrum: MsmsSpectrum) -> str:
     if decoy_spectrum.proforma.modifications is None:
         return decoy_spectrum.proforma.sequence
     else:
-        peptide = parser.parse(decoy_spectrum.proforma.sequence)
+        peptide = list(decoy_spectrum.proforma.sequence)
         modifications = {mod.position: mod.mass for mod in
                          decoy_spectrum.proforma.modifications}
         for shift, position in enumerate(sorted(modifications.keys())):
@@ -105,8 +104,8 @@ def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
         Decoy spectrum.
     """
     # annotate original spectrum
-    spectrum.annotate_proforma(spectrum.peptide, config.fragment_tol_mass,
-                               config.fragment_tol_mode, "aby",
+    spectrum.annotate_proforma(spectrum.peptide, config.fragment_mz_tolerance,
+                               config.fragment_tol_mode, "abpy",
                                neutral_losses=True)
     # parse original spectrum
     parsed_sequence = proforma.parse(spectrum.proforma)
@@ -117,7 +116,7 @@ def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     genuine_peptide_theoretical_fragments = {
     str(ion.ion_type) + '^' + str(ion.charge): mz for ion, mz in
     fragment_annotation.get_theoretical_fragments(
-        parsed_sequence[0], ion_types="aby",
+        parsed_sequence[0], ion_types="abpy",
         max_charge=spectrum.precursor_charge,
         neutral_losses=fragment_annotation._neutral_loss)}
 
@@ -133,7 +132,7 @@ def shuffle_and_reposition(spectrum: MsmsSpectrum) -> MsmsSpectrum:
     decoy_theoretical_fragments = {
     str(ion.ion_type) + '^' + str(ion.charge): mz for ion, mz in
     fragment_annotation.get_theoretical_fragments(
-        decoy_proforma, ion_types="aby",
+        decoy_proforma, ion_types="abpy",
         max_charge=spectrum.precursor_charge,
         neutral_losses=fragment_annotation._neutral_loss)}
 
