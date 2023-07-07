@@ -262,8 +262,8 @@ def test_shuffle_and_reposition(original_spectrum, expected_decoy_spectrum):
            Counter(original_spectrum.proforma.sequence)
 
     # Check if the generated spectrum is almost equal to the expected
-    np.testing.assert_allclose(original_spectrum.mz,
+    np.testing.assert_allclose(decoy_spectrum.mz,
                                expected_decoy_spectrum.mz,
                                rtol=0.1)
-    np.testing.assert_allclose(original_spectrum.intensity,
+    np.testing.assert_allclose(decoy_spectrum.intensity,
                                expected_decoy_spectrum.intensity)
