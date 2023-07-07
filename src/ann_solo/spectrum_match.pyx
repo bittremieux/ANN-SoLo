@@ -77,21 +77,19 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
                 for index, annotation in enumerate(candidate.annotation):
                     if annotation is not None:
                         candidate.charge[index] = annotation.charge
-            mz = candidate.mz
-            intensity = candidate.intensity
+            mz = candidate.mz.astype(np.float32)
+            intensity = candidate.intensity.astype(np.float32)
             charge = candidate.charge
             candidates_vec.push_back(new Spectrum(
                 candidate.precursor_mz, candidate.precursor_charge,
                 len(candidate.mz), &mz[0], &intensity[0], &charge[0]))
-
-        mz = query.mz
-        intensity = query.intensity
+        mz = query.mz.astype(np.float32)
+        intensity = query.intensity.astype(np.float32)
         query.charge = np.zeros_like(query.mz, dtype=np.uint8)
         charge = query.charge
         query_spec = new Spectrum(
             query.precursor_mz, query.precursor_charge, len(query.mz),
             &mz[0], &intensity[0], &charge[0])
-
         with nogil:
             query_matcher = new SpectrumMatcher()
             result = query_matcher.dot(query_spec, candidates_vec,
@@ -99,7 +97,6 @@ def get_best_match(query, candidates, fragment_mz_tolerance, allow_shift):
             candidate_index = result.getCandidateIndex()
             score = result.getScore()
             peak_matches = result.getPeakMatches()[0]
-
         return (candidates[candidate_index], score,
                 [peak_matches[i] for i in range(peak_matches.size())])
     finally:

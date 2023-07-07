@@ -12,7 +12,9 @@ from posix.fcntl cimport open
 from posix.fcntl cimport O_RDONLY
 from posix.unistd cimport off_t
 from spectrum_utils.spectrum import MsmsSpectrum
-from spectrum_utils.spectrum import PeptideFragmentAnnotation
+from spectrum_utils.fragment_annotation import FragmentAnnotation
+
+
 
 
 cdef extern from 'sys/mman.h' nogil:
@@ -139,16 +141,18 @@ cdef class SplibParser:
         for i in range(num_peaks):
             ion_type, ion_index, charge = annotation[i]
             if charge != -1:
-                annotation_p[i] = PeptideFragmentAnnotation(
-                    charge, mz[i], ion_type.decode(), ion_index)
+                annotation_p[i] = FragmentAnnotation( str(ion_type.decode()) +
+                str(ion_index),charge=charge )
         annotation.clear()
 
-        spectrum = MsmsSpectrum(identifier, precursor_mz, precursor_charge,
+        spectrum = MsmsSpectrum(str(identifier), precursor_mz,
+                                precursor_charge,
                                 np.asarray(<np.float32_t[:num_peaks]> mz),
                                 np.asarray(<np.float32_t[:num_peaks]>
-                                           intensity), annotation_p,
-                                is_decoy=is_decoy)
+                                           intensity))
         spectrum.peptide = peptide.decode()
+        spectrum._annotation = annotation_p
+        spectrum.is_decoy = is_decoy
 
         free(mz)
         free(intensity)
@@ -162,6 +166,7 @@ cdef (string, int, int) parse_annotation(string raw) nogil:
     cdef char ion_type = raw.at(0)
     cdef int ion_index = -1
     cdef int charge = -1
+
     # Discard peaks that don't correspond to typical ion types.
     if ion_type == b'a' or ion_type == b'b' or ion_type == b'y':
         # The ion index is the subsequent numeric part.

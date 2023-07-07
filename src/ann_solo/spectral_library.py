@@ -63,7 +63,7 @@ class SpectralLibrary:
         try:
             self._library_reader = reader.SpectralLibraryReader(
                 filename, self._get_hyperparameter_hash())
-            self._library_reader.open()
+
         except FileNotFoundError as e:
             logging.error(e)
             raise
@@ -149,8 +149,8 @@ class SpectralLibrary:
             for charge in charges}
 
         i = {charge: 0 for charge in charge_vectors.keys()}
-        for lib_spectrum, _ in tqdm.tqdm(
-                self._library_reader.get_all_spectra(),
+        for lib_spectrum in tqdm.tqdm(
+                self._library_reader.read_all_spectra(),
                 desc='Library spectra added', leave=False, unit='spectra',
                 smoothing=0.1):
             charge = lib_spectrum.precursor_charge
@@ -207,7 +207,6 @@ class SpectralLibrary:
             (specified in the config).
         """
         logging.info('Process file %s', query_filename)
-
         # Read all spectra in the query file and
         # split based on their precursor charge
         query_spectra = collections.defaultdict(list)
@@ -227,7 +226,6 @@ class SpectralLibrary:
                 if process_spectrum(query_spectrum_charge, False).is_valid:
                     (query_spectra[query_spectrum_charge.precursor_charge]
                      .append(query_spectrum_charge))
-
         # Identify all query spectra.
         identifications = {}
         do_cascade_open = (
@@ -284,7 +282,6 @@ class SpectralLibrary:
             threshold (specified in the config).
         """
         num_spectra = sum([len(q) for q in query_spectra.values()])
-
         if mode == 'std':
             logging.debug('Process %d query spectra using a standard search '
                           '(Δm = %s %s)',
@@ -297,7 +294,6 @@ class SpectralLibrary:
                           num_spectra,
                           config.precursor_tolerance_mass_open,
                           config.precursor_tolerance_mode_open)
-
         ssms = {}
         batch_size = config.batch_size
         with tqdm.tqdm(desc='Query spectra processed', total=num_spectra,
@@ -453,7 +449,7 @@ class SpectralLibrary:
         for candidate_filter in candidate_filters:
             query_candidates = []
             for idx in library_candidates['id'][candidate_filter]:
-                candidate = self._library_reader.get_spectrum(idx, True)
+                candidate = self._library_reader.read_spectrum(idx, True)
                 if candidate.is_valid:
                     query_candidates.append(candidate)
             yield query_candidates

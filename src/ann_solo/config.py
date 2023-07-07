@@ -215,6 +215,16 @@ class Config:
             help="don't use the GPU for ANN searching (default: GPU is used "
                  "if available)")
 
+        # Add decoys.
+        self._parser.add_argument(
+            '--add_decoys', action='store_true',
+            help="generate decoys of the spectral library ")
+
+        self._parser.add_argument(
+            '--fragment_tol_mode', type=str, choices=['Da', 'ppm'], default='ppm',
+            help='Fragment mass tolerance unit. Either (options: %(choices)s)')
+
+
         # Filled in 'parse', contains the specified settings.
         self._namespace = None
 
