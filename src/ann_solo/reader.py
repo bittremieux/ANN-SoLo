@@ -14,13 +14,14 @@ import numpy as np
 import pandas as pd
 import tqdm
 from lxml.etree import LxmlError
-from pyteomics import mgf, mzml, mzxml, parser
+from pyteomics import fasta, mass, mgf, mzml, mzxml, parser
 from spectrum_utils.spectrum import MsmsSpectrum
 from spectrum_utils.fragment_annotation import FragmentAnnotation
 
 from ann_solo.config import config
-from ann_solo.decoy_generator import shuffle_and_reposition
+from ann_solo.decoy_generator import shuffle_and_reposition, _shuffle
 from ann_solo.parsers import SplibParser
+from ann_solo.prosit import get_predictions
 from ann_solo.spectrum import process_spectrum
 
 
@@ -260,7 +261,7 @@ class SpectralLibraryReader:
 
     def read_library_file(self) -> Iterator[MsmsSpectrum]:
         """
-        Read all spectra from the splib library file.
+        Read/generate all spectra from spectral library or FASTA file.
 
         Returns
         -------
@@ -281,6 +282,8 @@ class SpectralLibraryReader:
             yield from self.read_sptxt()
         elif self._filename_ext == '.mgf':
             yield from read_mgf(self._filename)
+        elif self._filename_ext == '.fasta':
+            yield from read_fasta(self._filename)
 
 
     def get_version(self) -> str:
@@ -933,6 +936,85 @@ def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
         return read_mzml(filename)
     elif ext == '.mzxml':
         return read_mzxml(filename)
+
+
+def read_fasta(filename: str) -> Iterator[MsmsSpectrum]:
+    """
+    Read protein sequences from a FASTA file, and process them to predict
+    both genuine and decoy peptide spectra using Prosit.
+
+    Parameters
+    ----------
+    filename: str
+        The FASTA file name from which to read the protein sequences.
+
+    Returns
+    -------
+    Iterator[MsmsSpectrum]
+        An iterator of processed spectra.
+    """
+    missed_cleavages = 2
+
+    filename = filename  # FASTA file name
+    proteins = [
+        protein.sequence for protein in fasta.read(filename)
+    ]
+    tryptic_peptides = set().union(
+        *[
+            parser.cleave(peptide, "trypsin", missed_cleavages)
+            for peptide in proteins
+        ]
+    )
+    tryptic_peptides = list(tryptic_peptides)
+
+    ## Initializations of variables
+    tryptic_list_size = len(tryptic_peptides)
+    collision_energy = config.collision_energy
+
+    peptides = tryptic_peptides.copy()
+    peptides.extend(peptides)
+    precursor_charges = [2] * tryptic_list_size
+    precursor_charges = precursor_charges.extend([3] * tryptic_list_size)
+    precursor_mz = [
+        mass.fast_mass(sequence=peptide, ion_type="M", charge=precursor_charges[i]) for
+        i, peptide in range(peptides)]
+    collision_energies = [collision_energy] * (tryptic_list_size * 2)
+
+    ## Generate predictions for genuine peptides
+    for batch_id, genuine_peptides_batch in enumerate(get_predictions(
+                            peptides, precursor_charges, collision_energies)):
+        offset = batch_id * config.prosit_batch_size
+        for idx, intensities in enumerate(genuine_peptides_batch['intensities']):
+            spectrum = MsmsSpectrum(str(offset + idx),
+                                    precursor_mz[offset + idx],
+                                    precursor_charges[offset + idx],
+                                    genuine_peptides_batch['mz'][idx],
+                                    intensities)
+
+            spectrum.peptide = peptides[offset + idx]
+            spectrum._annotation = genuine_peptides_batch['annotation'][idx]
+            spectrum.is_decoy = False
+            yield spectrum
+
+    ## Generate predictions for decoy peptides
+    peptides = [_shuffle(peptide)[0] for peptide in tryptic_peptides]
+    peptides.extend(peptides)
+
+    for batch_id, decoy_peptides_batch in enumerate(get_predictions(
+                            peptides, precursor_charges, collision_energies), True):
+        offset = batch_id * config.prosit_batch_size
+        for idx, intensities in enumerate(decoy_peptides_batch['intensities']):
+            spectrum = MsmsSpectrum('Decoy_' + str(offset + idx),
+                                    precursor_mz[offset + idx],
+                                    precursor_charges[offset + idx],
+                                    decoy_peptides_batch['mz'][idx],
+                                    intensities)
+
+            spectrum.peptide = peptides[offset + idx]
+            spectrum._annotation = decoy_peptides_batch['annotation'][idx]
+            spectrum.is_decoy = True
+            yield spectrum
+
 
 def read_mztab_ssms(filename: str) -> pd.DataFrame:
     """

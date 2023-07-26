@@ -224,6 +224,26 @@ class Config:
             '--fragment_tol_mode', type=str, choices=['Da', 'ppm'], default='ppm',
             help='Fragment mass tolerance unit. Either (options: %(choices)s)')
 
+        # Prosit
+        # Prosit batch size.
+        self._parser.add_argument(
+            '--prosit_batch_size', default=1000, type=int,
+            help='maximum number of peptides to generate predictions for '
+                 'using prosit server (default: %(default)s)')
+        # Collision energy.
+        self._parser.add_argument(
+            '--collision_energy', default=32, type=int,
+            help='collision energy used by prosit to generate spectrum '
+                 'predictions of given peptides (default: %(default)s)')
+        # Prosit server URL.
+        self._parser.add_argument(
+            '--prosit_server_url', default="koina.proteomicsdb.org:443",
+            type=str, help='koina server url (default: %(default)s)')
+        # Prosit model name.
+        self._parser.add_argument(
+            '--prosit_model_name', default="Prosit_2020_intensity_HCD", type=str,
+            help='Prosit model name to use for predictions (default: %('
+                 'default)s)')
 
         # Filled in 'parse', contains the specified settings.
         self._namespace = None
