@@ -2,12 +2,12 @@ from typing import Dict, List
 
 import numpy as np
 import tqdm
-import tritonclient.grpc as grpcclient
+from koinapy import Koina
 
 from ann_solo.config import config
 
-def get_predictions(peptides: List(str), precursor_charges: List(int),
-                    collision_energies: List(int), decoy: bool = False) -> \
+def get_predictions(peptides: List[str], precursor_charges: List[int],
+                    collision_energies: List[int], decoy: bool = False) -> \
         Dict[str, np.ndarray]:
     """
     Predict spectra from the list of peptides.
@@ -30,55 +30,32 @@ def get_predictions(peptides: List(str), precursor_charges: List(int),
         A dictionary of spectra for each peptide, particularly containing
         intensities,  mz,  annotations for each spectrum.
     """
-    nptype_convert = {
-        np.dtype('float32'): 'FP32',
-        np.dtype('O'): 'BYTES',
-        np.dtype('int16'): 'INT16',
-        np.dtype('int32'): 'INT32',
-        np.dtype('int64'): 'INT64',
-    }
 
-    server_url = config.prosit_server_url
-    model_name = config.prosit_model_name
     batch_size = config.prosit_batch_size
-    inputs = {
-        'peptide_sequences': np.array(peptides, dtype=np.dtype("O")).reshape
-            ([tot ,1]),
-        'precursor_charges': np.array(precursor_charges, dtype=np.dtype("int32")).reshape
-            ([tot ,1]),
-        'collision_energies': np.array(collision_energies, dtype=np.dtype("float32")).reshape
-            ([tot ,1]),
-    }
-    outputs = [ 'intensities',  'mz',  'annotation', ]
+    len_inputs = list(peptides)
 
-    triton_client = grpcclient.InferenceServerClient(url=server_url, ssl=True)
-
-    koina_outputs = []
-    for name in outputs:
-        koina_outputs.append(grpcclient.InferRequestedOutput(name))
-
-    len_inputs = list(inputs.values())[0].shape[0]
     for i in tqdm.tqdm(range(0, len_inputs, batch_size),
             desc='Prosit peptides batch prediction:',
             unit=('decoy' if decoy else 'genuine') + ' peptides'):
-        predictions = {name: [] for name in outputs}
-        if len_inputs < i+ batch_size:
-            current_batchsize = len_inputs
-        else:
-            current_batchsize = batch_size
 
-        koina_inputs = []
-        for iname, iarr in inputs.items():
-            koina_inputs.append(
-                grpcclient.InferInput(iname, [current_batchsize, 1],
-                                      nptype_convert[iarr.dtype])
-            )
-            koina_inputs[-1].set_data_from_numpy(iarr[i:i + current_batchsize])
+        inputs = pd.DataFrame()
+        inputs['peptide_sequences'] = np.array(peptides[i:i + batch_size])
+        inputs['precursor_charges'] = np.array(precursor_charges[i:i + batch_size])
+        inputs['collision_energies'] = np.array(collision_energies[i:i + batch_size])
 
-        prediction = triton_client.infer(model_name, inputs=koina_inputs,
-                                         outputs=koina_outputs)
+        model = Koina(config.prosit_model_name, config.prosit_server_url)
+        koina_predictions = model.predict(inputs)
 
-        for name in outputs:
-            predictions[name].append(prediction.as_numpy(name))
+        grouped_predictions = koina_predictions.groupby(
+            ['peptide_sequences', 'precursor_charges', 'collision_energies']
+        ).agg(
+            {
+                'intensities': list,
+                'mz': list,
+                'annotation': list
+            }
+        ).reset_index()
+
+        predictions = grouped_predictions.to_dict(orient='list')
 
         yield predictions

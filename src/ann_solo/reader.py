@@ -297,40 +297,6 @@ class SpectralLibraryReader:
         """
         return 'null'
 
-    def _parse_fragment_annotation(self, annotation: str) -> \
-            FragmentAnnotation:
-        """
-        Takes an ion peak anotaion line and parse to retrieve: ion_type,
-        ion_index, and charge.
-
-        Parameters
-        ----------
-        annotation : str
-            Raw annotation line.
-
-        Returns
-        -------
-        FragmentAnnotation
-            An FragmentAnnotation object.
-        """
-        ion_type = annotation[0]
-        if ion_type in 'abyp':
-            index_charge = annotation[1:].split('/', 1)[0].split('^')
-            ion_index = re.search(r'^\d+', index_charge[0])
-            if len(index_charge) == 1:
-                charge, ion_index = (
-                1 if ion_index.group(0) == index_charge[0] else -1,
-                int(ion_index.group(0)))
-            else:
-                charge = re.search(r'^\d+', index_charge[1])
-                charge, ion_index = int(
-                    charge.group(0)) if charge else -1, int(
-                    ion_index.group(0)) if ion_index else 1
-            return FragmentAnnotation(str(ion_type)+str(ion_index),
-                                      charge=abs(charge))
-        else:
-            return None
-
     def _sptxt_seq_to_proforma(self, peptide: str, modifications: List[str]) \
             -> str:
         """
@@ -410,7 +376,7 @@ class SpectralLibraryReader:
 
 
         if mz_intensity_annotation.shape[1] > 2:
-            annotation = [self._parse_fragment_annotation(annotation)
+            annotation = [_parse_fragment_annotation(annotation)
                           for mz, annotation in
                           zip(mz_intensity_annotation[:, 0].astype(float),
                               mz_intensity_annotation[:, 2].astype(str))]
@@ -595,6 +561,40 @@ class SpectralLibraryStore:
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close_store()
+
+def _parse_fragment_annotation(annotation: str) -> \
+        FragmentAnnotation:
+    """
+    Takes an ion peak anotaion line and parse to retrieve: ion_type,
+    ion_index, and charge.
+
+    Parameters
+    ----------
+    annotation : str
+        Raw annotation line.
+
+    Returns
+    -------
+    FragmentAnnotation
+        An FragmentAnnotation object.
+    """
+    ion_type = annotation[0]
+    if ion_type in 'abyp':
+        index_charge = annotation[1:].split('/', 1)[0].split('^')
+        ion_index = re.search(r'^\d+', index_charge[0])
+        if len(index_charge) == 1:
+            charge, ion_index = (
+            1 if ion_index.group(0) == index_charge[0] else -1,
+            int(ion_index.group(0)))
+        else:
+            charge = re.search(r'^\d+', index_charge[1])
+            charge, ion_index = int(
+                charge.group(0)) if charge else -1, int(
+                ion_index.group(0)) if ion_index else 1
+        return FragmentAnnotation(str(ion_type)+str(ion_index),
+                                  charge=abs(charge))
+    else:
+        return None
 
 def _encode_ion_type(ion: str) -> int:
     """
@@ -941,7 +941,7 @@ def read_query_file(filename: str) -> Iterator[MsmsSpectrum]:
 def read_fasta(filename: str) -> Iterator[MsmsSpectrum]:
     """
     Read protein sequences from a FASTA file, and process them to predict
-    both genuine and decoy peptide spectra using Prosit.
+    both target and decoy peptide spectra using Prosit.
 
     Parameters
     ----------
@@ -953,65 +953,73 @@ def read_fasta(filename: str) -> Iterator[MsmsSpectrum]:
     Iterator[MsmsSpectrum]
         An iterator of processed spectra.
     """
-    missed_cleavages = 2
-
-    filename = filename  # FASTA file name
     proteins = [
         protein.sequence for protein in fasta.read(filename)
     ]
-    tryptic_peptides = set().union(
-        *[
-            parser.cleave(peptide, "trypsin", missed_cleavages)
-            for peptide in proteins
-        ]
-    )
-    tryptic_peptides = list(tryptic_peptides)
 
-    ## Initializations of variables
-    tryptic_list_size = len(tryptic_peptides)
-    collision_energy = config.collision_energy
+    _peptides = []
 
-    peptides = tryptic_peptides.copy()
-    peptides.extend(peptides)
-    precursor_charges = [2] * tryptic_list_size
-    precursor_charges = precursor_charges.extend([3] * tryptic_list_size)
+    ## Get all peptides based on desired protease types
+    for protease_type in config.proteases:
+        retrieved_peptides = set().union(
+            *[
+                parser.cleave(protein, protease_type, config.missed_cleavages)
+                for protein in proteins
+            ]
+        )
+        _peptides.extend(retrieved_peptides)
+
+    ## Initialize lists to pass to Prosit
+    _peptides_size = len(_peptides)
+    peptides = []
+    precursor_charges = []
+    collision_energies = []
+    for collision_energy in config.collision_energies:
+        for precursor_charge in range(config.min_precursor_charge,
+                                      config.max_precursor_charge + 1):
+            peptides.extend(_peptides)
+            collision_energies.extend([collision_energy] * _peptides_size)
+            precursor_charges.extend([precursor_charge] * _peptides_size)
+
     precursor_mz = [
-        mass.fast_mass(sequence=peptide, ion_type="M", charge=precursor_charges[i]) for
-        i, peptide in range(peptides)]
-    collision_energies = [collision_energy] * (tryptic_list_size * 2)
+        mass.fast_mass(sequence=peptide, ion_type="M",
+                       charge=precursor_charges[i]) for
+        i, peptide in enumerate(peptides)]
 
-    ## Generate predictions for genuine peptides
-    for batch_id, genuine_peptides_batch in enumerate(get_predictions(
+    ## Generate predictions for target peptides
+    for batch_id, target_peptides_batch in enumerate(get_predictions(
                             peptides, precursor_charges, collision_energies)):
         offset = batch_id * config.prosit_batch_size
-        for idx, intensities in enumerate(genuine_peptides_batch['intensities']):
+        for idx, intensities in enumerate(target_peptides_batch['intensities']):
             spectrum = MsmsSpectrum(str(offset + idx),
                                     precursor_mz[offset + idx],
                                     precursor_charges[offset + idx],
-                                    genuine_peptides_batch['mz'][idx],
+                                    target_peptides_batch['mz'][idx],
                                     intensities)
 
             spectrum.peptide = peptides[offset + idx]
-            spectrum._annotation = genuine_peptides_batch['annotation'][idx]
+            spectrum._annotation = [_parse_fragment_annotation(
+                annotation.decode('utf-8')) for annotation in
+                target_peptides_batch['annotation'][idx]]
             spectrum.is_decoy = False
             yield spectrum
 
     ## Generate predictions for decoy peptides
-    peptides = [_shuffle(peptide)[0] for peptide in tryptic_peptides]
-    peptides.extend(peptides)
-
+    peptides = [_shuffle(peptide)[0] for peptide in peptides]
     for batch_id, decoy_peptides_batch in enumerate(get_predictions(
                             peptides, precursor_charges, collision_energies), True):
         offset = batch_id * config.prosit_batch_size
         for idx, intensities in enumerate(decoy_peptides_batch['intensities']):
-            spectrum = MsmsSpectrum('Decoy_' + str(offset + idx),
+            spectrum = MsmsSpectrum('DECOY_' + str(offset + idx),
                                     precursor_mz[offset + idx],
                                     precursor_charges[offset + idx],
                                     decoy_peptides_batch['mz'][idx],
                                     intensities)
 
             spectrum.peptide = peptides[offset + idx]
-            spectrum._annotation = decoy_peptides_batch['annotation'][idx]
+            spectrum._annotation = [_parse_fragment_annotation(
+                annotation.decode('utf-8')) for annotation in
+                decoy_peptides_batch['annotation'][idx]]
             spectrum.is_decoy = True
             yield spectrum
 
