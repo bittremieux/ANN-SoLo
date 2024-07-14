@@ -36,7 +36,7 @@ def get_predictions(peptides: List[str], precursor_charges: List[int],
 
     for i in tqdm.tqdm(range(0, len_inputs, batch_size),
             desc='Prosit peptides batch prediction:',
-            unit=('decoy' if decoy else 'genuine') + ' peptides'):
+            unit=('decoy' if decoy else 'target') + ' peptides'):
 
         inputs = pd.DataFrame()
         inputs['peptide_sequences'] = np.array(peptides[i:i + batch_size])
