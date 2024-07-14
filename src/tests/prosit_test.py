@@ -5,7 +5,7 @@ import numpy as np
 from ann_solo.prosit import get_predictions
 
 
-def test_prosit_predictions():
+def test_get_predictions():
     # This function tests the spectrum prediction of a peptide using prosit.
 
     peptide_sequences = ["AAAAAKAK"]
