@@ -21,7 +21,7 @@ def get_predictions(peptides: List[str], precursor_charges: List[int],
     collision_energies: List(int)
         Synced list of collision_energies.
     decoy: bool = False
-        Boolean precising whether the peptides are genuine or decoys.
+        Boolean precising whether the peptides are target or decoys.
 
 
     Returns
