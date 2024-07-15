@@ -260,10 +260,10 @@ class Config:
             '--missed_cleavages', type=int, default=2,
             help='missed cleavages value used to cleave the protein sequence '
                  'and retrieve peptides (default: %(default)s)')
-        # proteases.
+        # protease.
         self._parser.add_argument(
-            '--proteases', nargs='+', type=str, default=['trypsin'],
-            help='list of proteases used to cleave the protein sequence '
+            '--protease', type=str, default='trypsin',
+            help='protease used to cleave the protein sequence '
                  'and retrieve peptides (default: %(default)s)')
 
         # Filled in 'parse', contains the specified settings.

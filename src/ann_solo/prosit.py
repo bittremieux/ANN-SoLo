@@ -32,16 +32,19 @@ def get_predictions(peptides: List[str], precursor_charges: List[int],
     """
 
     batch_size = config.prosit_batch_size
-    len_inputs = list(peptides)
+    len_inputs = len(peptides)
 
     for i in tqdm.tqdm(range(0, len_inputs, batch_size),
             desc='Prosit peptides batch prediction:',
             unit=('decoy' if decoy else 'target') + ' peptides'):
 
-        inputs = pd.DataFrame()
-        inputs['peptide_sequences'] = np.array(peptides[i:i + batch_size])
-        inputs['precursor_charges'] = np.array(precursor_charges[i:i + batch_size])
-        inputs['collision_energies'] = np.array(collision_energies[i:i + batch_size])
+        inputs = pd.DataFrame(
+            {
+                "peptide_sequences": peptides[i:i + batch_size],
+                "precursor_charges": precursor_charges[i:i + batch_size],
+                "collision_energies": collision_energies[i:i + batch_size],
+            }
+        )
 
         model = Koina(config.prosit_model_name, config.prosit_server_url)
         koina_predictions = model.predict(inputs)

@@ -957,17 +957,13 @@ def read_fasta(filename: str) -> Iterator[MsmsSpectrum]:
         protein.sequence for protein in fasta.read(filename)
     ]
 
-    _peptides = []
-
-    ## Get all peptides based on desired protease types
-    for protease_type in config.proteases:
-        retrieved_peptides = set().union(
-            *[
-                parser.cleave(protein, protease_type, config.missed_cleavages)
-                for protein in proteins
-            ]
-        )
-        _peptides.extend(retrieved_peptides)
+    ## Get all peptides based on desired protease
+    _peptides = set().union(
+        *[
+            parser.cleave(protein, config.protease, config.missed_cleavages)
+            for protein in proteins
+        ]
+    )
 
     ## Initialize lists to pass to Prosit
     _peptides_size = len(_peptides)
