@@ -224,6 +224,47 @@ class Config:
             '--fragment_tol_mode', type=str, choices=['Da', 'ppm'], default='ppm',
             help='Fragment mass tolerance unit. Either (options: %(choices)s)')
 
+        # Prosit
+        # Prosit batch size.
+        self._parser.add_argument(
+            '--prosit_batch_size', default=1000, type=int,
+            help='maximum number of peptides to generate predictions for '
+                 'using prosit server (default: %(default)s)')
+        # Prosit server URL.
+        self._parser.add_argument(
+            '--prosit_server_url', default="koina.proteomicsdb.org:443",
+            type=str, help='koina server url (default: %(default)s)')
+        # Prosit model name.
+        self._parser.add_argument(
+            '--prosit_model_name', default="Prosit_2020_intensity_HCD",
+            type=str,
+            help='Prosit model name to use for predictions (default: %('
+                 'default)s)')
+        # min_precursor_charge.
+        self._parser.add_argument(
+            '--min_precursor_charge', type=int, default=2,
+            help='min precursor charge value used for spectra Prosit '
+                 'predictions (default: %(default)s)')
+        # max_precursor_charge.
+        self._parser.add_argument(
+            '--max_precursor_charge', type=int, default=3,
+            help='max precursor charge value used for spectra Prosit '
+                 'predictions (default: %(default)s)')
+        # Collision energies.
+        self._parser.add_argument(
+            '--collision_energies', nargs='+', type=int, default=[32],
+            help='list of collision energies used by prosit to generate '
+                 'spectrum predictions of given peptides (default: %(default)s)')
+        # missed cleavages.
+        self._parser.add_argument(
+            '--missed_cleavages', type=int, default=2,
+            help='missed cleavages value used to cleave the protein sequence '
+                 'and retrieve peptides (default: %(default)s)')
+        # protease.
+        self._parser.add_argument(
+            '--protease', type=str, default='trypsin',
+            help='protease used to cleave the protein sequence '
+                 'and retrieve peptides (default: %(default)s)')
 
         # Filled in 'parse', contains the specified settings.
         self._namespace = None
