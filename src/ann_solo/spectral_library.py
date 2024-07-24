@@ -13,12 +13,14 @@ import faiss
 import numexpr as ne
 import numpy as np
 import tqdm
+from sklearn.random_projection import SparseRandomProjection
 from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo import reader
 from ann_solo import spectrum_match
 from ann_solo import utils
 from ann_solo.config import config
+from ann_solo.spectrum import get_dim
 from ann_solo.spectrum import process_spectrum
 from ann_solo.spectrum import spectrum_to_vector
 from ann_solo.spectrum import SpectrumSpectrumMatch
@@ -115,6 +117,12 @@ class SpectralLibrary:
             if create_ann_charges:
                 self._create_ann_indexes(create_ann_charges)
 
+        # Gaussian vector projection
+        _vec_len, _, _ = get_dim(config.min_mz, config.max_mz, config.bin_size)
+        self._transformation = (
+            SparseRandomProjection(config.low_dim, random_state=0).fit(
+                np.zeros((1, _vec_len))).components_.astype(np.float32).T)
+
     def _get_hyperparameter_hash(self) -> str:
         """
         Get a unique string representation of the hyperparameters used to
@@ -155,10 +163,15 @@ class SpectralLibrary:
                 smoothing=0.1):
             charge = lib_spectrum.precursor_charge
             if charge in charge_vectors.keys():
-                spectrum_to_vector(process_spectrum(lib_spectrum, True),
-                                   config.min_mz, config.max_mz,
-                                   config.bin_size, config.hash_len, True,
-                                   charge_vectors[charge][i[charge]])
+                charge_vectors[charge][i[charge]] = spectrum_to_vector(
+                    process_spectrum(lib_spectrum, True),
+                    self._transformation,
+                    config.min_mz,
+                    config.max_mz,
+                    config.bin_size,
+                    config.low_dim,
+                    norm=True,
+                )
                 i[charge] += 1
         # Build an individual FAISS index per charge.
         logging.info('Build the spectral library ANN indexes')
@@ -435,9 +448,15 @@ class SpectralLibrary:
             query_vectors = np.zeros((len(query_spectra), config.hash_len),
                                      np.float32)
             for i, query_spectrum in enumerate(query_spectra):
-                spectrum_to_vector(
-                    query_spectrum, config.min_mz, config.max_mz,
-                    config.bin_size, config.hash_len, True, query_vectors[i])
+                query_vectors[i] = spectrum_to_vector(
+                    query_spectrum,
+                    self._transformation,
+                    config.min_mz,
+                    config.max_mz,
+                    config.bin_size,
+                    config.low_dim,
+                    norm=True,
+                )
             mask = np.zeros_like(candidate_filters)
             # noinspection PyArgumentList
             for mask_i, ann_filter in zip(mask, ann_index.search(

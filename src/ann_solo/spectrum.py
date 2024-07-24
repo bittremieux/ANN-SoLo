@@ -5,6 +5,7 @@ from typing import List, Optional
 import mmh3
 import numba as nb
 import numpy as np
+import scipy.sparse as ss
 from spectrum_utils.spectrum import MsmsSpectrum
 
 from ann_solo.config import config
@@ -163,7 +164,7 @@ def hash_idx(bin_idx: int, hash_len: int) -> int:
     return mmh3.hash(str(bin_idx), 42, signed=False) % hash_len
 
 
-def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
+def _spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
                        bin_size: float, hash_len: int, norm: bool = True,
                        vector: np.ndarray = None) -> np.ndarray:
     """
@@ -213,6 +214,57 @@ def spectrum_to_vector(spectrum: MsmsSpectrum, min_mz: float, max_mz: float,
         vector /= np.linalg.norm(vector)
     return vector
 
+
+def spectrum_to_vector(spectrum: MsmsSpectrum, transformation: ss.csr_matrix,
+                       min_mz: float, max_mz: float, bin_size: float, dim: int,
+                       norm: bool) -> np.ndarray:
+    """
+    Convert a single spectrum to a dense NumPy vector.
+
+    Peaks are first discretized to mass bins of width `bin_size` starting from
+    `min_mz`, after which they are transformed using sparse random projections.
+
+    Parameters
+    ----------
+    spectrum : MsmsSpectrum
+        The spectrum to be converted to a vector.
+    transformation : ss.csr_matrix
+        Sparse random projection transformation to convert sparse spectrum
+        vectors to low-dimensional dense vectors.
+    min_mz : float
+        The minimum m/z to include in the vector.
+    max_mz : float
+        The maximum m/z to include in the vector.
+    bin_size : float
+        The bin size in m/z used to divide the m/z range.
+    dim : int
+        The high-resolution vector dimensionality.
+    norm : bool
+        Normalize the vector to unit length or not.
+    Returns
+    -------
+    np.ndarray
+        The low-dimensional transformed spectrum vector with unit length.
+    """
+    # set the spectrum range between min and max mz
+    spectrum = spectrum.set_mz_range(min_mz, max_mz)
+    # Convert a spectrum to a binned sparse vector
+    data = np.array(spectrum.intensity, dtype=np.float32)
+    indices = np.array(
+        [math.floor((mz - min_mz) / bin_size) for mz in spectrum.mz],
+        dtype=np.int32)
+    indptr = np.array([0, len(spectrum.mz)], dtype=np.int32)
+
+    # Instantiate the sparse matrix
+    sparse_vector = ss.csr_matrix(
+        (data, indices, indptr), (1, dim), np.float32, False)
+
+    # Transform
+    transformed_vector = (sparse_vector @ transformation).toarray()
+    if norm:
+        transformed_vector /= np.linalg.norm(transformed_vector)
+
+    return transformed_vector.ravel()
 
 class SpectrumSpectrumMatch:
 

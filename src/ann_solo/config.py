@@ -179,6 +179,10 @@ class Config:
         self._parser.add_argument(
             '--bin_size', default=0.04, type=float,
             help='ANN vector bin width (default: %(default)s Da)')
+        # ANN vector length after gaussian random projection.
+        self._parser.add_argument(
+            '--low_dim', default=400, type=int,
+            help='ANN vector length (default: %(default)s)')
         # ANN vector length after hashing.
         self._parser.add_argument(
             '--hash_len', default=800, type=int,
